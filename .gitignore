@@ -13,10 +13,11 @@ dist/
 .ruff_cache/
 .pytest_cache/
 
-# Data / artifacts (later milestones)
-replays/
-data/
-checkpoints/
+# Data / artifacts (later milestones). Anchored to the repo root: an unanchored
+# `data/` also matches the `lategame/data/` source package and silently un-tracks it.
+/replays/
+/data/
+/checkpoints/
 *.log
 
 # OS / editor
