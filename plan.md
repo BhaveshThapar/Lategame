@@ -305,11 +305,21 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   full 6-mon, in-distribution POV + exact labels (**0% decision drop** vs v1's 9.4%). **Fixing
   the shift did NOT break the plateau** (controlled, n=100 vs heuristic: v2 offrl 11% / bc 6% vs
   v1 offrl 8% / bc 5% — within noise). The shift was real but **not the binding constraint**.
-- **Conclusion across six methods (BC, offline AWR, self-play, transformer+critic, PPO,
-  human-replay v1+v2): the limiter is the hand-crafted 720-d encoder**, which carries no
-  species/move/item *identity* — evidenced by low ~32% imitation accuracy on the faithful v2 POV.
-  The next untested lever is **identity embeddings** (a v2 encoder), not more/better trajectory
-  data or a different RL objective. This sharpens Data Plan §10 and ML Approach §11.
+- **R-ENCODE (learned species/move/item/ability ID embeddings) — built, and its cheap BC gate
+  is a decisive negative.** The v2 encoder appends identity ID channels and the EntityTransformer
+  learns an embedding per id; a controlled BC ablation (embeddings ON vs OFF, 3 seeds, same
+  faithful v2 shard) shows identity **hurts** imitation accuracy — **ON 26.9% vs OFF 36.0%**
+  (best-by-val-loss val_acc), with the ON arm overfitting instantly (early-stop epoch 2–3, train
+  acc barely 62%). At 4196 winners-only samples over a ~1600-species vocab the embeddings are
+  un-learnable (most rows see <5 examples). Kill criterion triggered → did not proceed to the
+  offrl/PPO retrain. (Aside: transformer-numerics OFF ~36% edges the historical MLP ~32% — a
+  small architecture lift, not identity.)
+- **Conclusion across seven methods (BC, offline AWR, self-play, transformer+critic, PPO,
+  human-replay v1+v2, identity embeddings): the binding constraint is DATA QUANTITY**, not the
+  algorithm / objective / critic / architecture / encoder. Identity is not a cheap win at this
+  data scale; pursuing it would require a much larger replay scrape OR pre-initialized embeddings
+  (usage stats / species2vec), not learned-from-scratch on a few thousand samples. This sharpens
+  Data Plan §10 and ML Approach §11 toward **data scale** as the next lever.
 
 ---
 
