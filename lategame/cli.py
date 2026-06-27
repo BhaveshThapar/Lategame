@@ -66,6 +66,8 @@ def _run_train(args: argparse.Namespace) -> None:
         lr=args.lr,
         hidden_dim=args.hidden_dim,
         device=args.device,
+        model_type=args.model_type,
+        id_embed=args.id_embed,
     )
     train_bc(args.data, args.out, config)
 
@@ -268,6 +270,19 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--lr", type=float, default=1e-3)
     train.add_argument("--hidden-dim", type=int, default=256)
     train.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    train.add_argument(
+        "--model-type",
+        default="bc_policy",
+        choices=["bc_policy", "entity_transformer", "actor_critic"],
+        help="Architecture: flat MLP (default) or factory model",
+    )
+    train.add_argument(
+        "--no-id-embed",
+        dest="id_embed",
+        action="store_false",
+        help="entity_transformer: disable learned species/move/item/ability embeddings (ablation)",
+    )
+    train.set_defaults(id_embed=True)
 
     collect_rl = sub.add_parser(
         "collect-rl", help="Generate an offline-RL dataset (all turns + shaped rewards)"

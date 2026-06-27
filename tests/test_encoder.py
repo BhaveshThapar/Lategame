@@ -22,12 +22,18 @@ from lategame.features.encoder import (
 
 
 class FakePokemon:
-    def __init__(self, types, hp=1.0, active=True, fainted=False, status=None):
+    def __init__(
+        self, types, hp=1.0, active=True, fainted=False, status=None,
+        species=None, item=None, ability=None,
+    ):
         self.types = types
         self.current_hp_fraction = hp
         self.active = active
         self.fainted = fainted
         self.status = status
+        self.species = species  # id-str or None (-> UNK)
+        self.item = item
+        self.ability = ability
         self.boosts = {k: 0 for k in ("atk", "def", "spa", "spd", "spe", "accuracy", "evasion")}
         self.base_stats = {k: 100 for k in ("hp", "atk", "def", "spa", "spd", "spe")}
         self.moves = {}
@@ -78,6 +84,26 @@ def test_encode_pokemon_sets_type_and_hp():
     assert vec[3] == 0.5  # hp fraction
     fire_idx = 4 + encoder._TYPE_INDEX[PokemonType.FIRE]
     assert vec[fire_idx] == 1.0
+
+
+def test_encode_pokemon_appends_identity_ids():
+    from lategame.features import vocab
+
+    v = vocab.load_vocab()
+    mon = FakePokemon(
+        types=[PokemonType.GROUND],
+        species="greattusk",
+        item="leftovers",
+        ability="protosynthesis",
+    )
+    vec = _encode_pokemon(mon)
+    # POKEMON_ID_FIELDS order: species, item, ability -- the trailing 3 channels.
+    assert vec[-3] == v.index("species", "greattusk") > 0
+    assert vec[-2] == v.index("items", "leftovers") > 0
+    assert vec[-1] == v.index("abilities", "protosynthesis") > 0
+    # Unknown/None identity -> UNK (0).
+    bare = FakePokemon(types=[PokemonType.GROUND])
+    assert list(_encode_pokemon(bare)[-3:]) == [0.0, 0.0, 0.0]
 
 
 def test_embed_battle_is_fixed_size_float32():

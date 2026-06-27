@@ -16,11 +16,15 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader, random_split
 
 from lategame.data.dataset import BCDataset
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
-from lategame.model.policy import BCPolicy, masked_logits
+from lategame.model.factory import build_model, model_metadata
+from lategame.model.policy import BCPolicy, masked_logits, policy_logits
+
+BC_POLICY = "bc_policy"  # model_type sentinel for the flat MLP (factory has no BCPolicy).
 
 
 def select_device(prefer: str = "auto") -> torch.device:
@@ -44,10 +48,27 @@ class TrainConfig:
     weight_decay: float = 1e-4
     seed: int = 0
     device: str = "auto"
+    model_type: str = BC_POLICY  # BC_POLICY (flat MLP) | "entity_transformer" | "actor_critic"
+    id_embed: bool = True  # entity_transformer only: learned species/move/item/ability ids
+    id_embed_dim: int = 32
+
+
+def _build_model(config: TrainConfig, device: torch.device) -> nn.Module:
+    """BC_POLICY -> flat MLP (legacy default); anything else -> factory architecture."""
+    if config.model_type == BC_POLICY:
+        return BCPolicy(OBS_DIM, hidden_dim=config.hidden_dim, dropout=config.dropout).to(device)
+    meta = {
+        "model_type": config.model_type,
+        "input_dim": OBS_DIM,
+        "dropout": config.dropout,
+        "hidden_dim": config.hidden_dim,
+        "arch": {"id_embed": config.id_embed, "id_embed_dim": config.id_embed_dim},
+    }
+    return build_model(meta).to(device)
 
 
 def _run_epoch(
-    model: BCPolicy,
+    model: nn.Module,
     loader: DataLoader,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None,
@@ -61,7 +82,7 @@ def _run_epoch(
     with torch.set_grad_enabled(training):
         for obs, action, mask in loader:
             obs, action, mask = obs.to(device), action.to(device), mask.to(device)
-            logits = masked_logits(model(obs), mask)
+            logits = masked_logits(policy_logits(model(obs)), mask)
             loss = F.cross_entropy(logits, action)
             if optimizer is not None:
                 optimizer.zero_grad()
@@ -86,7 +107,7 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
-    model = BCPolicy(OBS_DIM, hidden_dim=config.hidden_dim, dropout=config.dropout).to(device)
+    model = _build_model(config, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
     best_val = float("inf")
@@ -109,7 +130,7 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
 
 
 def _save_checkpoint(
-    model: BCPolicy,
+    model: nn.Module,
     out_path: str | Path,
     battle_format: str,
     config: TrainConfig,
@@ -117,15 +138,22 @@ def _save_checkpoint(
 ) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(model, BCPolicy):
+        meta = {
+            "model_type": BC_POLICY,
+            "hidden_dim": config.hidden_dim,
+            "n_actions": model.n_actions,
+        }
+    else:
+        meta = model_metadata(model)
     torch.save(
         {
             "state_dict": model.state_dict(),
             "input_dim": OBS_DIM,
-            "hidden_dim": config.hidden_dim,
-            "n_actions": model.n_actions,
             "obs_version": OBS_VERSION,
             "battle_format": battle_format,
             "metrics": metrics,
+            **meta,
         },
         out_path,
     )
