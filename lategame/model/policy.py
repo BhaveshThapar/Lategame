@@ -27,6 +27,17 @@ def masked_logits(logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return logits.masked_fill(~mask, NEG_INF)
 
 
+def policy_logits(
+    out: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+) -> torch.Tensor:
+    """Policy logits from a model output, dropping the value head if it returns a tuple.
+
+    Lets the BC loop/agent consume ``BCPolicy`` (logits) and the actor-critic /
+    entity-transformer (``(policy_logits, value_logits)``) interchangeably.
+    """
+    return out[0] if isinstance(out, tuple) else out
+
+
 class BCPolicy(nn.Module):
     """Feed-forward policy: ``input_dim`` features -> ``n_actions`` logits."""
 

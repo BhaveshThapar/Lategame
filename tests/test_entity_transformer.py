@@ -11,7 +11,14 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION  # noqa: E402
+from lategame.features.encoder import (  # noqa: E402
+    MOVE_ID_FIELDS,
+    OBS_DIM,
+    OBS_LAYOUT,
+    OBS_VERSION,
+    POKEMON_ID_FIELDS,
+)
+from lategame.features.vocab import vocab_sizes  # noqa: E402
 from lategame.model.actor_critic import ActorCritic  # noqa: E402
 from lategame.model.entity_transformer import EntityTransformer  # noqa: E402
 from lategame.model.factory import (  # noqa: E402
@@ -23,8 +30,25 @@ from lategame.model.factory import (  # noqa: E402
 _SMALL = dict(d_model=32, n_layers=1, n_heads=2, ff_dim=64)
 
 
-def _tiny_transformer(n_bins=21):
-    return EntityTransformer(OBS_DIM, n_bins=n_bins, **_SMALL)
+def _tiny_transformer(n_bins=21, id_embed=True):
+    return EntityTransformer(OBS_DIM, n_bins=n_bins, id_embed=id_embed, **_SMALL)
+
+
+def _valid_obs(n, rng=None):
+    """Random obs whose trailing ID channels hold valid (in-range) embedding indices."""
+    rng = rng or np.random.default_rng(0)
+    sizes = vocab_sizes()
+    layout = OBS_LAYOUT
+    obs = rng.standard_normal((n, OBS_DIM)).astype(np.float32)
+    for tok in range(layout.n_pokemon_tokens):
+        base = tok * layout.pokemon_dim + layout.pokemon_numeric_dim
+        for off, cat in enumerate(POKEMON_ID_FIELDS):
+            obs[:, base + off] = rng.integers(0, sizes[cat], size=n)
+    for tok in range(layout.n_moves):
+        base = layout.moves_start + tok * layout.move_dim + layout.move_numeric_dim
+        for off, cat in enumerate(MOVE_ID_FIELDS):
+            obs[:, base + off] = rng.integers(0, sizes[cat], size=n)
+    return obs
 
 
 def test_forward_shapes():
@@ -97,7 +121,7 @@ def test_metadata_roundtrip_reproduces_outputs():
     rebuilt = build_model(meta).eval()
     load_actor_critic_weights(rebuilt, src.state_dict())
 
-    x = torch.randn(5, OBS_DIM)
+    x = torch.from_numpy(_valid_obs(5))
     with torch.no_grad():
         a_logits, a_val = src(x)
         b_logits, b_val = rebuilt(x)
@@ -105,12 +129,39 @@ def test_metadata_roundtrip_reproduces_outputs():
     assert torch.allclose(a_val, b_val, atol=1e-6)
 
 
+def test_id_embeddings_present_when_enabled_and_absent_when_off():
+    sizes = vocab_sizes()
+    on = _tiny_transformer(id_embed=True)
+    assert set(on.embeddings.keys()) == {f"emb_{c}" for c in (*POKEMON_ID_FIELDS, *MOVE_ID_FIELDS)}
+    assert on.embeddings["emb_species"].weight.shape[0] == sizes["species"]
+
+    off = _tiny_transformer(id_embed=False)
+    assert len(off.embeddings) == 0
+    # Fewer params without the embedding tables + wider projections.
+    assert sum(p.numel() for p in off.parameters()) < sum(p.numel() for p in on.parameters())
+
+    x = torch.from_numpy(_valid_obs(3))
+    for model in (on, off):
+        logits, value = model(x)
+        assert logits.shape == (3, 26)
+        assert value.shape == (3, 21)
+
+
+def test_id_embed_flag_round_trips_through_metadata():
+    off = _tiny_transformer(id_embed=False).eval()
+    meta = {**model_metadata(off), "input_dim": OBS_DIM}
+    assert meta["arch"]["id_embed"] is False
+    rebuilt = build_model(meta)
+    assert isinstance(rebuilt, EntityTransformer) and rebuilt.id_embed is False
+    rebuilt.load_state_dict(off.state_dict())
+
+
 def _make_rl_npz(path, n=64, episode_len=16):
     from lategame.data.collect import TrajectoryDataset, save_rl
     from lategame.data.reward import RewardWeights
 
     rng = np.random.default_rng(0)
-    obs = rng.standard_normal((n, OBS_DIM)).astype(np.float32)
+    obs = _valid_obs(n, rng)
     action = rng.integers(0, 26, size=n).astype(np.int64)
     mask = np.ones((n, 26), dtype=bool)
     reward = rng.standard_normal(n).astype(np.float32)
@@ -185,6 +236,37 @@ def test_train_offline_rl_transformer_selfplay_continuation(tmp_path):
     ckpt1 = torch.load(second, map_location="cpu", weights_only=False)
     assert ckpt1["model_type"] == MODEL_ENTITY_TRANSFORMER
     assert ckpt1["v_min"] == ckpt0["v_min"] and ckpt1["v_max"] == ckpt0["v_max"]
+
+
+def test_train_bc_dispatches_entity_transformer(tmp_path):
+    # BC is no longer hardcoded to the flat MLP: model_type routes through the factory,
+    # and the checkpoint stamps model_type/arch so the bc agent rebuilds the transformer.
+    from lategame.data.collect import Dataset, save
+    from lategame.train.bc import TrainConfig, train_bc
+
+    rng = np.random.default_rng(1)
+    obs = _valid_obs(64, rng)
+    action = rng.integers(0, 26, size=64).astype(np.int64)
+    mask = np.ones((64, 26), dtype=bool)
+    data_path = tmp_path / "bc.npz"
+    save(Dataset(obs, action, mask, "gen9randombattle"), data_path)
+
+    ckpt_path = tmp_path / "bc_et.pt"
+    metrics = train_bc(
+        data_path,
+        ckpt_path,
+        TrainConfig(
+            epochs=1, batch_size=32, device="cpu",
+            model_type=MODEL_ENTITY_TRANSFORMER, id_embed=True,
+        ),
+    )
+    assert "val_acc" in metrics
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    assert ckpt["model_type"] == MODEL_ENTITY_TRANSFORMER
+    assert ckpt["arch"]["id_embed"] is True
+    model = build_model(ckpt)
+    model.load_state_dict(ckpt["state_dict"])
+    assert isinstance(model, EntityTransformer)
 
 
 def test_bc_warm_start_into_transformer_rejected(tmp_path):

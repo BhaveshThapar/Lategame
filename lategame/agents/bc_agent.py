@@ -36,8 +36,9 @@ class BCAgent(Player):
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
         import torch
+        from torch import nn
 
-        from lategame.model.policy import BCPolicy, masked_logits
+        from lategame.model.policy import masked_logits, policy_logits
 
         path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
         if not path.exists():
@@ -52,15 +53,24 @@ class BCAgent(Player):
                 f"{ckpt.get('input_dim')} vs encoder {OBS_VERSION}/{OBS_DIM}). Retrain."
             )
 
-        model = BCPolicy(
-            ckpt["input_dim"], hidden_dim=ckpt["hidden_dim"], n_actions=ckpt["n_actions"]
-        )
+        model: nn.Module
+        if ckpt.get("model_type", "bc_policy") == "bc_policy":
+            from lategame.model.policy import BCPolicy
+
+            model = BCPolicy(
+                ckpt["input_dim"], hidden_dim=ckpt["hidden_dim"], n_actions=ckpt["n_actions"]
+            )
+        else:
+            from lategame.model.factory import build_model
+
+            model = build_model(ckpt)
         model.load_state_dict(ckpt["state_dict"])
         model.eval()
 
         self._torch = torch
         self._model = model
         self._masked_logits = masked_logits
+        self._policy_logits = policy_logits
         self._sample = sample
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
@@ -71,7 +81,7 @@ class BCAgent(Player):
         obs = torch.from_numpy(embed_battle(battle)).float().unsqueeze(0)
         mask = torch.from_numpy(action_mask(battle)).unsqueeze(0)
         with torch.no_grad():
-            logits = self._masked_logits(self._model(obs), mask)
+            logits = self._masked_logits(self._policy_logits(self._model(obs)), mask)
             if self._sample:
                 action = int(torch.multinomial(torch.softmax(logits, dim=1), 1).item())
             else:

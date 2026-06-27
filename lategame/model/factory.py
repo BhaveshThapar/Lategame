@@ -54,6 +54,8 @@ def build_model(meta: Mapping[str, Any]) -> nn.Module:
             n_layers=int(arch.get("n_layers", 2)),
             n_heads=int(arch.get("n_heads", 4)),
             ff_dim=int(arch.get("ff_dim", 256)),
+            id_embed=bool(arch.get("id_embed", True)),
+            id_embed_dim=int(arch.get("id_embed_dim", 32)),
         )
 
     raise ValueError(f"Unknown model_type {model_type!r}; expected one of {KNOWN_MODELS}.")

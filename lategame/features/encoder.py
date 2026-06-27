@@ -41,8 +41,11 @@ from poke_env.battle import (
 from poke_env.battle.side_condition import STACKABLE_CONDITIONS
 
 from lategame.engine.damage import normalize_accuracy, score_move
+from lategame.features import vocab
 
-OBS_VERSION = "v1"
+# Folds the vocab content hash into the version, so the existing obs-version guard on
+# shards/checkpoints also rejects an obs encoded against a different identity vocab.
+OBS_VERSION = f"v2-{vocab.vocab_version()}"
 
 # Stable index maps. Enum iteration order is fixed (aliases excluded), so these
 # define a deterministic, versioned feature layout.
@@ -77,8 +80,24 @@ _POKEMON_SCALARS = 4  # present, active, fainted, hp_fraction
 _MOVE_SCALARS = 6  # present, base_power, accuracy, priority, pp_fraction, score
 _GLOBAL_SCALARS = 4  # turn, force_switch, can_tera, maybe_trapped
 
-_POKEMON_DIM = _POKEMON_SCALARS + len(_TYPES) + len(_STATUSES) + len(_BOOST_KEYS) + len(_STAT_KEYS)
-_MOVE_DIM = _MOVE_SCALARS + len(_CATEGORIES) + len(_TYPES)
+# Identity ID channels (R-ENCODE): trailing integer channels per entity block, each a
+# ``vocab`` index (0 = none/unknown) the model looks up in a learned embedding table.
+# Kept at the END of every block so the "present" flag stays at index 0 and the numeric
+# features stay contiguous -- the transformer splits ``[numeric | ids]`` by these counts.
+POKEMON_ID_FIELDS = ("species", "items", "abilities")
+MOVE_ID_FIELDS = ("moves",)
+_POKEMON_ID_CHANNELS = len(POKEMON_ID_FIELDS)
+_MOVE_ID_CHANNELS = len(MOVE_ID_FIELDS)
+
+_POKEMON_DIM = (
+    _POKEMON_SCALARS
+    + len(_TYPES)
+    + len(_STATUSES)
+    + len(_BOOST_KEYS)
+    + len(_STAT_KEYS)
+    + _POKEMON_ID_CHANNELS
+)
+_MOVE_DIM = _MOVE_SCALARS + len(_CATEGORIES) + len(_TYPES) + _MOVE_ID_CHANNELS
 _GLOBAL_DIM = len(_WEATHERS) + len(_FIELDS) + 2 * len(_SIDE_CONDITIONS) + _GLOBAL_SCALARS
 
 OBS_DIM = _TEAM_SIZE * 2 * _POKEMON_DIM + _N_MOVES * _MOVE_DIM + _GLOBAL_DIM
@@ -100,6 +119,18 @@ class ObsLayout:
     pokemon_dim: int
     move_dim: int
     global_dim: int
+    pokemon_id_channels: int = 0
+    move_id_channels: int = 0
+
+    @property
+    def pokemon_numeric_dim(self) -> int:
+        """Numeric (non-ID) channels per Pokemon block; ID channels are the trailing tail."""
+        return self.pokemon_dim - self.pokemon_id_channels
+
+    @property
+    def move_numeric_dim(self) -> int:
+        """Numeric (non-ID) channels per move block; ID channels are the trailing tail."""
+        return self.move_dim - self.move_id_channels
 
     @property
     def n_pokemon_tokens(self) -> int:
@@ -128,6 +159,8 @@ OBS_LAYOUT = ObsLayout(
     pokemon_dim=_POKEMON_DIM,
     move_dim=_MOVE_DIM,
     global_dim=_GLOBAL_DIM,
+    pokemon_id_channels=_POKEMON_ID_CHANNELS,
+    move_id_channels=_MOVE_ID_CHANNELS,
 )
 
 
@@ -168,7 +201,11 @@ def _encode_pokemon(mon: Pokemon | None) -> np.ndarray:
     base_stats = np.array(
         [mon.base_stats.get(k, 0) / _STAT_SCALE for k in _STAT_KEYS], dtype=np.float32
     )
-    return np.concatenate([flags, types, status, boosts, base_stats])
+    # Trailing ID channels, in POKEMON_ID_FIELDS order (species, item, ability).
+    ids = np.array(
+        [vocab.species_id(mon), vocab.item_id(mon), vocab.ability_id(mon)], dtype=np.float32
+    )
+    return np.concatenate([flags, types, status, boosts, base_stats, ids])
 
 
 def _encode_move(
@@ -192,7 +229,9 @@ def _encode_move(
     )
     category = _one_hot(_CATEGORY_INDEX.get(move.category), len(_CATEGORIES))
     move_type = _one_hot(_TYPE_INDEX.get(move.type) if move.type else None, len(_TYPES))
-    return np.concatenate([scalars, category, move_type])
+    # Trailing ID channel, in MOVE_ID_FIELDS order (move).
+    ids = np.array([vocab.move_id(move)], dtype=np.float32)
+    return np.concatenate([scalars, category, move_type, ids])
 
 
 def _presence(active: dict, members: list) -> np.ndarray:
