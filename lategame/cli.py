@@ -8,11 +8,15 @@
     python -m lategame.cli train-rl --data data/gen9rb_rl.npz --bc-init checkpoints/bc.pt
     python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
     python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
+    python -m lategame.cli fetch-replays --min-rating 1200 --limit 200
+    python -m lategame.cli resim-replays --out data/resim_gen9rb_rl.npz
 
 ``collect``/``train`` are the M2 BC pipeline; ``collect-rl``/``train-rl`` are the
 M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop; ``ppo`` is
-the M5 on-policy PPO self-play loop. Torch is imported lazily inside the train handlers
-so ``evaluate``/``play``/``collect``/``collect-rl`` keep running without ``[ml]``.
+the M5 on-policy PPO self-play loop. ``fetch-replays`` + ``ingest-replays`` are the M6
+human-replay pipeline (public-log POV); ``resim-replays`` is M6 v2, re-simulating each
+replay's inputlog for a full-fidelity (request-based) POV. Torch is imported lazily inside
+the train handlers so the eval/collect/data commands keep running without ``[ml]``.
 """
 
 from __future__ import annotations
@@ -203,6 +207,32 @@ def _run_ingest_replays(args: argparse.Namespace) -> None:
     )
 
 
+def _run_resim_replays(args: argparse.Namespace) -> None:
+    from lategame.data.replays import cached_replay_paths
+    from lategame.data.resim import resim_and_save
+    from lategame.data.reward import RewardWeights
+
+    paths = cached_replay_paths(args.cache_dir)
+    if not paths:
+        raise SystemExit(f"No cached replays under '{args.cache_dir}'. Run `fetch-replays` first.")
+    weights = RewardWeights(
+        hp_value=args.hp_value,
+        fainted_value=args.fainted_value,
+        status_value=args.status_value,
+        victory_value=args.victory_value,
+    )
+    resim_and_save(
+        paths,
+        rl_out=args.out,
+        bc_out=args.bc_out,
+        weights=weights,
+        gamma=args.gamma,
+        battle_format=args.battle_format,
+        showdown_dir=args.showdown_dir,
+        node=args.node,
+    )
+
+
 def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
     agents = ", ".join(AGENTS)
     parser.add_argument("--p1", required=True, help=f"Agent for player 1 ({agents})")
@@ -388,6 +418,34 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
     )
+
+    resim = sub.add_parser(
+        "resim-replays",
+        help="Re-simulate cached replays for full-fidelity POV shards (M6 v2)",
+    )
+    resim.add_argument(
+        "--cache-dir", default="replays/gen9randombattle", help="Cached replay JSON dir"
+    )
+    resim.add_argument(
+        "--out", default="data/resim_gen9rb_rl.npz", help="Offline-RL shard output (.npz)"
+    )
+    resim.add_argument(
+        "--bc-out", default="data/resim_gen9rb_bc.npz", help="Winners-only BC shard (.npz)"
+    )
+    resim.add_argument(
+        "--showdown-dir",
+        default="third_party/pokemon-showdown",
+        help="Vendored pokemon-showdown dir (must have a built dist/)",
+    )
+    resim.add_argument("--node", default="node", help="Node executable for the resim driver")
+    resim.add_argument("--gamma", type=float, default=0.99, help="Return discount")
+    resim.add_argument("--hp-value", type=float, default=0.3, help="Shaping: HP weight")
+    resim.add_argument("--fainted-value", type=float, default=1.0, help="Shaping: faint")
+    resim.add_argument("--status-value", type=float, default=0.1, help="Shaping: status")
+    resim.add_argument("--victory-value", type=float, default=1.0, help="Terminal win/loss")
+    resim.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
     return parser
 
 
@@ -411,6 +469,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_fetch_replays(args)
     elif args.command == "ingest-replays":
         _run_ingest_replays(args)
+    elif args.command == "resim-replays":
+        _run_resim_replays(args)
 
 
 if __name__ == "__main__":

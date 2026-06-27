@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -214,6 +214,84 @@ def _episode_rewards(
     return [nv - v for v, nv in zip(values, next_values, strict=True)]
 
 
+@dataclass
+class _ShardBuilder:
+    """Accumulates labelled POV episodes into the ``collect`` on-disk schema.
+
+    Shared by public-log ingestion (this module) and re-sim ingestion
+    (``data.resim``): both yield a per-POV ``(battle, records, values)`` and differ
+    only in *how* those are reconstructed, not in how they are aggregated/saved.
+    """
+
+    obs: list[np.ndarray] = field(default_factory=list)
+    act: list[int] = field(default_factory=list)
+    mask: list[np.ndarray] = field(default_factory=list)
+    rew: list[float] = field(default_factory=list)
+    done: list[bool] = field(default_factory=list)
+    bc_obs: list[np.ndarray] = field(default_factory=list)
+    bc_act: list[int] = field(default_factory=list)
+    bc_mask: list[np.ndarray] = field(default_factory=list)
+
+    def add_pov(
+        self,
+        battle: AbstractBattle,
+        records: list[_Record],
+        values: list[float],
+        weights: RewardWeights,
+    ) -> int:
+        """Append one finished POV's turns; return the count kept (0 if unusable).
+
+        Computes per-turn shaped rewards, marks the last turn ``done``, and mirrors
+        winning POVs into the BC shard -- the M2 reward filter.
+        """
+        rewards = _episode_rewards(battle, records, values, weights)
+        if not rewards:
+            return 0
+        won = bool(battle.won)
+        last = len(records) - 1
+        for i, ((obs, action, mask), r) in enumerate(zip(records, rewards, strict=True)):
+            self.obs.append(obs)
+            self.act.append(action)
+            self.mask.append(mask)
+            self.rew.append(r)
+            self.done.append(i == last)
+            if won:
+                self.bc_obs.append(obs)
+                self.bc_act.append(action)
+                self.bc_mask.append(mask)
+        return len(records)
+
+    def finalize(
+        self, battle_format: str, gamma: float, weights: RewardWeights
+    ) -> tuple[TrajectoryDataset, Dataset | None]:
+        """Stack the columns into the RL shard (+ winners-only BC shard)."""
+        if not self.obs:
+            raise RuntimeError(
+                "No labelled turns reconstructed from any replay -- check the input format."
+            )
+        rl = TrajectoryDataset(
+            obs=np.stack(self.obs).astype(np.float32),
+            action=np.asarray(self.act, dtype=np.int64),
+            mask=np.stack(self.mask).astype(bool),
+            reward=np.asarray(self.rew, dtype=np.float32),
+            done=np.asarray(self.done, dtype=bool),
+            battle_format=battle_format,
+            gamma=gamma,
+            weights=weights,
+        )
+        bc = (
+            Dataset(
+                obs=np.stack(self.bc_obs).astype(np.float32),
+                action=np.asarray(self.bc_act, dtype=np.int64),
+                mask=np.stack(self.bc_mask).astype(bool),
+                battle_format=battle_format,
+            )
+            if self.bc_obs
+            else None
+        )
+        return rl, bc
+
+
 def _gen_from_log(log: str) -> int:
     for line in log.split("\n"):
         if line.startswith("|gen|"):
@@ -237,14 +315,7 @@ def ingest_replays(
     turns (the M2 reward filter). Both use the exact ``collect`` on-disk schema.
     """
     weights = weights or RewardWeights()
-    obs_c: list[np.ndarray] = []
-    act_c: list[int] = []
-    mask_c: list[np.ndarray] = []
-    rew_c: list[float] = []
-    done_c: list[bool] = []
-    bc_obs: list[np.ndarray] = []
-    bc_act: list[int] = []
-    bc_mask: list[np.ndarray] = []
+    builder = _ShardBuilder()
     stats = IngestStats()
 
     for replay in replays:
@@ -269,52 +340,16 @@ def ingest_replays(
                     lines, str(username), f"{tag}-{username}", gen, weights
                 )
                 stats.dropped_turns += dropped
-                rewards = _episode_rewards(battle, records, values, weights)
-                if not rewards:
-                    continue
-                stats.episodes += 1
-                stats.turns += len(records)
-                won = bool(battle.won)
-                for i, ((obs, action, mask), r) in enumerate(zip(records, rewards, strict=True)):
-                    obs_c.append(obs)
-                    act_c.append(action)
-                    mask_c.append(mask)
-                    rew_c.append(r)
-                    done_c.append(i == len(records) - 1)
-                    if won:
-                        bc_obs.append(obs)
-                        bc_act.append(action)
-                        bc_mask.append(mask)
+                kept = builder.add_pov(battle, records, values, weights)
+                if kept:
+                    stats.episodes += 1
+                    stats.turns += kept
         except Exception:  # noqa: BLE001 -- a single bad replay shouldn't kill the run
             stats.skipped_replays += 1
             continue
         stats.parsed += 1
 
-    if not obs_c:
-        raise RuntimeError(
-            "No labelled turns reconstructed from any replay -- check the input format."
-        )
-
-    rl = TrajectoryDataset(
-        obs=np.stack(obs_c).astype(np.float32),
-        action=np.asarray(act_c, dtype=np.int64),
-        mask=np.stack(mask_c).astype(bool),
-        reward=np.asarray(rew_c, dtype=np.float32),
-        done=np.asarray(done_c, dtype=bool),
-        battle_format=battle_format,
-        gamma=gamma,
-        weights=weights,
-    )
-    bc = (
-        Dataset(
-            obs=np.stack(bc_obs).astype(np.float32),
-            action=np.asarray(bc_act, dtype=np.int64),
-            mask=np.stack(bc_mask).astype(bool),
-            battle_format=battle_format,
-        )
-        if bc_obs
-        else None
-    )
+    rl, bc = builder.finalize(battle_format, gamma, weights)
     return rl, bc, stats
 
 
