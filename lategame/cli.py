@@ -6,10 +6,12 @@
     python -m lategame.cli train    --data data/gen9rb.npz --epochs 20
     python -m lategame.cli collect-rl --pool random,maxbasepower,heuristic --n 50
     python -m lategame.cli train-rl --data data/gen9rb_rl.npz --bc-init checkpoints/bc.pt
+    python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
 
 ``collect``/``train`` are the M2 BC pipeline; ``collect-rl``/``train-rl`` are the
-M3 offline-RL pipeline. Torch is imported lazily inside the train handlers so
-``evaluate``/``play``/``collect``/``collect-rl`` keep running without ``[ml]``.
+M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop. Torch is
+imported lazily inside the train handlers so ``evaluate``/``play``/``collect``/
+``collect-rl`` keep running without ``[ml]``.
 """
 
 from __future__ import annotations
@@ -93,6 +95,33 @@ def _run_train_rl(args: argparse.Namespace) -> None:
     train_offline_rl(args.data, args.out, config)
 
 
+async def _run_selfplay(args: argparse.Namespace) -> None:
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    config = SelfPlayConfig(
+        init=args.init,
+        out_dir=args.out_dir,
+        data_dir=args.data_dir,
+        battle_format=args.battle_format,
+        iters=args.iters,
+        games_per_opp=args.games_per_opp,
+        pop_size=args.pop_size,
+        buffer_iters=args.buffer_iters,
+        anchors=tuple(a.strip() for a in args.anchors.split(",") if a.strip()),
+        eval_baselines=tuple(b.strip() for b in args.eval_baselines.split(",") if b.strip()),
+        eval_n=args.eval_n,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        beta=args.beta,
+        value_coef=args.value_coef,
+        gamma=args.gamma,
+        device=args.device,
+        seed=args.seed,
+    )
+    await run_selfplay(config)
+
+
 def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
     agents = ", ".join(AGENTS)
     parser.add_argument("--p1", required=True, help=f"Agent for player 1 ({agents})")
@@ -162,6 +191,39 @@ def build_parser() -> argparse.ArgumentParser:
     train_rl.add_argument("--beta", type=float, default=1.0, help="AWR temperature")
     train_rl.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")
     train_rl.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+
+    selfplay = sub.add_parser("selfplay", help="Run the M4 self-play improvement loop")
+    selfplay.add_argument(
+        "--init",
+        default="checkpoints/offrl_gen9randombattle.pt",
+        help="Warm-start (M3 offline-RL) checkpoint = iteration 0",
+    )
+    selfplay.add_argument("--out-dir", default="checkpoints/selfplay", help="Checkpoints + curve")
+    selfplay.add_argument("--data-dir", default="data/selfplay", help="Per-iteration shards")
+    selfplay.add_argument("--iters", type=int, default=8, help="Self-play iterations")
+    selfplay.add_argument("--games-per-opp", type=int, default=30, help="Battles per opponent")
+    selfplay.add_argument("--pop-size", type=int, default=2, help="League members sampled per iter")
+    selfplay.add_argument("--buffer-iters", type=int, default=3, help="Sliding shard window")
+    selfplay.add_argument(
+        "--anchors", default="heuristic,simpleheuristics", help="Fixed anchor opponents"
+    )
+    selfplay.add_argument(
+        "--eval-baselines",
+        default="random,simpleheuristics,heuristic",
+        help="Baselines to chart win-rate against each iteration",
+    )
+    selfplay.add_argument("--eval-n", type=int, default=100, help="Battles per eval matchup")
+    selfplay.add_argument("--epochs", type=int, default=4, help="Fine-tune epochs per iteration")
+    selfplay.add_argument("--batch-size", type=int, default=256)
+    selfplay.add_argument("--lr", type=float, default=1e-3)
+    selfplay.add_argument("--beta", type=float, default=1.0, help="AWR temperature")
+    selfplay.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")
+    selfplay.add_argument("--gamma", type=float, default=0.99, help="Return discount")
+    selfplay.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    selfplay.add_argument("--seed", type=int, default=0)
+    selfplay.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
     return parser
 
 
@@ -177,6 +239,8 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(_run_collect_rl(args))
     elif args.command == "train-rl":
         _run_train_rl(args)
+    elif args.command == "selfplay":
+        asyncio.run(_run_selfplay(args))
 
 
 if __name__ == "__main__":

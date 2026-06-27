@@ -110,3 +110,15 @@ def load_bc_weights(model: ActorCritic, bc_state_dict: Mapping[str, torch.Tensor
         raise ValueError(f"Unexpected keys while warm-starting from BC: {unexpected}")
     if set(missing) != {"value_head.weight", "value_head.bias"}:
         raise ValueError(f"Unexpected missing keys after BC warm-start: {missing}")
+
+
+def load_actor_critic_weights(
+    model: ActorCritic, state_dict: Mapping[str, torch.Tensor]
+) -> None:
+    """Warm-start a full actor-critic (trunk + policy + value heads) in place.
+
+    Used by the self-play loop to continue from the previous iteration's checkpoint
+    (unlike ``load_bc_weights``, the value head carries over too). The architecture
+    must match exactly (same ``hidden_dim``/``n_bins``); a mismatch raises loudly.
+    """
+    model.load_state_dict(dict(state_dict))

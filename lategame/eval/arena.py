@@ -34,6 +34,10 @@ AGENTS: dict[str, type[Player]] = {
     "offrl": OfflineRLAgent,
 }
 
+# Agents backed by a trained checkpoint accept ``checkpoint_path``/``sample`` kwargs;
+# the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
+_CHECKPOINT_AGENTS = {"bc", "offrl"}
+
 
 @dataclass
 class EvalResult:
@@ -50,15 +54,37 @@ def _unique_username(name: str) -> str:
     return f"{name[:10]}-{secrets.token_hex(3)}"
 
 
-def build_player(name: str, battle_format: str) -> Player:
+def build_player(
+    name: str,
+    battle_format: str,
+    checkpoint_path: str | None = None,
+    sample: bool = False,
+) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
     cls = AGENTS[name]
+    extra: dict[str, object] = {}
+    if name in _CHECKPOINT_AGENTS:
+        extra["sample"] = sample
+        if checkpoint_path is not None:
+            extra["checkpoint_path"] = checkpoint_path
     return cls(
         account_configuration=local_account(_unique_username(name)),
         battle_format=battle_format,
         server_configuration=LOCAL_SERVER,
+        **extra,  # type: ignore[arg-type]
     )
+
+
+async def evaluate_built(p1: Player, p2: Player, n_battles: int) -> float:
+    """Win rate of ``p1`` vs ``p2`` over ``n_battles`` on the local server.
+
+    The low-level core shared by ``evaluate`` and the self-play loop, which needs to
+    pit two already-built players (e.g. a specific checkpoint vs a baseline).
+    """
+    results = await cross_evaluate([p1, p2], n_challenges=n_battles)
+    win_rate = results[p1.username][p2.username]
+    return 0.0 if win_rate is None else float(win_rate)
 
 
 async def evaluate(
@@ -69,14 +95,11 @@ async def evaluate(
 ) -> EvalResult:
     p1 = build_player(p1_name, battle_format)
     p2 = build_player(p2_name, battle_format)
-
-    results = await cross_evaluate([p1, p2], n_challenges=n_battles)
-    p1_win_rate = results[p1.username][p2.username]
-
+    win_rate = await evaluate_built(p1, p2, n_battles)
     return EvalResult(
         p1_name=p1_name,
         p2_name=p2_name,
         n_battles=n_battles,
         battle_format=battle_format,
-        p1_win_rate=0.0 if p1_win_rate is None else float(p1_win_rate),
+        p1_win_rate=win_rate,
     )

@@ -29,6 +29,7 @@ from lategame.features.encoder import OBS_DIM, OBS_VERSION
 from lategame.model.actor_critic import (
     ActorCritic,
     hl_gauss_target,
+    load_actor_critic_weights,
     load_bc_weights,
     value_from_logits,
     value_support,
@@ -54,6 +55,11 @@ class OfflineRLConfig:
     seed: int = 0
     device: str = "auto"
     bc_init: str | None = None
+    # Fixed value support: when both set, skip deriving it from the shard's returns.
+    # The self-play loop pins these to the warm-start checkpoint's support so the
+    # carried-over value head stays calibrated across iterations.
+    v_min: float | None = None
+    v_max: float | None = None
 
 
 def _support_from_returns(ret: torch.Tensor, margin: float = 0.1) -> tuple[float, float]:
@@ -123,7 +129,10 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     print(f"training on {device}")
 
     dataset = RLDataset(data_path)
-    v_min, v_max = _support_from_returns(dataset.ret)
+    if config.v_min is not None and config.v_max is not None:
+        v_min, v_max = config.v_min, config.v_max
+    else:
+        v_min, v_max = _support_from_returns(dataset.ret)
     centers = value_support(v_min, v_max, config.n_bins).to(device)
     bin_width = (v_max - v_min) / (config.n_bins - 1)
     sigma = config.hl_gauss_sigma_bins * bin_width
@@ -137,20 +146,31 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
     hidden_dim = config.hidden_dim
-    bc_state = None
+    init_state = None
+    init_kind = "bc"
     if config.bc_init:
-        bc_ckpt = torch.load(config.bc_init, map_location="cpu", weights_only=False)
-        if bc_ckpt.get("obs_version") != OBS_VERSION or bc_ckpt.get("input_dim") != OBS_DIM:
-            raise ValueError("BC checkpoint encoder mismatch; cannot warm-start. Retrain BC.")
-        hidden_dim = int(bc_ckpt["hidden_dim"])  # trunk shapes must match for warm-start
-        bc_state = bc_ckpt["state_dict"]
+        init_ckpt = torch.load(config.bc_init, map_location="cpu", weights_only=False)
+        if init_ckpt.get("obs_version") != OBS_VERSION or init_ckpt.get("input_dim") != OBS_DIM:
+            raise ValueError("Warm-start checkpoint encoder mismatch; cannot warm-start. Retrain.")
+        hidden_dim = int(init_ckpt["hidden_dim"])  # trunk shapes must match for warm-start
+        init_state = init_ckpt["state_dict"]
+        init_kind = str(init_ckpt.get("model_type", "bc"))
+        if init_kind == "actor_critic" and int(init_ckpt["n_bins"]) != config.n_bins:
+            raise ValueError(
+                f"Warm-start n_bins {init_ckpt['n_bins']} != config n_bins {config.n_bins}; "
+                "match them to continue an actor-critic checkpoint."
+            )
 
     model = ActorCritic(
         OBS_DIM, hidden_dim=hidden_dim, n_bins=config.n_bins, dropout=config.dropout
     ).to(device)
-    if bc_state is not None:
-        load_bc_weights(model, bc_state)
-        print(f"warm-started trunk + policy head from {config.bc_init}")
+    if init_state is not None:
+        if init_kind == "actor_critic":
+            load_actor_critic_weights(model, init_state)
+            print(f"warm-started full actor-critic from {config.bc_init}")
+        else:
+            load_bc_weights(model, init_state)
+            print(f"warm-started trunk + policy head from {config.bc_init}")
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
     best_val = float("inf")
