@@ -1,0 +1,82 @@
+"""R-EVAL seed: run battles between two agents and report win rates.
+
+Wraps poke-env's ``cross_evaluate`` against the local server. Win rate is the
+right phase-1 signal; bias-robust metrics (GXE / Glicko-1) come later -- see
+plan.md, requirement R-EVAL.
+"""
+
+from __future__ import annotations
+
+import secrets
+from dataclasses import dataclass
+
+from poke_env.player import (
+    MaxBasePowerPlayer,
+    Player,
+    RandomPlayer,
+    SimpleHeuristicsPlayer,
+    cross_evaluate,
+)
+
+from lategame.agents.bc_agent import BCAgent
+from lategame.agents.heuristic_agent import HeuristicAgent
+from lategame.agents.offline_rl_agent import OfflineRLAgent
+from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
+
+# BCAgent / OfflineRLAgent are torch-free to import (torch loads lazily on
+# instantiation), so registering them here does not pull torch into M0/M1.
+AGENTS: dict[str, type[Player]] = {
+    "random": RandomPlayer,
+    "maxbasepower": MaxBasePowerPlayer,
+    "simpleheuristics": SimpleHeuristicsPlayer,
+    "heuristic": HeuristicAgent,
+    "bc": BCAgent,
+    "offrl": OfflineRLAgent,
+}
+
+
+@dataclass
+class EvalResult:
+    p1_name: str
+    p2_name: str
+    n_battles: int
+    battle_format: str
+    p1_win_rate: float
+
+
+def _unique_username(name: str) -> str:
+    # Showdown usernames are short; keep a stable prefix + random suffix so
+    # repeated runs never collide.
+    return f"{name[:10]}-{secrets.token_hex(3)}"
+
+
+def build_player(name: str, battle_format: str) -> Player:
+    if name not in AGENTS:
+        raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
+    cls = AGENTS[name]
+    return cls(
+        account_configuration=local_account(_unique_username(name)),
+        battle_format=battle_format,
+        server_configuration=LOCAL_SERVER,
+    )
+
+
+async def evaluate(
+    p1_name: str,
+    p2_name: str,
+    n_battles: int,
+    battle_format: str = DEFAULT_FORMAT,
+) -> EvalResult:
+    p1 = build_player(p1_name, battle_format)
+    p2 = build_player(p2_name, battle_format)
+
+    results = await cross_evaluate([p1, p2], n_challenges=n_battles)
+    p1_win_rate = results[p1.username][p2.username]
+
+    return EvalResult(
+        p1_name=p1_name,
+        p2_name=p2_name,
+        n_battles=n_battles,
+        battle_format=battle_format,
+        p1_win_rate=0.0 if p1_win_rate is None else float(p1_win_rate),
+    )

@@ -1,0 +1,81 @@
+"""M3 offline-RL agent: plays from the actor-critic policy head.
+
+Loads an ``actor_critic`` checkpoint produced by ``train.offline_rl`` and plays
+exactly like the BC agent -- encode, mask, pick from the action logits -- using
+the policy head; the value head is unused at inference in M3 (it powers search /
+leaf evaluation only in M7). Torch is imported lazily so registering this class
+keeps the M0/M1 commands torch-free.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from poke_env.battle import AbstractBattle
+from poke_env.player import BattleOrder, Player
+
+from lategame.features.action_space import action_mask, action_to_order
+from lategame.features.encoder import OBS_DIM, OBS_VERSION, embed_battle
+
+DEFAULT_CHECKPOINT = "checkpoints/offrl_gen9randombattle.pt"
+CHECKPOINT_ENV_VAR = "LATEGAME_OFFRL_CHECKPOINT"
+
+
+class OfflineRLAgent(Player):
+    def __init__(
+        self,
+        *args: object,
+        checkpoint_path: str | Path | None = None,
+        sample: bool = False,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+
+        import torch
+
+        from lategame.model.actor_critic import ActorCritic
+        from lategame.model.policy import masked_logits
+
+        path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Offline-RL checkpoint not found at '{path}'. Train one first "
+                f"(`lategame train-rl`) or set {CHECKPOINT_ENV_VAR}."
+            )
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
+        if ckpt.get("obs_version") != OBS_VERSION or ckpt.get("input_dim") != OBS_DIM:
+            raise ValueError(
+                f"Checkpoint encoder mismatch (ckpt {ckpt.get('obs_version')}/"
+                f"{ckpt.get('input_dim')} vs encoder {OBS_VERSION}/{OBS_DIM}). Retrain."
+            )
+
+        model = ActorCritic(
+            ckpt["input_dim"],
+            hidden_dim=ckpt["hidden_dim"],
+            n_actions=ckpt["n_actions"],
+            n_bins=ckpt["n_bins"],
+        )
+        model.load_state_dict(ckpt["state_dict"])
+        model.eval()
+
+        self._torch = torch
+        self._model = model
+        self._masked_logits = masked_logits
+        self._sample = sample
+
+    def choose_move(self, battle: AbstractBattle) -> BattleOrder:
+        if not battle.available_moves and not battle.available_switches:
+            return self.choose_default_move()
+
+        torch = self._torch
+        obs = torch.from_numpy(embed_battle(battle)).float().unsqueeze(0)
+        mask = torch.from_numpy(action_mask(battle)).unsqueeze(0)
+        with torch.no_grad():
+            logits, _ = self._model(obs)
+            logits = self._masked_logits(logits, mask)
+            if self._sample:
+                action = int(torch.multinomial(torch.softmax(logits, dim=1), 1).item())
+            else:
+                action = int(logits.argmax(dim=1).item())
+        return action_to_order(action, battle)

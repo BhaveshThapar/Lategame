@@ -1,0 +1,25 @@
+# Local Showdown server (cloned, not vendored)
+third_party/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Data / artifacts (later milestones)
+replays/
+data/
+checkpoints/
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

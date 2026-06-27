@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lategame"
+version = "0.1.0"
+description = "Competitive Pokemon Showdown ML battle agent (M0 infra + M1 baseline)"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+authors = [{ name = "Bhavesh" }]
+dependencies = [
+    "poke-env>=0.8",
+    "orjson>=3.9",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+# torch is only needed for M2+ (BC policy training/inference). The feature
+# encoder and self-play data collection run on numpy alone (a base dep), so the
+# `collect` step does not require this extra -- only `train` and the `bc` agent do.
+ml = [
+    "torch>=2.2",
+]
+
+[project.scripts]
+lategame = "lategame.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lategame*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
