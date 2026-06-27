@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** Proposed
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-06-27).
 
 ---
 
@@ -282,6 +282,34 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M5 — Live deploy + eval** | Live-server play within timer; GXE/Glicko telemetry | Strong-human band in Random Battles (G2) |
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
+
+### 13.1 Build status & findings (as of 2026-06-27)
+
+> The build milestones below track the *actual* implementation sequence and differ from the
+> roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
+> **Gen 9 Random Battles** on the local server; live deploy and multi-format are not started.
+
+- **M0 infra + M1 heuristic — done & verified.** Heuristic: 96% vs random, 84% vs
+  maxbasepower, 51% vs simpleheuristics. It is the fixed baseline every learned agent must beat.
+- **M2 BC → M3 offline RL (value-classification critic + AWR) → M4 self-play league →
+  M5 entity transformer + on-policy PPO — all built and verified; none beat the baseline.**
+  Learned policies plateau at **~27–34% vs heuristic** regardless of algorithm/architecture.
+  M5 fixed the critic ~2.3× (offline value MAE 1.35→0.58) **without** moving win-rate, and PPO
+  with a strong GAE baseline + exploration outside the demonstrator distribution was flat →
+  the objective/algorithm is not the bottleneck.
+- **M6 human-replay ingestion — built, two POV reconstructions, decisive negative.** v1 (public
+  spectator logs) regressed the policy and was attributed to a train/inference observation
+  distribution shift (public logs carry no `|request|`, so the agent's own bench is hidden at
+  train time but full at live inference). **v2** re-simulates each replay's `inputlog` (PRNG seed
+  + choices) through the vendored simulator to recover the private `|request|` per player →
+  full 6-mon, in-distribution POV + exact labels (**0% decision drop** vs v1's 9.4%). **Fixing
+  the shift did NOT break the plateau** (controlled, n=100 vs heuristic: v2 offrl 11% / bc 6% vs
+  v1 offrl 8% / bc 5% — within noise). The shift was real but **not the binding constraint**.
+- **Conclusion across six methods (BC, offline AWR, self-play, transformer+critic, PPO,
+  human-replay v1+v2): the limiter is the hand-crafted 720-d encoder**, which carries no
+  species/move/item *identity* — evidenced by low ~32% imitation accuracy on the faithful v2 POV.
+  The next untested lever is **identity embeddings** (a v2 encoder), not more/better trajectory
+  data or a different RL objective. This sharpens Data Plan §10 and ML Approach §11.
 
 ---
 
