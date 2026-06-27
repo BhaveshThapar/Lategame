@@ -34,7 +34,7 @@ class OfflineRLAgent(Player):
 
         import torch
 
-        from lategame.model.actor_critic import ActorCritic
+        from lategame.model.factory import build_model
         from lategame.model.policy import masked_logits
 
         path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
@@ -50,12 +50,7 @@ class OfflineRLAgent(Player):
                 f"{ckpt.get('input_dim')} vs encoder {OBS_VERSION}/{OBS_DIM}). Retrain."
             )
 
-        model = ActorCritic(
-            ckpt["input_dim"],
-            hidden_dim=ckpt["hidden_dim"],
-            n_actions=ckpt["n_actions"],
-            n_bins=ckpt["n_bins"],
-        )
+        model = build_model(ckpt)
         model.load_state_dict(ckpt["state_dict"])
         model.eval()
 

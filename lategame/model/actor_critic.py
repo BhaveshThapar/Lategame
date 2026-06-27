@@ -93,11 +93,12 @@ _BC_TO_AC = {
 }
 
 
-def load_bc_weights(model: ActorCritic, bc_state_dict: Mapping[str, torch.Tensor]) -> None:
+def load_bc_weights(model: nn.Module, bc_state_dict: Mapping[str, torch.Tensor]) -> None:
     """Warm-start ``model``'s trunk + policy head from a BC ``state_dict`` in place.
 
-    The value head is left at its random init. Raises if the BC checkpoint lacks
-    the expected layer keys (a shape/architecture mismatch we want to fail loudly).
+    Only valid for the MLP ``ActorCritic`` (the layer names are MLP-specific). The
+    value head is left at its random init. Raises if the BC checkpoint lacks the
+    expected layer keys (a shape/architecture mismatch we want to fail loudly).
     """
     try:
         remapped = {dst: bc_state_dict[src] for src, dst in _BC_TO_AC.items()}
@@ -113,12 +114,13 @@ def load_bc_weights(model: ActorCritic, bc_state_dict: Mapping[str, torch.Tensor
 
 
 def load_actor_critic_weights(
-    model: ActorCritic, state_dict: Mapping[str, torch.Tensor]
+    model: nn.Module, state_dict: Mapping[str, torch.Tensor]
 ) -> None:
-    """Warm-start a full actor-critic (trunk + policy + value heads) in place.
+    """Warm-start a full actor-critic (all weights) in place, architecture-agnostic.
 
     Used by the self-play loop to continue from the previous iteration's checkpoint
-    (unlike ``load_bc_weights``, the value head carries over too). The architecture
-    must match exactly (same ``hidden_dim``/``n_bins``); a mismatch raises loudly.
+    (unlike ``load_bc_weights``, the value head carries over too). Works for any
+    architecture (MLP or entity transformer); the state dict must match the model
+    exactly, so a shape/arch mismatch raises loudly via ``load_state_dict``.
     """
     model.load_state_dict(dict(state_dict))

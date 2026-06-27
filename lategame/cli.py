@@ -23,6 +23,8 @@ from lategame.config import DEFAULT_FORMAT
 from lategame.eval.arena import AGENTS, EvalResult, evaluate
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
+_DEFAULT_BC_INIT = "checkpoints/bc_gen9randombattle.pt"
+_MODEL_CHOICES = ["actor_critic", "entity_transformer"]
 
 
 def _print_result(result: EvalResult) -> None:
@@ -81,6 +83,12 @@ async def _run_collect_rl(args: argparse.Namespace) -> None:
 def _run_train_rl(args: argparse.Namespace) -> None:
     from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
 
+    # The MLP BC checkpoint cannot warm-start a transformer (no compatible trunk);
+    # drop the default BC init for non-MLP models so the transformer trains fresh.
+    bc_init = args.bc_init or None
+    if args.model != "actor_critic" and bc_init == _DEFAULT_BC_INIT:
+        bc_init = None
+
     config = OfflineRLConfig(
         epochs=args.epochs,
         batch_size=args.batch_size,
@@ -90,7 +98,11 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         beta=args.beta,
         value_coef=args.value_coef,
         device=args.device,
-        bc_init=args.bc_init,
+        bc_init=bc_init,
+        model_type=args.model,
+        d_model=args.d_model,
+        n_layers=args.n_layers,
+        n_heads=args.n_heads,
     )
     train_offline_rl(args.data, args.out, config)
 
@@ -180,13 +192,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train_rl.add_argument(
         "--bc-init",
-        default="checkpoints/bc_gen9randombattle.pt",
+        default=_DEFAULT_BC_INIT,
         help="BC checkpoint to warm-start from (pass '' to train from scratch)",
+    )
+    train_rl.add_argument(
+        "--model",
+        default="actor_critic",
+        choices=_MODEL_CHOICES,
+        help="Architecture: flat MLP (actor_critic) or entity transformer",
     )
     train_rl.add_argument("--epochs", type=int, default=30)
     train_rl.add_argument("--batch-size", type=int, default=256)
     train_rl.add_argument("--lr", type=float, default=1e-3)
-    train_rl.add_argument("--hidden-dim", type=int, default=256)
+    train_rl.add_argument("--hidden-dim", type=int, default=256, help="MLP trunk width")
+    train_rl.add_argument("--d-model", type=int, default=128, help="Transformer token width")
+    train_rl.add_argument("--n-layers", type=int, default=2, help="Transformer encoder layers")
+    train_rl.add_argument("--n-heads", type=int, default=4, help="Transformer attention heads")
     train_rl.add_argument("--n-bins", type=int, default=51)
     train_rl.add_argument("--beta", type=float, default=1.0, help="AWR temperature")
     train_rl.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")

@@ -22,18 +22,20 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import DataLoader, random_split
 
 from lategame.data.rl_dataset import RLDataset
+from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
 from lategame.model.actor_critic import (
-    ActorCritic,
     hl_gauss_target,
     load_actor_critic_weights,
     load_bc_weights,
     value_from_logits,
     value_support,
 )
+from lategame.model.factory import MODEL_ACTOR_CRITIC, build_model, model_metadata
 from lategame.model.policy import masked_logits
 from lategame.train.bc import select_device
 
@@ -55,11 +57,27 @@ class OfflineRLConfig:
     seed: int = 0
     device: str = "auto"
     bc_init: str | None = None
+    # Architecture: "actor_critic" (flat MLP, M3) or "entity_transformer" (M5).
+    # The transformer arch fields are ignored for the MLP.
+    model_type: str = MODEL_ACTOR_CRITIC
+    d_model: int = 128
+    n_layers: int = 2
+    n_heads: int = 4
+    ff_dim: int = 256
     # Fixed value support: when both set, skip deriving it from the shard's returns.
     # The self-play loop pins these to the warm-start checkpoint's support so the
     # carried-over value head stays calibrated across iterations.
     v_min: float | None = None
     v_max: float | None = None
+
+    def arch(self) -> dict[str, int]:
+        """Transformer architecture block (used when ``model_type`` is the transformer)."""
+        return {
+            "d_model": self.d_model,
+            "n_layers": self.n_layers,
+            "n_heads": self.n_heads,
+            "ff_dim": self.ff_dim,
+        }
 
 
 def _support_from_returns(ret: torch.Tensor, margin: float = 0.1) -> tuple[float, float]:
@@ -76,7 +94,7 @@ def _value_ce(value_logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
 
 
 def _run_epoch(
-    model: ActorCritic,
+    model: nn.Module,
     loader: DataLoader,
     device: torch.device,
     centers: torch.Tensor,
@@ -145,32 +163,60 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
-    hidden_dim = config.hidden_dim
+    # Model spec defaults to the config; an AC->AC warm-start overrides it with the
+    # init checkpoint's architecture so the carried-over weights load exactly.
+    model_meta: dict = {
+        "model_type": config.model_type,
+        "input_dim": OBS_DIM,
+        "n_actions": GEN9_ACTION_SPACE_SIZE,
+        "n_bins": config.n_bins,
+        "dropout": config.dropout,
+        "hidden_dim": config.hidden_dim,
+        "arch": config.arch(),
+    }
     init_state = None
     init_kind = "bc"
     if config.bc_init:
         init_ckpt = torch.load(config.bc_init, map_location="cpu", weights_only=False)
         if init_ckpt.get("obs_version") != OBS_VERSION or init_ckpt.get("input_dim") != OBS_DIM:
             raise ValueError("Warm-start checkpoint encoder mismatch; cannot warm-start. Retrain.")
-        hidden_dim = int(init_ckpt["hidden_dim"])  # trunk shapes must match for warm-start
         init_state = init_ckpt["state_dict"]
         init_kind = str(init_ckpt.get("model_type", "bc"))
-        if init_kind == "actor_critic" and int(init_ckpt["n_bins"]) != config.n_bins:
-            raise ValueError(
-                f"Warm-start n_bins {init_ckpt['n_bins']} != config n_bins {config.n_bins}; "
-                "match them to continue an actor-critic checkpoint."
-            )
-
-    model = ActorCritic(
-        OBS_DIM, hidden_dim=hidden_dim, n_bins=config.n_bins, dropout=config.dropout
-    ).to(device)
-    if init_state is not None:
-        if init_kind == "actor_critic":
-            load_actor_critic_weights(model, init_state)
-            print(f"warm-started full actor-critic from {config.bc_init}")
+        if init_kind == "bc":
+            # BC->AC warm-start copies the MLP trunk + policy head; the transformer
+            # has no compatible trunk, so it must train from scratch instead.
+            if config.model_type != MODEL_ACTOR_CRITIC:
+                raise ValueError(
+                    f"BC warm-start only supports the MLP actor-critic, not "
+                    f"{config.model_type!r}; train it from scratch (omit bc_init)."
+                )
+            model_meta["hidden_dim"] = int(init_ckpt["hidden_dim"])  # trunk shapes must match
         else:
+            # AC->AC warm-start (self-play continuation): load the full state dict,
+            # so the architecture must match the checkpoint exactly.
+            if int(init_ckpt["n_bins"]) != config.n_bins:
+                raise ValueError(
+                    f"Warm-start n_bins {init_ckpt['n_bins']} != config n_bins {config.n_bins}; "
+                    "match them to continue an actor-critic checkpoint."
+                )
+            model_meta = {
+                "model_type": init_kind,
+                "input_dim": OBS_DIM,
+                "n_actions": int(init_ckpt.get("n_actions", GEN9_ACTION_SPACE_SIZE)),
+                "n_bins": int(init_ckpt["n_bins"]),
+                "dropout": config.dropout,
+                "hidden_dim": int(init_ckpt.get("hidden_dim", config.hidden_dim)),
+                "arch": init_ckpt.get("arch") or config.arch(),
+            }
+
+    model = build_model(model_meta).to(device)
+    if init_state is not None:
+        if init_kind == "bc":
             load_bc_weights(model, init_state)
             print(f"warm-started trunk + policy head from {config.bc_init}")
+        else:
+            load_actor_critic_weights(model, init_state)
+            print(f"warm-started full {init_kind} from {config.bc_init}")
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
     best_val = float("inf")
@@ -197,7 +243,7 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
 
 
 def _save_checkpoint(
-    model: ActorCritic,
+    model: nn.Module,
     out_path: str | Path,
     battle_format: str,
     config: OfflineRLConfig,
@@ -207,14 +253,18 @@ def _save_checkpoint(
 ) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # model_type / arch / dims come from the actual model (which an AC->AC
+    # warm-start may have built from the init checkpoint, not from config).
+    meta = model_metadata(model)
     torch.save(
         {
             "state_dict": model.state_dict(),
-            "model_type": "actor_critic",
+            "model_type": meta["model_type"],
+            "arch": meta["arch"],
             "input_dim": OBS_DIM,
-            "hidden_dim": model.hidden_dim,
-            "n_actions": model.n_actions,
-            "n_bins": model.n_bins,
+            "hidden_dim": meta["hidden_dim"],
+            "n_actions": meta["n_actions"],
+            "n_bins": meta["n_bins"],
             "v_min": v_min,
             "v_max": v_max,
             "obs_version": OBS_VERSION,

@@ -23,6 +23,7 @@ assert they match the live encoder so a stale encoding can never be used silentl
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TypeVar
 
 import numpy as np
@@ -81,6 +82,53 @@ _MOVE_DIM = _MOVE_SCALARS + len(_CATEGORIES) + len(_TYPES)
 _GLOBAL_DIM = len(_WEATHERS) + len(_FIELDS) + 2 * len(_SIDE_CONDITIONS) + _GLOBAL_SCALARS
 
 OBS_DIM = _TEAM_SIZE * 2 * _POKEMON_DIM + _N_MOVES * _MOVE_DIM + _GLOBAL_DIM
+
+
+@dataclass(frozen=True)
+class ObsLayout:
+    """Public, drift-proof view of the flat-obs block structure.
+
+    ``embed_battle`` concatenates blocks in a fixed order: ``team_size`` ego
+    Pokemon, ``team_size`` opponent Pokemon, ``n_moves`` active moves, then 1
+    global block. Consumers (e.g. the entity transformer) slice the flat vector
+    back into per-entity tokens using these dims, so the token layout can never
+    silently drift from the encoder.
+    """
+
+    team_size: int
+    n_moves: int
+    pokemon_dim: int
+    move_dim: int
+    global_dim: int
+
+    @property
+    def n_pokemon_tokens(self) -> int:
+        """Ego + opponent Pokemon tokens."""
+        return self.team_size * 2
+
+    @property
+    def n_tokens(self) -> int:
+        """Total tokens: ego + opp Pokemon, moves, and the single global token."""
+        return self.team_size * 2 + self.n_moves + 1
+
+    @property
+    def moves_start(self) -> int:
+        """Flat-obs offset where the move blocks begin."""
+        return self.team_size * 2 * self.pokemon_dim
+
+    @property
+    def global_start(self) -> int:
+        """Flat-obs offset where the global block begins."""
+        return self.moves_start + self.n_moves * self.move_dim
+
+
+OBS_LAYOUT = ObsLayout(
+    team_size=_TEAM_SIZE,
+    n_moves=_N_MOVES,
+    pokemon_dim=_POKEMON_DIM,
+    move_dim=_MOVE_DIM,
+    global_dim=_GLOBAL_DIM,
+)
 
 
 _T = TypeVar("_T")
