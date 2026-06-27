@@ -62,3 +62,48 @@ def action_to_order(action: int, battle: AbstractBattle) -> BattleOrder:
 def action_mask(battle: AbstractBattle) -> np.ndarray:
     """Boolean legality mask over the action space (``True`` == legal)."""
     return np.asarray(SinglesEnv.get_action_mask(battle), dtype=bool)  # type: ignore[arg-type]
+
+
+# --------------------------------------------------------------------------- #
+# Request-free siblings for offline replay ingestion (M6).
+#
+# Public Showdown replays carry no ``|request|`` JSON, so a battle reconstructed
+# from spectator logs has empty ``available_moves``/``available_switches`` and the
+# functions above (which read them) can't be used. These two recover the same
+# labels positionally from the *public* state instead -- the only state a replay
+# gives us -- so ingested samples align with the live encoder's move/switch order.
+# --------------------------------------------------------------------------- #
+
+
+def label_action(order: BattleOrder, battle: AbstractBattle) -> int:
+    """Label ``order`` with its integer action from *public* battle state only.
+
+    Uses poke-env's codec with ``fake=True``, which skips the request-derived
+    ``valid_orders`` legality guard and computes the index purely positionally --
+    switch from ``battle.team.values()`` order, move from ``active.moves`` order,
+    the same orderings ``embed_battle`` uses. ``strict=False`` so an
+    un-indexable order returns a default rather than raising; callers should
+    treat a default (negative) result as undecodable and drop the turn.
+    """
+    return int(SinglesEnv.order_to_action(order, battle, fake=True, strict=False))  # type: ignore[arg-type]
+
+
+def synthesize_action_mask(battle: AbstractBattle, taken_action: int) -> np.ndarray:
+    """Permissive legality mask for a replay turn (no ``|request|`` available).
+
+    Marks every revealed move slot (``active.moves[:4]`` -> 6-9) and every
+    non-active, non-fainted team slot (``team.values()`` -> 0-5) legal, plus the
+    actually-taken action. Over-approximates legality, which is harmless for the
+    masked CE / AWR losses: they only require the *taken* action to stay unmasked.
+    """
+    mask = np.zeros(GEN9_ACTION_SPACE_SIZE, dtype=bool)
+    for i, mon in enumerate(battle.team.values()):
+        if i < 6 and not mon.active and not mon.fainted:
+            mask[i] = True
+    active = battle.active_pokemon
+    if active is not None:
+        for i in range(min(len(active.moves), 4)):
+            mask[6 + i] = True
+    if 0 <= taken_action < GEN9_ACTION_SPACE_SIZE:
+        mask[taken_action] = True
+    return mask
