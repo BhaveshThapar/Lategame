@@ -7,11 +7,12 @@
     python -m lategame.cli collect-rl --pool random,maxbasepower,heuristic --n 50
     python -m lategame.cli train-rl --data data/gen9rb_rl.npz --bc-init checkpoints/bc.pt
     python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
+    python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
 
 ``collect``/``train`` are the M2 BC pipeline; ``collect-rl``/``train-rl`` are the
-M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop. Torch is
-imported lazily inside the train handlers so ``evaluate``/``play``/``collect``/
-``collect-rl`` keep running without ``[ml]``.
+M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop; ``ppo`` is
+the M5 on-policy PPO self-play loop. Torch is imported lazily inside the train handlers
+so ``evaluate``/``play``/``collect``/``collect-rl`` keep running without ``[ml]``.
 """
 
 from __future__ import annotations
@@ -134,6 +135,36 @@ async def _run_selfplay(args: argparse.Namespace) -> None:
     await run_selfplay(config)
 
 
+async def _run_ppo(args: argparse.Namespace) -> None:
+    from lategame.train.ppo import PPOConfig, run_ppo
+
+    config = PPOConfig(
+        init=args.init,
+        out_dir=args.out_dir,
+        battle_format=args.battle_format,
+        iters=args.iters,
+        games_per_opp=args.games_per_opp,
+        pop_size=args.pop_size,
+        max_concurrent=args.max_concurrent,
+        anchors=tuple(a.strip() for a in args.anchors.split(",") if a.strip()),
+        eval_baselines=tuple(b.strip() for b in args.eval_baselines.split(",") if b.strip()),
+        eval_n=args.eval_n,
+        epochs=args.epochs,
+        minibatch=args.minibatch,
+        lr=args.lr,
+        clip_eps=args.clip_eps,
+        gamma=args.gamma,
+        gae_lambda=args.gae_lambda,
+        ent_coef=args.ent_coef,
+        value_coef=args.value_coef,
+        max_grad_norm=args.max_grad_norm,
+        target_kl=args.target_kl,
+        device=args.device,
+        seed=args.seed,
+    )
+    await run_ppo(config)
+
+
 def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
     agents = ", ".join(AGENTS)
     parser.add_argument("--p1", required=True, help=f"Agent for player 1 ({agents})")
@@ -245,6 +276,42 @@ def build_parser() -> argparse.ArgumentParser:
     selfplay.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
     )
+
+    ppo = sub.add_parser("ppo", help="Run the M5 on-policy PPO self-play loop")
+    ppo.add_argument(
+        "--init",
+        default="checkpoints/offrl_gen9randombattle.pt",
+        help="Warm-start (M3 offline-RL / M4 self-play) checkpoint = iteration 0",
+    )
+    ppo.add_argument("--out-dir", default="checkpoints/ppo", help="Checkpoints + curve")
+    ppo.add_argument("--iters", type=int, default=8, help="PPO iterations")
+    ppo.add_argument("--games-per-opp", type=int, default=8, help="Rollout battles per opponent")
+    ppo.add_argument("--pop-size", type=int, default=2, help="League members sampled per iter")
+    ppo.add_argument(
+        "--max-concurrent", type=int, default=20, help="Concurrent battles in rollout/eval"
+    )
+    ppo.add_argument("--anchors", default="simpleheuristics", help="Fixed anchor opponents")
+    ppo.add_argument(
+        "--eval-baselines",
+        default="random,simpleheuristics,heuristic",
+        help="Baselines to chart win-rate against each iteration",
+    )
+    ppo.add_argument("--eval-n", type=int, default=100, help="Battles per eval matchup")
+    ppo.add_argument("--epochs", type=int, default=4, help="PPO epochs per rollout")
+    ppo.add_argument("--minibatch", type=int, default=256)
+    ppo.add_argument("--lr", type=float, default=2.5e-4)
+    ppo.add_argument("--clip-eps", type=float, default=0.2, help="PPO surrogate clip")
+    ppo.add_argument("--gamma", type=float, default=0.99, help="Return discount")
+    ppo.add_argument("--gae-lambda", type=float, default=0.95, help="GAE lambda")
+    ppo.add_argument("--ent-coef", type=float, default=0.01, help="Entropy bonus weight")
+    ppo.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")
+    ppo.add_argument("--max-grad-norm", type=float, default=0.5, help="Gradient clip norm")
+    ppo.add_argument("--target-kl", type=float, default=0.03, help="Approx-KL early-stop target")
+    ppo.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    ppo.add_argument("--seed", type=int, default=0)
+    ppo.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
     return parser
 
 
@@ -262,6 +329,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_train_rl(args)
     elif args.command == "selfplay":
         asyncio.run(_run_selfplay(args))
+    elif args.command == "ppo":
+        asyncio.run(_run_ppo(args))
 
 
 if __name__ == "__main__":

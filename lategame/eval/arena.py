@@ -21,10 +21,11 @@ from poke_env.player import (
 from lategame.agents.bc_agent import BCAgent
 from lategame.agents.heuristic_agent import HeuristicAgent
 from lategame.agents.offline_rl_agent import OfflineRLAgent
+from lategame.agents.ppo_agent import PPORecordingAgent
 from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
 
-# BCAgent / OfflineRLAgent are torch-free to import (torch loads lazily on
-# instantiation), so registering them here does not pull torch into M0/M1.
+# BCAgent / OfflineRLAgent / PPORecordingAgent are torch-free to import (torch loads
+# lazily on instantiation), so registering them here does not pull torch into M0/M1.
 AGENTS: dict[str, type[Player]] = {
     "random": RandomPlayer,
     "maxbasepower": MaxBasePowerPlayer,
@@ -32,11 +33,12 @@ AGENTS: dict[str, type[Player]] = {
     "heuristic": HeuristicAgent,
     "bc": BCAgent,
     "offrl": OfflineRLAgent,
+    "ppo": PPORecordingAgent,
 }
 
 # Agents backed by a trained checkpoint accept ``checkpoint_path``/``sample`` kwargs;
 # the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
-_CHECKPOINT_AGENTS = {"bc", "offrl"}
+_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo"}
 
 
 @dataclass
@@ -59,6 +61,7 @@ def build_player(
     battle_format: str,
     checkpoint_path: str | None = None,
     sample: bool = False,
+    max_concurrent_battles: int | None = None,
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
@@ -68,6 +71,10 @@ def build_player(
         extra["sample"] = sample
         if checkpoint_path is not None:
             extra["checkpoint_path"] = checkpoint_path
+    # poke-env defaults to one battle at a time; PPO rollouts/eval pass a higher value
+    # so cross_evaluate keeps many battles in flight (the local server is the bottleneck).
+    if max_concurrent_battles is not None:
+        extra["max_concurrent_battles"] = max_concurrent_battles
     return cls(
         account_configuration=local_account(_unique_username(name)),
         battle_format=battle_format,
