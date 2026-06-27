@@ -165,6 +165,44 @@ async def _run_ppo(args: argparse.Namespace) -> None:
     await run_ppo(config)
 
 
+def _run_fetch_replays(args: argparse.Namespace) -> None:
+    from lategame.data.replays import fetch_replays
+
+    fetch_replays(
+        battle_format=args.battle_format,
+        min_rating=args.min_rating,
+        limit=args.limit,
+        cache_dir=args.cache_dir,
+        max_pages=args.max_pages,
+        sleep=args.sleep,
+        require_rating=not args.allow_unrated,
+    )
+
+
+def _run_ingest_replays(args: argparse.Namespace) -> None:
+    from lategame.data.ingest import ingest_and_save
+    from lategame.data.replays import cached_replay_paths
+    from lategame.data.reward import RewardWeights
+
+    paths = cached_replay_paths(args.cache_dir)
+    if not paths:
+        raise SystemExit(f"No cached replays under '{args.cache_dir}'. Run `fetch-replays` first.")
+    weights = RewardWeights(
+        hp_value=args.hp_value,
+        fainted_value=args.fainted_value,
+        status_value=args.status_value,
+        victory_value=args.victory_value,
+    )
+    ingest_and_save(
+        paths,
+        rl_out=args.out,
+        bc_out=args.bc_out,
+        weights=weights,
+        gamma=args.gamma,
+        battle_format=args.battle_format,
+    )
+
+
 def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
     agents = ", ".join(AGENTS)
     parser.add_argument("--p1", required=True, help=f"Agent for player 1 ({agents})")
@@ -312,6 +350,44 @@ def build_parser() -> argparse.ArgumentParser:
     ppo.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
     )
+
+    fetch = sub.add_parser(
+        "fetch-replays", help="Download + cache rated human replays (M6 data plan)"
+    )
+    fetch.add_argument("--min-rating", type=int, default=1200, help="Keep replays >= this rating")
+    fetch.add_argument("--limit", type=int, default=200, help="Number of rated replays to keep")
+    fetch.add_argument(
+        "--cache-dir", default="replays/gen9randombattle", help="Where to cache replay JSON"
+    )
+    fetch.add_argument("--sleep", type=float, default=0.4, help="Seconds between network requests")
+    fetch.add_argument("--max-pages", type=int, default=80, help="Max search index pages to walk")
+    fetch.add_argument(
+        "--allow-unrated", action="store_true", help="Also keep replays with unknown rating"
+    )
+    fetch.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
+
+    ingest = sub.add_parser(
+        "ingest-replays", help="Reconstruct cached replays into RL (+ BC) shards"
+    )
+    ingest.add_argument(
+        "--cache-dir", default="replays/gen9randombattle", help="Cached replay JSON dir"
+    )
+    ingest.add_argument(
+        "--out", default="data/replays_gen9rb_rl.npz", help="Offline-RL shard output (.npz)"
+    )
+    ingest.add_argument(
+        "--bc-out", default="data/replays_gen9rb_bc.npz", help="Winners-only BC shard (.npz)"
+    )
+    ingest.add_argument("--gamma", type=float, default=0.99, help="Return discount")
+    ingest.add_argument("--hp-value", type=float, default=0.3, help="Shaping: HP weight")
+    ingest.add_argument("--fainted-value", type=float, default=1.0, help="Shaping: faint")
+    ingest.add_argument("--status-value", type=float, default=0.1, help="Shaping: status")
+    ingest.add_argument("--victory-value", type=float, default=1.0, help="Terminal win/loss")
+    ingest.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
     return parser
 
 
@@ -331,6 +407,10 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(_run_selfplay(args))
     elif args.command == "ppo":
         asyncio.run(_run_ppo(args))
+    elif args.command == "fetch-replays":
+        _run_fetch_replays(args)
+    elif args.command == "ingest-replays":
+        _run_ingest_replays(args)
 
 
 if __name__ == "__main__":
