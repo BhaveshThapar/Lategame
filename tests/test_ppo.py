@@ -151,6 +151,87 @@ def test_save_checkpoint_roundtrip(tmp_path):
     rebuilt.load_state_dict(ck["state_dict"])  # exact arch + shapes round-trip
 
 
+def _tiny_entity_transformer(torch, n_bins=21):
+    """Small EntityTransformer with the GREEN-checkpoint config (id_embed + dex priors)."""
+    from lategame.model.entity_transformer import EntityTransformer
+
+    return EntityTransformer(
+        OBS_DIM,
+        n_bins=n_bins,
+        d_model=16,
+        n_layers=1,
+        n_heads=2,
+        ff_dim=32,
+        id_embed=True,
+        id_embed_init="prior",
+    )
+
+
+def test_ppo_warm_starts_entity_transformer_checkpoint(tmp_path):
+    # The Lever 10 gate continues PPO from the GREEN *EntityTransformer* offline checkpoint.
+    # ``run_ppo`` builds straight from the checkpoint meta, so prove the ET warm-start path
+    # (save -> build_model -> load_actor_critic_weights) round-trips before the multi-hour run.
+    torch = pytest.importorskip("torch")
+    from lategame.model.actor_critic import load_actor_critic_weights
+    from lategame.model.factory import build_model
+    from lategame.train.ppo import _save_checkpoint
+
+    model = _tiny_entity_transformer(torch, n_bins=11)
+    path = tmp_path / "et.pt"
+    _save_checkpoint(model, str(path), "gen9randombattle", -3.0, 3.0, 11)
+    ck = torch.load(path, weights_only=False)
+    assert ck["model_type"] == "entity_transformer"
+    assert ck["arch"]["id_embed"] is True and ck["arch"]["id_embed_init"] == "prior"
+
+    rebuilt = build_model(ck)
+    load_actor_critic_weights(rebuilt, ck["state_dict"])  # full state dict, exact arch
+    obs = torch.zeros(2, OBS_DIM)  # zeros keep the trailing ID channels at valid index 0
+    with torch.no_grad():
+        logits, value_logits = rebuilt(obs)
+    assert logits.shape == (2, GEN9_ACTION_SPACE_SIZE)
+    assert value_logits.shape == (2, 11)
+
+
+def test_ppo_update_runs_on_entity_transformer():
+    # The PPO surrogate + categorical value loss must run on the two-tower transformer, not
+    # just the MLP -- this is the model the Lever 10 gate actually updates.
+    torch = pytest.importorskip("torch")
+    from lategame.model.actor_critic import value_from_logits, value_support
+    from lategame.model.policy import masked_logits
+    from lategame.train.ppo import PPOConfig, RolloutBuffer, compute_gae, ppo_update
+
+    torch.manual_seed(0)
+    n, n_bins = 24, 21
+    model = _tiny_entity_transformer(torch, n_bins=n_bins)
+    centers = value_support(-5.0, 5.0, n_bins)
+    obs = torch.zeros(n, OBS_DIM)  # zeros keep the trailing ID channels at valid index 0
+    mask = torch.ones(n, GEN9_ACTION_SPACE_SIZE, dtype=torch.bool)
+    action = torch.randint(0, GEN9_ACTION_SPACE_SIZE, (n,))
+    model.eval()
+    with torch.no_grad():
+        logits, value_logits = model(obs)
+        lp = torch.log_softmax(masked_logits(logits, mask), dim=1)
+        old_log_prob = lp.gather(1, action.unsqueeze(1)).squeeze(1)
+        value = value_from_logits(value_logits, centers)
+    done = torch.zeros(n, dtype=torch.bool)
+    done[n // 2 - 1] = True
+    done[n - 1] = True
+    reward = torch.randn(n) * 0.1
+    buffer = RolloutBuffer(obs, action, mask, reward, done, old_log_prob, value)
+
+    config = PPOConfig(epochs=2, minibatch=8, target_kl=10.0)  # no early stop
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    adv, returns = compute_gae(
+        buffer.reward, buffer.value, buffer.done, config.gamma, config.gae_lambda
+    )
+    stats = ppo_update(
+        model, optimizer, buffer, adv, returns, centers, 0.375, config, torch.device("cpu")
+    )
+    for key in ("policy_loss", "value_loss", "entropy", "approx_kl", "clip_frac", "vmae"):
+        assert np.isfinite(stats[key]), f"{key} not finite: {stats[key]}"
+    assert stats["epochs_run"] == 2.0
+
+
 def test_arena_registers_ppo_agent():
     from lategame.agents.ppo_agent import PPORecordingAgent
 
