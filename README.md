@@ -60,6 +60,10 @@ python -m lategame.cli train-rl   --data data/gen9rb_rl.npz
 python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
 python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
 
+# Lever experiment gates (win-rate vs the heuristic; write results/*.json)
+python scripts/offrl_scale_gate.py  --out results/offrl_scale_gate.json    # Lever 9: AWR @ 82k (GREEN)
+python scripts/ppo_continue_gate.py --out results/ppo_continue_gate.json   # Lever 10: PPO continuation (AMBER)
+
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
 python -m lategame.cli fetch-replays  --min-rating 1200 --limit 200

@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** In progress — see §13.1 for build status & findings (updated 2026-06-27).
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-06-28).
 
 ---
 
@@ -402,6 +402,42 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   **Verdict: GREEN** — first method in the whole arc to beat the heuristic baseline band. Per the
   gate, this greenlights a **self-play / PPO continuation** warm-started from the best
   `checkpoints/offrl_scale_et_prior_s0.pt`. Full grid in `results/offrl_scale_gate.json`.
+
+- **Lever 10 — on-policy PPO continuation from the GREEN checkpoint — built + run; STABLE BUT
+  DOES NOT COMPOUND (AMBER).** Acted on the Lever 9 greenlight. The on-policy PPO loop
+  (`train/ppo.py`) needed **no code change** — it builds straight from the checkpoint meta
+  (`build_model(ckpt)` + full-state-dict `load_actor_critic_weights`), so the EntityTransformer
+  + dex-prior arch loads as-is; added a server-free ET warm-start + `ppo_update` regression test
+  (`tests/test_ppo.py`) and a gate runner (`scripts/ppo_continue_gate.py`). Thesis: every prior
+  method was either off-policy AWR (re-weights actions *already in the data* → caps at the
+  demonstrator ceiling) or PPO on a *broken* MLP critic (M5 cratered 0.34→0.20); for the first
+  time we have both a >47% start **and** a working low-variance GAE baseline (transformer critic,
+  value-MAE 0.28), so on-policy PPO can push probability toward actions outside the demonstrator
+  distribution with a critic that can score them. `heuristic` held **out** of training (anchors =
+  simpleheuristics + the self-play league); win-rate reported vs the held-out heuristic. **3 seeds
+  × 10 iters, games_per_opp 16, eval n=200/iter:**
+  - **No collapse — the real positive vs M5.** vs_heuristic stays 0.43–0.56 across all
+    iters/seeds (vs_random 0.98–1.0); the carried critic's value-MAE settles ~1.0 (disturbed from
+    0.28 by the on-policy return distribution but stable — nothing like the MLP's 2.59 or the
+    smoke run's transient blow-up). The decoupled two-tower critic is what keeps PPO stable from a
+    strong warm-start where the M5 MLP cratered.
+  - **No durable improvement — fails GREEN.** best-iter mean vs_heuristic **0.530±0.023** looks
+    up, but it is the *max over 10 noisy n=200 evals* (per-iter σ≈0.035 ⇒ max-of-10 upward bias
+    ≈ +0.05 ≈ the observed +0.065–0.090 per-seed deltas). Two **unbiased** checks say it's noise:
+    the n=300 confirmatory ladder on the apparent-best checkpoint (seed-2 iter-9, 0.56@n=200)
+    regresses to **heuristic 0.517** (≈ the ~0.45–0.48 start), and **final vs_iter0 = 0.442±0.024
+    < 0.50** — the end-state policy marginally *loses* the head-to-head to the start it descended
+    from. The per-iter curve wanders around the start with no trend. Confirmatory ladder (n=300):
+    random 0.993, maxbasepower 0.843, simpleheuristics 0.410, **heuristic 0.517**.
+  - **Insight:** with a strong warm-start + working critic, vanilla on-policy PPO against this
+    opponent set is *stable but flat* — the GREEN offline policy is near a local ceiling for gen9
+    random-battle vs the heuristic; on-policy gradient on the same opponents gives the policy
+    nothing new to climb toward.
+  **Verdict: AMBER** — did **not** trigger the RED conservative-retry (no collapse) and did
+  **not** clear GREEN (no durable gain), so per the gate it was recorded without re-tuning. The
+  next lever is no longer more on-policy gradient: it is the **R-PREDICT** direction
+  (depth-limited search / opponent-modeling on the strong base policy + working value function) or
+  a tougher opponent curriculum. Full grid in `results/ppo_continue_gate.json`.
 
 ---
 
