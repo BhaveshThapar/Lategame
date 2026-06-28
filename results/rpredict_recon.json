@@ -1,0 +1,94 @@
+{
+  "gate": "rpredict_recon",
+  "limit": 40,
+  "seed": 0,
+  "snapshots": 2437,
+  "errored": 0,
+  "checks": 145400,
+  "mismatches": 7,
+  "match_rate": 0.999952,
+  "by_field": {
+    "active": {
+      "mismatch": 0,
+      "total": 24206,
+      "rate": 1.0
+    },
+    "boosts": {
+      "mismatch": 0,
+      "total": 24206,
+      "rate": 1.0
+    },
+    "fainted": {
+      "mismatch": 0,
+      "total": 24206,
+      "rate": 1.0
+    },
+    "hazards": {
+      "mismatch": 0,
+      "total": 4874,
+      "rate": 1.0
+    },
+    "hp": {
+      "mismatch": 0,
+      "total": 24206,
+      "rate": 1.0
+    },
+    "present": {
+      "mismatch": 7,
+      "total": 14622,
+      "rate": 0.9995
+    },
+    "status": {
+      "mismatch": 0,
+      "total": 24206,
+      "rate": 1.0
+    },
+    "terrain": {
+      "mismatch": 0,
+      "total": 2437,
+      "rate": 1.0
+    },
+    "weather": {
+      "mismatch": 0,
+      "total": 2437,
+      "rate": 1.0
+    }
+  },
+  "samples": [
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.miniororange MISSING in reconstruction"
+      ]
+    }
+  ]
+}
