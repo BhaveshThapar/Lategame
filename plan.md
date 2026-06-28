@@ -472,9 +472,37 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     active-mon boosts to observed (clear Intimidate-at-`>start`) and clear weather/terrain a
     determinized lead's ability set at start. Leaf-eval path validated piecewise: deepcopy the live
     poke-env root + feed the step delta (resim's `_feed_line`) → `embed_battle`. `results/rpredict_recon.json`.
-    **Next (compute-heavy, post-sync):** depth-1 expectimax (policy prior + value-head leaves +
-    policy-as-opponent model) + SearchAgent, then Gate B (does lookahead help) and Gate C
-    (confirmatory ladder).
+  - **Gate B — does depth-1 search help? — AMBER (does not compound).** Built depth-1
+    expectimax (`search/expectimax.py`) + `SearchAgent` (registered `search` in the arena),
+    test-time only on the FROZEN GREEN checkpoint. The same checkpoint powers both the `search`
+    agent and the greedy `offrl` base, so any gap is the search, not the weights. Two findings:
+    - **Pure value-head leaves over-switch (a real property of V, not a bug).** Diagnosed
+      directly: at one ply every leaf scores ~4.2 and V rates "my strong mon active" *above*
+      "opponent at 21% HP" (it prefers switching to Salamence over a move that chips the foe to
+      21%). The GREEN value head is a coarse *outcome* estimator, near-flat at one ply, so
+      greedy-over-V switches almost every turn (offline 12/13 switches) → ~0.19 vs random, 0.0
+      vs base at n=16. A **shaped tactical leaf** (`leaf = V + c·state_value`, c=3) adds the
+      immediate chip/HP signal V lacks and restores sane play (1/13 switches; 1.000 vs random).
+    - **Even with the tactical leaf, search does NOT beat the base.** Confirmatory n=120, two
+      opponent-aggregation arms: **mean** — search vs base (h2h) **0.383**, search vs heuristic
+      0.425 vs base 0.458 (−0.033); **min** (worst-case) — h2h **0.342**, 0.408 vs 0.442, and
+      0.833 vs random (over-conservative). Search is *slightly net-negative* vs the base both
+      ways. **Crucially this is NOT GIGO** — the forward model is validated (Gate A exact, recon
+      ~100%) and the agent plays sanely; the cause is the value head being too flat at one ply,
+      not broken machinery. `results/rpredict_gate_b_{mean,min}.json` (the script's raw
+      threshold auto-labels "RED" at h2h<0.45; the *lever* verdict is AMBER — no collapse, the
+      policy stays in the GREEN band ~0.41–0.43 vs heuristic, search just fails to add).
+    **Verdict: AMBER** — structurally identical to Lever 10 ("stable, does not compound";
+    L10's final-vs-iter0 was likewise 0.442<0.5). Two *independent* mechanisms — on-policy
+    gradient (L10) and test-time depth-1 search (L11) — now both fail to compound, strongly
+    reaffirming that the GREEN policy is near a **local ceiling** for gen9-RB vs the heuristic.
+    Gate B negative ⇒ the n=300×4×3 Gate C ladder was **not** run, per cheap-gate-first. **Lasting
+    asset:** a *faithful Showdown forward model + determinization* for gen9-RB (infra the project
+    never had), reusable for any future lookahead. **Next-lever candidates:** depth-2+ search (V
+    may discriminate deeper — compute-heavy, uncertain); a learned one-ply *afterstate/Q* leaf
+    trained to be tactically discriminative; an explicit learned opponent model (uniform/min are
+    weak); or the tougher-opponent **curriculum** (the Lever-10 fallback). Did NOT re-tune to
+    chase GREEN.
 
 ---
 

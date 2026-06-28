@@ -1,0 +1,77 @@
+"""R-PREDICT search agent (Lever 11): depth-1 expectimax on the frozen GREEN checkpoint.
+
+At each decision it runs ``search.expectimax.choose_order`` -- determinize the opponent, fork
+the reconstructed state, step hypothetical (our action, opponent action) pairs, and evaluate
+leaves with the GREEN value head -- and falls back to the greedy policy action whenever search
+can't run (so a battle never crashes). Search is test-time only: the checkpoint is frozen.
+Config is read from the environment so a gate can sweep arms without touching ``build_player``.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from poke_env.battle import AbstractBattle
+from poke_env.player import BattleOrder, Player
+
+if TYPE_CHECKING:
+    from lategame.search.expectimax import SearchConfig
+
+DEFAULT_CHECKPOINT = "checkpoints/offrl_scale_et_prior_s0.pt"
+CHECKPOINT_ENV_VAR = "LATEGAME_SEARCH_CHECKPOINT"
+
+
+def _config_from_env() -> SearchConfig:
+    from lategame.search.expectimax import SearchConfig
+
+    return SearchConfig(
+        determinizations=int(os.environ.get("LATEGAME_SEARCH_DETERMINIZATIONS", "1")),
+        opp_aggregation=os.environ.get("LATEGAME_SEARCH_OPP_AGG", "mean"),
+        opp_cap=int(os.environ.get("LATEGAME_SEARCH_OPP_CAP", "6")),
+        policy_blend=float(os.environ.get("LATEGAME_SEARCH_BLEND", "0.0")),
+        shaped_coef=float(os.environ.get("LATEGAME_SEARCH_SHAPED", "0.0")),
+        seed=int(os.environ.get("LATEGAME_SEARCH_SEED", "0")),
+    )
+
+
+class SearchAgent(Player):
+    def __init__(
+        self,
+        *args: object,
+        checkpoint_path: str | Path | None = None,
+        sample: bool = False,  # accepted for build_player parity; search is deterministic
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+
+        from lategame.search.expectimax import PolicyValue, choose_order
+        from lategame.search.forward import ForwardModel
+
+        self._choose_order = choose_order
+
+        path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Search checkpoint not found at '{path}'. Train one (`lategame train-rl`) "
+                f"or set {CHECKPOINT_ENV_VAR}."
+            )
+        self._cfg = _config_from_env()
+        self._pv = PolicyValue(str(path), policy_blend=self._cfg.policy_blend)
+        self._fm = ForwardModel()
+
+    def choose_move(self, battle: AbstractBattle) -> BattleOrder:
+        if not battle.available_moves and not battle.available_switches:
+            return self.choose_default_move()
+        order: BattleOrder | None = None
+        try:
+            order = self._choose_order(self._fm, self._pv, battle, self._cfg)
+        except Exception:  # noqa: BLE001 -- search must never crash a live battle
+            order = None
+        return order if order is not None else self._pv.greedy_order(battle)
+
+    def __del__(self) -> None:
+        fm = getattr(self, "_fm", None)
+        if fm is not None:
+            fm.close()

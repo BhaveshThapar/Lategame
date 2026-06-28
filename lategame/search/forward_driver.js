@@ -209,6 +209,27 @@ function digest(battle) {
 	};
 }
 
+/** Legal choices for a side, read from the live (post-edit) battle objects + labelled. */
+function legalChoices(side) {
+	const out = [];
+	const active = side.active[0];
+	if (active && !active.fainted) {
+		const slots = active.moveSlots || [];
+		for (let i = 0; i < slots.length; i++) {
+			const m = slots[i];
+			if (m.disabled) continue;
+			if ((m.pp ?? 1) <= 0) continue;
+			out.push({ choice: `move ${i + 1}`, type: "move", id: toID(m.id) });
+		}
+	}
+	for (let j = 0; j < side.pokemon.length; j++) {
+		const p = side.pokemon[j];
+		if (side.active.indexOf(p) >= 0 || p.fainted) continue;
+		out.push({ choice: `switch ${j + 1}`, type: "switch", id: idOf(p.species) });
+	}
+	return out;
+}
+
 function reconstruct(spec) {
 	const rng = mulberry32((spec.seed || 0) >>> 0);
 	// Build teams; record the active-first reordering so per-slot state lines up.
@@ -233,7 +254,12 @@ function reconstruct(spec) {
 	);
 	const battle = stream.battle;
 	applyState(battle, spec);
-	return { state: State.serializeBattle(battle), digest: digest(battle) };
+	return {
+		state: State.serializeBattle(battle),
+		digest: digest(battle),
+		p1_choices: legalChoices(battle.sides[0]),
+		p2_choices: legalChoices(battle.sides[1]),
+	};
 }
 
 function step(serialized, p1, p2) {
@@ -243,8 +269,14 @@ function step(serialized, p1, p2) {
 		if (type === "update") collected.push(Array.isArray(data) ? data.join("\n") : data);
 	};
 	fork.sentLogPos = fork.log.length;
-	if (p1 && fork.sides[0].activeRequest && !fork.sides[0].activeRequest.wait) fork.choose("p1", p1);
-	if (p2 && fork.sides[1].activeRequest && !fork.sides[1].activeRequest.wait) fork.choose("p2", p2);
+	let illegal = false;
+	if (p1 && fork.sides[0].activeRequest && !fork.sides[0].activeRequest.wait) {
+		if (!fork.choose("p1", p1)) illegal = true;
+	}
+	if (!illegal && p2 && fork.sides[1].activeRequest && !fork.sides[1].activeRequest.wait) {
+		if (!fork.choose("p2", p2)) illegal = true;
+	}
+	if (illegal) return { illegal: true };
 	fork.sendUpdates();
 	const full = collected.join("\n");
 	const ch = extractChannelMessages(full, [1, 2]);

@@ -22,6 +22,7 @@ from lategame.agents.bc_agent import BCAgent
 from lategame.agents.heuristic_agent import HeuristicAgent
 from lategame.agents.offline_rl_agent import OfflineRLAgent
 from lategame.agents.ppo_agent import PPORecordingAgent
+from lategame.agents.search_agent import SearchAgent
 from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
 
 # BCAgent / OfflineRLAgent / PPORecordingAgent are torch-free to import (torch loads
@@ -34,11 +35,12 @@ AGENTS: dict[str, type[Player]] = {
     "bc": BCAgent,
     "offrl": OfflineRLAgent,
     "ppo": PPORecordingAgent,
+    "search": SearchAgent,
 }
 
 # Agents backed by a trained checkpoint accept ``checkpoint_path``/``sample`` kwargs;
 # the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
-_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo"}
+_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search"}
 
 
 @dataclass
