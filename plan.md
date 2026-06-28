@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-06-27)
+### 13.1 Build status & findings (as of 2026-06-28)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -369,6 +369,39 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   BC saturates ~0.42), i.e. the next lever is the learning target/data composition (losers' turns,
   value-based RL beyond pure imitation), not the representation. Full grid in
   `results/embed_prior_sweep.json`.
+
+- **Lever 9 — value-RL at data scale (AWR on all turns) — built + run; CLEARS THE WALL (GREEN).**
+  Acted on the indicated next lever: the *learning target / data composition*, not the encoder. Key
+  realization — this lever was already built and the data already existed but had **never been run
+  at scale**: `data/resim_v3_gen9rb_rl.npz` holds **82,751 turns (winners AND losers)** with
+  shaped Monte-Carlo returns (losers carry a `−victory_value` terminal), and `train/offline_rl.py`
+  already does advantage-weighted regression over all turns; yet every offrl checkpoint on disk
+  predated the 9.65×-scaled shard (AWR had only ever seen the small ~8k-turn shards). Pre-flight
+  confirmed the signal is informative: winner vs loser start-return gap **+5.48**. Built a win-rate
+  gate (`scripts/offrl_scale_gate.py`, gated on win-rate not val-acc — val-acc is the wrong metric
+  for AWR, which deliberately deviates from imitation), threaded `id_embed`/`id_embed_init` through
+  `OfflineRLConfig.arch()`+`train-rl` CLI (offrl previously couldn't pass the dex-prior embeddings —
+  it silently used random init), and fixed a latent warm-start bug (the BC→AC path only matched
+  `model_type=="bc"` but `train_bc` now stamps `"bc_policy"` → `KeyError`). **2 arms × 3 seeds, 30
+  epochs on the 82k shard, eval n=200 vs heuristic:**
+  - **MLP actor-critic (warm-started): 4.2% ± 0.6% — COLLAPSE.** Its critic cannot fit a value
+    function over 82k diverse states (**value-MAE 2.59** over a ±10 support ≈ uninformative), so the
+    AWR advantage weights are noise and the actor degrades *below* even the old plateau.
+  - **EntityTransformer + dex-prior: 47.7% ± 2.5% (min 45%, seed-0 51%) — CLEARS 27–34%.** Its
+    decoupled two-tower critic fits the value function (**value-MAE 0.28, ~9× sharper**), so
+    advantage-weighting is meaningful and the actor exceeds winners-only imitation. Confirmatory
+    ladder (best ckpt): vs random **98.5%** (matches the heuristic's own dominance), maxbasepower
+    82.5%, simpleheuristics 42.5%, **heuristic 41.7% (n=300)** — a monotonic, sensible placement, not
+    a harness artifact (the MLP arm fails in the *same* harness).
+  - **The binding insight: the plateau was never one constraint.** Each ingredient failed in
+    isolation across levers 1–8 — winners-only BC caps ~0.42 *regardless of encoder*; AWR on the MLP
+    collapses because its critic underfits; data scale alone (MLP arm) does nothing. The wall breaks
+    only at the **conjunction**: value-RL (advantage-weighting over losers' turns too) **×** a critic
+    with the capacity to fit the value function (transformer two-tower) **×** data scale (82k). The
+    AMBER dex-priors are part of the winning config — "free" turned out to matter here.
+  **Verdict: GREEN** — first method in the whole arc to beat the heuristic baseline band. Per the
+  gate, this greenlights a **self-play / PPO continuation** warm-started from the best
+  `checkpoints/offrl_scale_et_prior_s0.pt`. Full grid in `results/offrl_scale_gate.json`.
 
 ---
 

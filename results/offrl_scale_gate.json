@@ -1,0 +1,97 @@
+{
+  "data": "data/resim_v3_gen9rb_rl.npz",
+  "bc_init": "checkpoints/bc_mlp_resim_v3.pt",
+  "arms": [
+    "mlp",
+    "et_prior"
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "epochs": 30,
+  "beta": 1.0,
+  "eval_n": 200,
+  "opponent": "heuristic",
+  "records": [
+    {
+      "arm": "mlp",
+      "seed": 0,
+      "checkpoint": "checkpoints/offrl_scale_mlp_s0.pt",
+      "win_rate": 0.05,
+      "val_acc": 0.26380664652567976,
+      "val_value_mae": 2.5944750570890767,
+      "train_seconds": 53.3
+    },
+    {
+      "arm": "mlp",
+      "seed": 1,
+      "checkpoint": "checkpoints/offrl_scale_mlp_s1.pt",
+      "win_rate": 0.035,
+      "val_acc": 0.2596978851963746,
+      "val_value_mae": 2.5906124131124906,
+      "train_seconds": 56.8
+    },
+    {
+      "arm": "mlp",
+      "seed": 2,
+      "checkpoint": "checkpoints/offrl_scale_mlp_s2.pt",
+      "win_rate": 0.04,
+      "val_acc": 0.2523262839879154,
+      "val_value_mae": 2.5895838066170223,
+      "train_seconds": 54.4
+    },
+    {
+      "arm": "et_prior",
+      "seed": 0,
+      "checkpoint": "checkpoints/offrl_scale_et_prior_s0.pt",
+      "win_rate": 0.51,
+      "val_acc": 0.4241691842900302,
+      "val_value_mae": 0.2813041571764067,
+      "train_seconds": 261.9
+    },
+    {
+      "arm": "et_prior",
+      "seed": 1,
+      "checkpoint": "checkpoints/offrl_scale_et_prior_s1.pt",
+      "win_rate": 0.47,
+      "val_acc": 0.4206646525679758,
+      "val_value_mae": 0.2820985772170329,
+      "train_seconds": 255.1
+    },
+    {
+      "arm": "et_prior",
+      "seed": 2,
+      "checkpoint": "checkpoints/offrl_scale_et_prior_s2.pt",
+      "win_rate": 0.45,
+      "val_acc": 0.4222356495468278,
+      "val_value_mae": 0.24998079651432095,
+      "train_seconds": 251.2
+    }
+  ],
+  "summary": {
+    "mlp": {
+      "win_rates": [
+        0.05,
+        0.035,
+        0.04
+      ],
+      "mean": 0.04166666666666667,
+      "std": 0.0062360956446232355,
+      "min": 0.035,
+      "max": 0.05
+    },
+    "et_prior": {
+      "win_rates": [
+        0.51,
+        0.47,
+        0.45
+      ],
+      "mean": 0.4766666666666667,
+      "std": 0.024944382578492946,
+      "min": 0.45,
+      "max": 0.51
+    }
+  }
+}
