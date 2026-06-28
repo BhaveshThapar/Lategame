@@ -455,10 +455,26 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     negative control confirms the check has teeth (a fork stepped with a *swapped* choice does
     **not** match). `lategame/search/{fidelity_driver.js,fidelity.py}`,
     `scripts/rpredict_fidelity_gate.py`, `results/rpredict_fidelity.json`, `tests/test_fidelity.py`
-    (server-free, env-gated like `test_resim`). **Next:** state reconstruction + determinization
-    (poke-env POV → full Showdown state w/ sampled opponent) behind its own cheap reconstruction
-    mini-gate, then depth-1 expectimax (policy prior + value-head leaves + policy-as-opponent
-    model), then Gate B (does lookahead help) and Gate C (confirmatory ladder).
+    (server-free, env-gated like `test_resim`).
+  - **Forward model + reconstruction mini-gate — built, PASS.** Persistent
+    `search/forward_driver.js` (reconstruct a full battle from a determinization spec; fork+step
+    a serialized state, emitting clean fog-of-war per-side delta + new request) + `search/forward.py`
+    wrapper (one long-lived node process per agent). `search/determinize.py` transcribes a live
+    poke-env POV into the spec: our full team (known) + revealed opponent mons + field/hazards,
+    with hidden opponent slots filled from the gen9 RB pool via the simulator's own team generator
+    (`Teams.getGenerator().randomSet`). The mini-gate (`search/recon_check.py`,
+    `scripts/rpredict_recon_gate.py`) re-simulates replays, snapshots each decision turn,
+    determinizes it, and compares the reconstruction's *observable* digest to poke-env's. Over
+    **40 replays = 2,437 snapshots / 145,400 field-checks: every dynamic field matches 100%**
+    (hp, status, fainted, active, boosts, hazards, weather, terrain); `present` 99.95% (the only
+    gap is Minior-Orange, a cosmetic forme the dex normalizes to base `minior` — a digest-naming
+    artifact, not a reconstruction defect). Two reconstruction fixes found by the gate: reset
+    active-mon boosts to observed (clear Intimidate-at-`>start`) and clear weather/terrain a
+    determinized lead's ability set at start. Leaf-eval path validated piecewise: deepcopy the live
+    poke-env root + feed the step delta (resim's `_feed_line`) → `embed_battle`. `results/rpredict_recon.json`.
+    **Next (compute-heavy, post-sync):** depth-1 expectimax (policy prior + value-head leaves +
+    policy-as-opponent model) + SearchAgent, then Gate B (does lookahead help) and Gate C
+    (confirmatory ladder).
 
 ---
 
