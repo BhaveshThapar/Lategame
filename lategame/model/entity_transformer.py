@@ -68,6 +68,7 @@ class EntityTransformer(nn.Module):
         ff_dim: int = 256,
         id_embed: bool = True,
         id_embed_dim: int = 32,
+        id_embed_init: str = "random",
     ) -> None:
         super().__init__()
         if input_dim != OBS_DIM:
@@ -83,6 +84,7 @@ class EntityTransformer(nn.Module):
         self.ff_dim = ff_dim
         self.id_embed = id_embed
         self.id_embed_dim = id_embed_dim
+        self.id_embed_init = id_embed_init
 
         layout = OBS_LAYOUT
         self._n_tokens = layout.n_tokens
@@ -138,8 +140,24 @@ class EntityTransformer(nn.Module):
         nn.init.normal_(self.pos_embed, std=0.02)
         nn.init.normal_(self.actor_cls, std=0.02)
         nn.init.normal_(self.critic_cls, std=0.02)
+        if self.id_embed and self.id_embed_init == "prior":
+            self._apply_id_priors()
 
-    def arch_config(self) -> dict[str, int | bool]:
+    @torch.no_grad()
+    def _apply_id_priors(self) -> None:
+        """Warm-start species/move embeddings from dex-feature priors (R-ENCODE).
+
+        Overwritten by ``load_state_dict`` when a trained checkpoint is loaded, so this
+        only seeds *fresh* models; items/abilities (no priors) keep their random init.
+        """
+        from lategame.features.embed_prior import load_id_priors
+
+        for cat, weight in load_id_priors(self.id_embed_dim).items():
+            emb = self.embeddings[f"emb_{cat}"]
+            assert isinstance(emb, nn.Embedding)
+            emb.weight.copy_(torch.from_numpy(weight))
+
+    def arch_config(self) -> dict[str, int | bool | str]:
         """Architecture hyperparameters for the checkpoint ``arch`` block."""
         return {
             "d_model": self.d_model,
@@ -148,6 +166,7 @@ class EntityTransformer(nn.Module):
             "ff_dim": self.ff_dim,
             "id_embed": self.id_embed,
             "id_embed_dim": self.id_embed_dim,
+            "id_embed_init": self.id_embed_init,
         }
 
     def _entity_features(

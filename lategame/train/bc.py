@@ -51,6 +51,7 @@ class TrainConfig:
     model_type: str = BC_POLICY  # BC_POLICY (flat MLP) | "entity_transformer" | "actor_critic"
     id_embed: bool = True  # entity_transformer only: learned species/move/item/ability ids
     id_embed_dim: int = 32
+    id_embed_init: str = "random"  # entity_transformer only: "random" | "prior" (dex warm-start)
     max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
 
 
@@ -79,7 +80,11 @@ def _build_model(config: TrainConfig, device: torch.device) -> nn.Module:
         "input_dim": OBS_DIM,
         "dropout": config.dropout,
         "hidden_dim": config.hidden_dim,
-        "arch": {"id_embed": config.id_embed, "id_embed_dim": config.id_embed_dim},
+        "arch": {
+            "id_embed": config.id_embed,
+            "id_embed_dim": config.id_embed_dim,
+            "id_embed_init": config.id_embed_init,
+        },
     }
     return build_model(meta).to(device)
 

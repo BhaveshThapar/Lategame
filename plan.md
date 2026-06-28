@@ -342,6 +342,34 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   the precise remedy for "identity is real but data-starved," and BC-gate testable before any
   expensive retrain. Full grid in `results/embed_scaling_sweep.json`.
 
+- **R-ENCODE identity-prior gate — built + run; priors reach parity, do not clear OFF (AMBER).**
+  Acted on the indicated next lever from the scaling sweep. Built dex-feature **pre-initialized
+  embeddings** (`lategame/features/embed_prior.py` + committed `data/id_priors_gen9.npz`, stamped
+  with `vocab_version`): species warm-started from base stats + types, moves from
+  power/accuracy/type/category/priority/pp — all from local poke-env `GenData` (no network; the
+  named "Smogon usage / species2vec" alternatives were dropped — species2vec is meaningless on
+  *random* battle teams, and dex features are the cheapest prior that captures "what this entity
+  is"). Items/abilities lack structured features → stay random. Threaded a new
+  `id_embed_init={random,prior}` through `EntityTransformer`→factory→`TrainConfig`→CLI (warm-start
+  applied in `_reset_parameters`, overwritten by `load_state_dict`, so backward compatible). Ran a
+  **3-arm** BC gate (OFF / random-init / prior-init, 3 seeds, 20 epochs) over N ∈ {8k,16k,32k,40496}
+  via `scripts/embed_prior_sweep.py`. **Val-acc:** 8k OFF .363 / rand .276 / prior .282; 16k .400 /
+  .274 / **.378**; 32k .417 / .392 / .407; 40496 OFF **.418±.004** / rand **.401±.010** / prior
+  **.420±.005**. Reading: (i) priors **decisively beat random-init** at every rung and
+  **accelerate emergence** — the headline is 16k, where prior is already .378 while random is still
+  stuck at .274 (**+0.104**); (ii) priors **close the random→OFF deficit** — random trailed OFF by
+  −1.7pp at the ceiling, prior reaches **+0.001 (parity)**; (iii) **but parity is not a win** —
+  prior (.420±.005) vs OFF (.418±.004) bands overlap heavily, and all three arms converge to ~0.42
+  while OFF itself is flat 32k→40k. **Verdict: AMBER** — priors make identity embeddings "free"
+  (worth keeping as the default ON config: faster, no downside) but are **not the unlock**; the
+  ~0.42 winners-only imitation-accuracy ceiling holds regardless of identity encoding. Per the gate
+  (GREEN required ON-prior to clear OFF with non-overlapping bands), did **not** greenlight an
+  offrl/PPO retrain. **8th lever to land at the same wall** → the binding constraint is no longer
+  plausibly the encoder/embedding at all; it points at the imitation *signal itself* (winners-only
+  BC saturates ~0.42), i.e. the next lever is the learning target/data composition (losers' turns,
+  value-based RL beyond pure imitation), not the representation. Full grid in
+  `results/embed_prior_sweep.json`.
+
 ---
 
 ## 14. Risks & mitigations

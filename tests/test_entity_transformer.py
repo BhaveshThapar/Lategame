@@ -156,6 +156,43 @@ def test_id_embed_flag_round_trips_through_metadata():
     rebuilt.load_state_dict(off.state_dict())
 
 
+def test_id_embed_init_prior_warm_starts_species_and_moves():
+    from lategame.features.embed_prior import load_id_priors
+
+    model = _tiny_transformer(id_embed=True)
+    assert model.id_embed_init == "random"
+    prior = EntityTransformer(OBS_DIM, id_embed=True, id_embed_init="prior", **_SMALL)
+    priors = load_id_priors(prior.id_embed_dim)
+    for cat in ("species", "moves"):
+        assert torch.allclose(
+            prior.embeddings[f"emb_{cat}"].weight, torch.from_numpy(priors[cat])
+        )
+    # No dex prior for items/abilities -> random rows, zero padding row, and species
+    # embeddings differ from the random arm (structure was injected).
+    zero = torch.zeros(prior.id_embed_dim)
+    for cat in ("items", "abilities"):
+        weight = prior.embeddings[f"emb_{cat}"].weight
+        assert torch.allclose(weight[0], zero) and not torch.allclose(weight[1], zero)
+    assert not torch.allclose(
+        model.embeddings["emb_species"].weight, prior.embeddings["emb_species"].weight
+    )
+
+
+def test_id_embed_init_round_trips_and_load_state_dict_overwrites_prior():
+    src = EntityTransformer(OBS_DIM, id_embed=True, id_embed_init="prior", **_SMALL).eval()
+    meta = {**model_metadata(src), "input_dim": OBS_DIM}
+    assert meta["arch"]["id_embed_init"] == "prior"
+    rebuilt = build_model(meta)
+    assert isinstance(rebuilt, EntityTransformer) and rebuilt.id_embed_init == "prior"
+    rebuilt.load_state_dict(src.state_dict())  # trained weights survive the prior warm-start
+    rebuilt.eval()
+    x = torch.from_numpy(_valid_obs(2))
+    with torch.no_grad():
+        a_logits, _ = src(x)
+        b_logits, _ = rebuilt(x)
+    assert torch.allclose(a_logits, b_logits, atol=1e-6)
+
+
 def _make_rl_npz(path, n=64, episode_len=16):
     from lategame.data.collect import TrajectoryDataset, save_rl
     from lategame.data.reward import RewardWeights
@@ -267,6 +304,33 @@ def test_train_bc_dispatches_entity_transformer(tmp_path):
     model = build_model(ckpt)
     model.load_state_dict(ckpt["state_dict"])
     assert isinstance(model, EntityTransformer)
+
+
+def test_train_bc_prior_init_stamps_and_rebuilds(tmp_path):
+    from lategame.data.collect import Dataset, save
+    from lategame.train.bc import TrainConfig, train_bc
+
+    rng = np.random.default_rng(2)
+    obs = _valid_obs(64, rng)
+    action = rng.integers(0, 26, size=64).astype(np.int64)
+    mask = np.ones((64, 26), dtype=bool)
+    data_path = tmp_path / "bc.npz"
+    save(Dataset(obs, action, mask, "gen9randombattle"), data_path)
+
+    ckpt_path = tmp_path / "bc_prior.pt"
+    train_bc(
+        data_path,
+        ckpt_path,
+        TrainConfig(
+            epochs=1, batch_size=32, device="cpu",
+            model_type=MODEL_ENTITY_TRANSFORMER, id_embed=True, id_embed_init="prior",
+        ),
+    )
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    assert ckpt["arch"]["id_embed_init"] == "prior"
+    model = build_model(ckpt)
+    model.load_state_dict(ckpt["state_dict"])
+    assert isinstance(model, EntityTransformer) and model.id_embed_init == "prior"
 
 
 def test_bc_warm_start_into_transformer_rejected(tmp_path):

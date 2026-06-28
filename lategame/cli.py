@@ -68,6 +68,7 @@ def _run_train(args: argparse.Namespace) -> None:
         device=args.device,
         model_type=args.model_type,
         id_embed=args.id_embed,
+        id_embed_init=args.id_embed_init,
         seed=args.seed,
         max_samples=args.max_samples,
     )
@@ -285,6 +286,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="entity_transformer: disable learned species/move/item/ability embeddings (ablation)",
     )
     train.set_defaults(id_embed=True)
+    train.add_argument(
+        "--id-embed-init",
+        default="random",
+        choices=["random", "prior"],
+        help="entity_transformer: 'prior' warm-starts species/move embeddings from dex features",
+    )
     train.add_argument("--seed", type=int, default=0, help="Init + train/val-split seed")
     train.add_argument(
         "--max-samples",
