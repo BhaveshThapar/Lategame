@@ -17,8 +17,17 @@ advantage-weighted regression over all 82k re-simulated turns (winners **and** l
 the **EntityTransformer + dex-prior critic** reaches **~45–48% vs the heuristic** (3 seeds,
 n=200). The plateau was never one constraint — it breaks only at the *conjunction* of
 value-RL **×** a critic that can fit the value function (the transformer two-tower; value-MAE
-0.28 vs the MLP's 2.59, which collapses to ~4%) **×** data scale. Next lever: a self-play /
-PPO continuation warm-started from this checkpoint. See `plan.md` §13.1 for the full arc.
+0.28 vs the MLP's 2.59, which collapses to ~4%) **×** data scale.
+
+**Two follow-ups both find the GREEN policy near a local ceiling (AMBER).** Lever 10 —
+on-policy PPO warm-started from the GREEN checkpoint — is stable (no collapse) but does not
+compound. Lever 11 (**R-PREDICT**) builds the infrastructure the project never had: a
+*faithful Showdown forward model* (serialize/fork/step, validated bit-for-bit, **0/9,734**
+transition mismatches) + *determinization* of the hidden opponent (live POV → full battle,
+**~100%** observable-faithful). But depth-1 test-time search on the frozen GREEN policy still
+doesn't beat it (head-to-head ~0.36 at n=120) — the value head is a coarse one-ply evaluator —
+so two independent mechanisms (gradient and search) confirm the local ceiling. See `plan.md`
+§13.1 for the full arc.
 
 ## Setup
 
@@ -61,8 +70,11 @@ python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --i
 python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
 
 # Lever experiment gates (win-rate vs the heuristic; write results/*.json)
-python scripts/offrl_scale_gate.py  --out results/offrl_scale_gate.json    # Lever 9: AWR @ 82k (GREEN)
-python scripts/ppo_continue_gate.py --out results/ppo_continue_gate.json   # Lever 10: PPO continuation (AMBER)
+python scripts/offrl_scale_gate.py     --out results/offrl_scale_gate.json   # Lever 9: AWR @ 82k (GREEN)
+python scripts/ppo_continue_gate.py    --out results/ppo_continue_gate.json  # Lever 10: PPO continuation (AMBER)
+python scripts/rpredict_fidelity_gate.py --out results/rpredict_fidelity.json  # Lever 11 Gate A: forward-model fidelity (PASS)
+python scripts/rpredict_recon_gate.py    --out results/rpredict_recon.json     # Lever 11: reconstruction mini-gate (PASS)
+python scripts/rpredict_gate.py          --out results/rpredict_gate_b.json    # Lever 11 Gate B: depth-1 search (AMBER)
 
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
