@@ -320,6 +320,27 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   data scale; pursuing it would require a much larger replay scrape OR pre-initialized embeddings
   (usage stats / species2vec), not learned-from-scratch on a few thousand samples. This sharpens
   Data Plan §10 and ML Approach §11 toward **data scale** as the next lever.
+- **R-ENCODE data-scaling sweep — built + run; data-starvation CONFIRMED, but lands just short
+  (AMBER).** Tested the "embeddings are starved, not useless" hypothesis directly. Scaled the
+  scrape 150→**1424** replays (≥1200; the public index for recent gen9randombattle was exhausted
+  at page 100, so this is the achievable ceiling), re-simulated at **0% drop** → **40,496
+  winners-only BC samples** (9.65×) + 82,751 RL turns (`data/resim_v3_gen9rb_*.npz`). Ran a BC
+  imitation-accuracy sweep (EntityTransformer, id_embed ON vs OFF, 3 seeds) over nested subsets
+  N ∈ {1k, 2k, 4196, 8k, 16k, 32k, 40496} via a new `--max-samples` train flag +
+  `scripts/embed_scaling_sweep.py`. **Gap (OFF−ON) val-acc:** +0.04 (1k) → −0.02 (4196) →
+  **+0.088 (8k) → +0.125 (16k)** → **+0.025 (32k) → +0.017 (40k)**. Reading: (i) absolute
+  imitation rises with data for both arms (OFF 0.28→0.42, ON 0.24→0.40), (ii) the R-ENCODE
+  "identity hurts" negative is a **small-data artifact** — the gap is worst in the overfitting
+  regime (8k–16k) and then **collapses** as data grows, (iii) a phase transition between 16k→32k
+  where ON jumps **+0.118** (0.274→0.392) vs OFF's +0.017 — embeddings learn ~7× faster once fed,
+  the signature of emergence with scale. **But** at the data ceiling ON (0.401±0.010) still trails
+  OFF (0.418±0.004) by a small, seed-resolved margin (non-overlapping bands) — ON did not reach
+  parity. **Verdict: AMBER** — starvation was real and is resolving with scale, yet the achievable
+  replay ceiling (~40k samples) lands just short of identity paying off. Per the decision gate, did
+  **not** greenlight an offrl/PPO retrain on this half-signal; and since the scrape is now maxed,
+  the indicated next lever is **pre-initialized embeddings** (Smogon usage stats / species2vec) —
+  the precise remedy for "identity is real but data-starved," and BC-gate testable before any
+  expensive retrain. Full grid in `results/embed_scaling_sweep.json`.
 
 ---
 

@@ -68,6 +68,8 @@ def _run_train(args: argparse.Namespace) -> None:
         device=args.device,
         model_type=args.model_type,
         id_embed=args.id_embed,
+        seed=args.seed,
+        max_samples=args.max_samples,
     )
     train_bc(args.data, args.out, config)
 
@@ -283,6 +285,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="entity_transformer: disable learned species/move/item/ability embeddings (ablation)",
     )
     train.set_defaults(id_embed=True)
+    train.add_argument("--seed", type=int, default=0, help="Init + train/val-split seed")
+    train.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Train on a deterministic nested subset of N samples (data-scaling sweep)",
+    )
 
     collect_rl = sub.add_parser(
         "collect-rl", help="Generate an offline-RL dataset (all turns + shaped rewards)"

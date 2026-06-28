@@ -17,7 +17,7 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 
 from lategame.data.dataset import BCDataset
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
@@ -51,6 +51,23 @@ class TrainConfig:
     model_type: str = BC_POLICY  # BC_POLICY (flat MLP) | "entity_transformer" | "actor_critic"
     id_embed: bool = True  # entity_transformer only: learned species/move/item/ability ids
     id_embed_dim: int = 32
+    max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
+
+
+# Fixed seed for the data-subset permutation -- deliberately independent of TrainConfig.seed
+# so that (a) every model seed at a given N sees the *same* subset and (b) larger N nests the
+# smaller (size-N subset is a prefix of size-2N). config.seed varies only init + train/val split.
+_SUBSET_SEED = 1234
+
+
+def _subset(dataset: BCDataset, max_samples: int | None) -> BCDataset | Subset:
+    """Deterministic nested subset of the first ``max_samples`` shuffled indices, or the
+    full dataset when ``max_samples`` is None or already covers it."""
+    if max_samples is None or max_samples >= len(dataset):
+        return dataset
+    generator = torch.Generator().manual_seed(_SUBSET_SEED)
+    indices = torch.randperm(len(dataset), generator=generator)[:max_samples].tolist()
+    return Subset(dataset, indices)
 
 
 def _build_model(config: TrainConfig, device: torch.device) -> nn.Module:
@@ -100,10 +117,13 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     print(f"training on {device}")
 
     dataset = BCDataset(data_path)
-    n_val = max(1, int(len(dataset) * config.val_frac))
-    n_train = len(dataset) - n_val
+    battle_format = dataset.battle_format
+    data = _subset(dataset, config.max_samples)
+    print(f"training on {len(data)}/{len(dataset)} samples")
+    n_val = max(1, int(len(data) * config.val_frac))
+    n_train = len(data) - n_val
     generator = torch.Generator().manual_seed(config.seed)
-    train_set, val_set = random_split(dataset, [n_train, n_val], generator=generator)
+    train_set, val_set = random_split(data, [n_train, n_val], generator=generator)
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
@@ -123,7 +143,7 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
         if val_loss < best_val:
             best_val = val_loss
             best_metrics = {"epoch": epoch, "val_loss": val_loss, "val_acc": val_acc}
-            _save_checkpoint(model, out_path, dataset.battle_format, config, best_metrics)
+            _save_checkpoint(model, out_path, battle_format, config, best_metrics)
 
     print(f"best: {best_metrics}")
     return best_metrics
