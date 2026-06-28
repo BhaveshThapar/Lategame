@@ -113,6 +113,8 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         d_model=args.d_model,
         n_layers=args.n_layers,
         n_heads=args.n_heads,
+        id_embed=args.id_embed,
+        id_embed_init=args.id_embed_init,
     )
     train_offline_rl(args.data, args.out, config)
 
@@ -338,6 +340,19 @@ def build_parser() -> argparse.ArgumentParser:
     train_rl.add_argument("--d-model", type=int, default=128, help="Transformer token width")
     train_rl.add_argument("--n-layers", type=int, default=2, help="Transformer encoder layers")
     train_rl.add_argument("--n-heads", type=int, default=4, help="Transformer attention heads")
+    train_rl.add_argument(
+        "--no-id-embed",
+        dest="id_embed",
+        action="store_false",
+        help="entity_transformer: disable learned species/move/item/ability embeddings",
+    )
+    train_rl.set_defaults(id_embed=True)
+    train_rl.add_argument(
+        "--id-embed-init",
+        default="random",
+        choices=["random", "prior"],
+        help="entity_transformer: 'prior' warm-starts species/move embeddings from dex features",
+    )
     train_rl.add_argument("--n-bins", type=int, default=51)
     train_rl.add_argument("--beta", type=float, default=1.0, help="AWR temperature")
     train_rl.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")

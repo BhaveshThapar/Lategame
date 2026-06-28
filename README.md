@@ -9,11 +9,16 @@ A complete experimental pipeline is built and verified — rule-based baseline �
 cloning → offline RL → self-play → entity transformer + on-policy PPO → human-replay
 ingestion (public-log **and** full-fidelity re-simulation).
 
-**Key finding so far: no learned method yet beats the M1 heuristic.** Every RL approach
-plateaus at ~27–34% win rate vs the heuristic; human-replay imitation does worse (~5–11%).
-The evidence across six methods points at the hand-crafted observation encoder (no
-species/move/item identity) as the remaining lever — not the algorithm, critic, or
-trajectory data. The `heuristic` agent stays the strongest player and the fixed eval baseline.
+**Key finding: a learned method finally clears the heuristic plateau.** For eight levers
+every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
+worse, ~5–11%), and winners-only behavior cloning saturated at ~0.42 imitation accuracy
+*regardless of encoder*. The breakthrough (lever 9) is **value-RL at data scale**:
+advantage-weighted regression over all 82k re-simulated turns (winners **and** losers) with
+the **EntityTransformer + dex-prior critic** reaches **~45–48% vs the heuristic** (3 seeds,
+n=200). The plateau was never one constraint — it breaks only at the *conjunction* of
+value-RL **×** a critic that can fit the value function (the transformer two-tower; value-MAE
+0.28 vs the MLP's 2.59, which collapses to ~4%) **×** data scale. Next lever: a self-play /
+PPO continuation warm-started from this checkpoint. See `plan.md` §13.1 for the full arc.
 
 ## Setup
 

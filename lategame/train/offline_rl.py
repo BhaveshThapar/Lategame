@@ -37,7 +37,11 @@ from lategame.model.actor_critic import (
 )
 from lategame.model.factory import MODEL_ACTOR_CRITIC, build_model, model_metadata
 from lategame.model.policy import masked_logits
-from lategame.train.bc import select_device
+from lategame.train.bc import BC_POLICY, select_device
+
+# A flat-MLP BC checkpoint warm-starts the actor-critic trunk + policy head. Legacy
+# checkpoints carry no ``model_type`` (default "bc"); ``train_bc`` now stamps BC_POLICY.
+_BC_WARM_START_KINDS = ("bc", BC_POLICY)
 
 
 @dataclass
@@ -64,19 +68,28 @@ class OfflineRLConfig:
     n_layers: int = 2
     n_heads: int = 4
     ff_dim: int = 256
+    # Learned species/move/item/ability identity embeddings (transformer only).
+    # The R-ENCODE gate adopted prior-init as the BC default; offrl must pass it
+    # through too, else the factory silently falls back to random-init embeddings.
+    id_embed: bool = True
+    id_embed_dim: int = 32
+    id_embed_init: str = "random"  # "random" | "prior"
     # Fixed value support: when both set, skip deriving it from the shard's returns.
     # The self-play loop pins these to the warm-start checkpoint's support so the
     # carried-over value head stays calibrated across iterations.
     v_min: float | None = None
     v_max: float | None = None
 
-    def arch(self) -> dict[str, int]:
+    def arch(self) -> dict[str, object]:
         """Transformer architecture block (used when ``model_type`` is the transformer)."""
         return {
             "d_model": self.d_model,
             "n_layers": self.n_layers,
             "n_heads": self.n_heads,
             "ff_dim": self.ff_dim,
+            "id_embed": self.id_embed,
+            "id_embed_dim": self.id_embed_dim,
+            "id_embed_init": self.id_embed_init,
         }
 
 
@@ -182,7 +195,7 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
             raise ValueError("Warm-start checkpoint encoder mismatch; cannot warm-start. Retrain.")
         init_state = init_ckpt["state_dict"]
         init_kind = str(init_ckpt.get("model_type", "bc"))
-        if init_kind == "bc":
+        if init_kind in _BC_WARM_START_KINDS:
             # BC->AC warm-start copies the MLP trunk + policy head; the transformer
             # has no compatible trunk, so it must train from scratch instead.
             if config.model_type != MODEL_ACTOR_CRITIC:
@@ -211,7 +224,7 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
 
     model = build_model(model_meta).to(device)
     if init_state is not None:
-        if init_kind == "bc":
+        if init_kind in _BC_WARM_START_KINDS:
             load_bc_weights(model, init_state)
             print(f"warm-started trunk + policy head from {config.bc_init}")
         else:
