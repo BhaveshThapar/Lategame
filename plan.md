@@ -438,6 +438,27 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   next lever is no longer more on-policy gradient: it is the **R-PREDICT** direction
   (depth-limited search / opponent-modeling on the strong base policy + working value function) or
   a tougher opponent curriculum. Full grid in `results/ppo_continue_gate.json`.
+- **Lever 11 — R-PREDICT (depth-limited search on the frozen GREEN base) — IN PROGRESS.**
+  Acting on the Lever 10 verdict: layer test-time search on the frozen GREEN checkpoint (no
+  retrain). The binding obstacle is that there is **no forward model** — the net gives V(s) and
+  π(a|s) but not Q(s,a), and the vendored simulator was wired only for replay re-simulation. The
+  forward model is built on the simulator's `State.serializeBattle`/`deserializeBattle` (fork) +
+  `battle.choose` (step); hidden opponent info will be **determinized** from the gen9
+  random-battle pool. Gated cheap-first.
+  - **Gate A — forward-model fidelity (the cheap KILL gate) — PASS.** Before building search,
+    prove the fork/step primitive is faithful: `search/fidelity_driver.js` replays real replays
+    turn-by-turn and, at each decision round, forks the battle, steps the fork with the *same*
+    choices, and checks the result matches stepping the battle directly. The serialized PRNG seed
+    makes a faithful fork an **exact** match (same damage rolls / crits / accuracy). Over **300
+    replays = 9,734 transitions: 0 mismatches** (core *and* the stricter full digest incl.
+    boosts/pp/item/ability), 0 drive errors, match rate **1.0000** (≥0.99 ⇒ build search). A
+    negative control confirms the check has teeth (a fork stepped with a *swapped* choice does
+    **not** match). `lategame/search/{fidelity_driver.js,fidelity.py}`,
+    `scripts/rpredict_fidelity_gate.py`, `results/rpredict_fidelity.json`, `tests/test_fidelity.py`
+    (server-free, env-gated like `test_resim`). **Next:** state reconstruction + determinization
+    (poke-env POV → full Showdown state w/ sampled opponent) behind its own cheap reconstruction
+    mini-gate, then depth-1 expectimax (policy prior + value-head leaves + policy-as-opponent
+    model), then Gate B (does lookahead help) and Gate C (confirmatory ladder).
 
 ---
 
