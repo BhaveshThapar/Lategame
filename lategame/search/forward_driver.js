@@ -10,6 +10,7 @@
  *                                                        "digest":{...}}      (observable digest)
  *   {"cmd":"step","id":..,"state":<serialized>,      -> {"id":..,"state":<serialized'>,
  *        "p1":<choice|null>,"p2":<choice|null>}          "p1_delta":"<lines>","p1_request":<json|null>,
+ *                                                        "p1_choices":[..],"p2_choices":[..],
  *                                                        "ended":bool,"winner":<name|null>}
  *
  * `reconstruct` builds a full two-sided battle from a determinization spec (our known team +
@@ -289,6 +290,11 @@ function step(serialized, p1, p2) {
 		p2_delta: (ch[2] || []).join("\n"),
 		p1_request: reqLine(fork.sides[0]),
 		p2_request: reqLine(fork.sides[1]),
+		// Legal choices at the resulting node (driver frame: p1 = us), so depth>1
+		// search can recurse without re-parsing the request. Empty for a side that
+		// is waiting / has no decision this step.
+		p1_choices: legalChoices(fork.sides[0]),
+		p2_choices: legalChoices(fork.sides[1]),
 		ended: !!fork.ended,
 		winner: fork.winner ?? null,
 		state: State.serializeBattle(fork),
