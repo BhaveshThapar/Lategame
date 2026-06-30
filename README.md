@@ -19,7 +19,7 @@ n=200). The plateau was never one constraint — it breaks only at the *conjunct
 value-RL **×** a critic that can fit the value function (the transformer two-tower; value-MAE
 0.28 vs the MLP's 2.59, which collapses to ~4%) **×** data scale.
 
-**Three follow-ups all find the GREEN policy near a local ceiling (AMBER).** Lever 10 —
+**Four follow-ups all find the GREEN policy near a local ceiling (AMBER).** Lever 10 —
 on-policy PPO warm-started from the GREEN checkpoint — is stable (no collapse) but does not
 compound. Lever 11 (**R-PREDICT**) builds the infrastructure the project never had: a
 *faithful Showdown forward model* (serialize/fork/step, validated bit-for-bit, **0/9,734**
@@ -29,9 +29,15 @@ beat it (head-to-head ~0.36 at n=120). Lever 12 deepens it to **depth-2** (same 
 recursion + policy-prior pruning): the over-switch is gone (vs random **1.000**) and search now
 reaches **parity** with its base (h2h **0.500**) but still does not exceed it (vs heuristic
 −0.025; the minimax arm regresses to h2h 0.275 — the determinized opponent model is too weak for
-worst-case search). Three independent mechanisms — gradient (L10), depth-1 (L11), depth-2 (L12) —
-confirm the local ceiling; the search direction is retired and the next lever is the
-tougher-opponent **curriculum** (change the signal, not the inference). See `plan.md` §13.1.
+worst-case search). Lever 13 tests the last untested axis — the **tougher-opponent curriculum**:
+the wall-clearing AWR mechanism (all turns, both sides) re-run from GREEN on self-play data vs
+the tough `simpleheuristics` anchor + a fictitious-play league (heuristic held out), powered up
+(the M4 loop was underpowered + never run from GREEN). A cheap pre-flight confirms the signal is
+present (winner/loser start-return gap **6.30**), but 3 seeds × 12 iters stays **flat**: best-iter
+vs heuristic **0.472±0.013** ≈ the 0.462 start, final head-to-head vs the start **0.443 < 0.50**,
+and even win-rate vs the *trained* anchor doesn't rise. Four independent mechanisms — gradient
+(L10), depth-1 (L11), depth-2 (L12), curriculum (L13) — confirm the local ceiling; the limiter
+is neither the inference machinery nor the opponent distribution. See `plan.md` §13.1.
 
 ## Setup
 
@@ -81,6 +87,7 @@ python scripts/rpredict_fidelity_gate.py --out results/rpredict_fidelity.json  #
 python scripts/rpredict_recon_gate.py    --out results/rpredict_recon.json     # Lever 11: reconstruction mini-gate (PASS)
 python scripts/rpredict_gate.py          --out results/rpredict_gate_b.json    # Lever 11 Gate B: depth-1 search (AMBER)
 python scripts/rpredict_gate.py --depth 2 --opp-cap 4 --out results/rpredict_gate_b2_mean.json  # Lever 12: depth-2 search (AMBER)
+python scripts/curriculum_gate.py        --out results/curriculum_gate.json   # Lever 13: tougher-opponent AWR self-play (AMBER)
 
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
@@ -92,7 +99,7 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 112 tests; server-gated smokes run when the local server is up
+pytest            # 118 tests; server-gated smokes run when the local server is up
 ruff check .
 mypy lategame
 ```

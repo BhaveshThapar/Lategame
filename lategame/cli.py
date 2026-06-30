@@ -134,6 +134,7 @@ async def _run_selfplay(args: argparse.Namespace) -> None:
         anchors=tuple(a.strip() for a in args.anchors.split(",") if a.strip()),
         eval_baselines=tuple(b.strip() for b in args.eval_baselines.split(",") if b.strip()),
         eval_n=args.eval_n,
+        max_concurrent=args.max_concurrent,
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,
@@ -379,6 +380,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Baselines to chart win-rate against each iteration",
     )
     selfplay.add_argument("--eval-n", type=int, default=100, help="Battles per eval matchup")
+    selfplay.add_argument(
+        "--max-concurrent", type=int, default=20, help="Concurrent battles in collection/eval"
+    )
     selfplay.add_argument("--epochs", type=int, default=4, help="Fine-tune epochs per iteration")
     selfplay.add_argument("--batch-size", type=int, default=256)
     selfplay.add_argument("--lr", type=float, default=1e-3)

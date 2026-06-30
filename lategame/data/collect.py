@@ -102,7 +102,10 @@ class PlayerSpec:
 
 
 def _build_recording_player(
-    spec: PlayerSpec, battle_format: str, weights: RewardWeights | None = None
+    spec: PlayerSpec,
+    battle_format: str,
+    weights: RewardWeights | None = None,
+    max_concurrent: int = 1,
 ) -> Player:
     if spec.name not in AGENTS:
         raise ValueError(f"Unknown agent '{spec.name}'. Choose from: {', '.join(AGENTS)}")
@@ -112,6 +115,11 @@ def _build_recording_player(
         extra["sample"] = spec.sample
         if spec.checkpoint_path is not None:
             extra["checkpoint_path"] = spec.checkpoint_path
+    # poke-env defaults to one battle at a time; the self-play loop passes a higher
+    # value so cross_evaluate keeps many battles in flight (the local server is the
+    # bottleneck). Default 1 keeps M2/M3 collection behaviour unchanged.
+    if max_concurrent > 1:
+        extra["max_concurrent_battles"] = max_concurrent
     player = cls(
         account_configuration=local_account(_unique_username(f"rec{spec.name}")),
         battle_format=battle_format,
@@ -334,6 +342,7 @@ async def collect_selfplay(
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
     record_opponents: bool = True,
+    max_concurrent: int = 1,
 ) -> TrajectoryDataset:
     """Play ``learner`` against each opponent; return all turns + shaped rewards.
 
@@ -354,8 +363,8 @@ async def collect_selfplay(
     dropped = 0
 
     for opp in opponents:
-        pl = _build_recording_player(learner, battle_format, weights)
-        po = _build_recording_player(opp, battle_format, weights)
+        pl = _build_recording_player(learner, battle_format, weights, max_concurrent)
+        po = _build_recording_player(opp, battle_format, weights, max_concurrent)
         await cross_evaluate([pl, po], n_challenges=games_per_opp)
         for player in (pl, po) if record_opponents else (pl,):
             dropped += _append_episodes(
