@@ -1,4 +1,4 @@
-"""R-PREDICT search agent (Lever 11): depth-1 expectimax on the frozen GREEN checkpoint.
+"""R-PREDICT search agent (Lever 11/12): depth-limited expectimax on the frozen GREEN checkpoint.
 
 At each decision it runs ``search.expectimax.choose_order`` -- determinize the opponent, fork
 the reconstructed state, step hypothetical (our action, opponent action) pairs, and evaluate
@@ -32,6 +32,9 @@ def _config_from_env() -> SearchConfig:
         opp_cap=int(os.environ.get("LATEGAME_SEARCH_OPP_CAP", "6")),
         policy_blend=float(os.environ.get("LATEGAME_SEARCH_BLEND", "0.0")),
         shaped_coef=float(os.environ.get("LATEGAME_SEARCH_SHAPED", "0.0")),
+        depth=int(os.environ.get("LATEGAME_SEARCH_DEPTH", "1")),
+        top_k_my=int(os.environ.get("LATEGAME_SEARCH_TOPK_MY", "3")),
+        opp_cap_deep=int(os.environ.get("LATEGAME_SEARCH_OPP_CAP_DEEP", "3")),
         seed=int(os.environ.get("LATEGAME_SEARCH_SEED", "0")),
     )
 

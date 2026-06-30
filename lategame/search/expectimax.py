@@ -1,11 +1,18 @@
-"""Depth-1 expectimax over the forward model (Lever 11 / R-PREDICT).
+"""Depth-limited expectimax over the forward model (Lever 11 R-PREDICT / Lever 12 depth-2).
 
 Layered on the FROZEN GREEN checkpoint at decision time (no retrain). For each of our legal
 actions we determinize the hidden opponent (K samples), fork the reconstructed state, step a
-hypothetical (our action, opponent action), and evaluate the leaf with the GREEN value head;
-we aggregate over the opponent's actions (``mean`` = uniform expectimax, ``min`` = worst-case)
-and over determinizations, then pick the best action -- optionally blended with the policy
-prior so search only overrides the base policy when the lookahead is decisive.
+hypothetical (our action, opponent action), and evaluate the resulting node -- either as a
+shaped leaf (depth-1, Lever 11) or by recursing ``cfg.depth - 1`` plies further (Lever 12),
+maximizing over our policy-pruned actions and aggregating the opponent (``mean`` = uniform
+expectimax, ``min`` = minimax). We average over determinizations, then pick the best action --
+optionally blended with the policy prior so search only overrides the base when decisive.
+
+Why depth-2: depth-1 is provably near-equivalent to the policy when the leaf is the same value
+the policy trained against (the Lever 11 AMBER). The shaped term (HP/faints) only becomes
+discriminative one ply deeper, where search sees 2-ply sequences (switch -> they KO -> revenge)
+the 1-ply reactive policy cannot represent. Root expands all our actions; deeper plies prune to
+the top-k by policy prior and cap opponent branching to keep the node-RPC cost tractable.
 
 Leaf evaluation reuses the validated path: deepcopy the live poke-env battle and feed the
 fork's clean fog-of-war delta (resim's ``_feed_line``) -> ``embed_battle`` -> V. The forward
@@ -36,9 +43,12 @@ _WEIGHTS = RewardWeights()
 class SearchConfig:
     determinizations: int = 1  # opponent-team samples averaged per decision
     opp_aggregation: str = "mean"  # "mean" (uniform expectimax) | "min" (worst-case)
-    opp_cap: int = 6  # cap opponent branching (their moves first)
+    opp_cap: int = 6  # cap opponent branching at the ROOT (their moves first)
     policy_blend: float = 0.0  # lambda in [0,1]: mix z-scored search value with log-pi prior
     shaped_coef: float = 0.0  # leaf = V + shaped_coef * shaped state-value (tactical term)
+    depth: int = 1  # plies of lookahead (1 = the L11 depth-1 path, unchanged)
+    top_k_my: int = 3  # prune OUR actions by policy prior at deep plies (root expands all)
+    opp_cap_deep: int = 3  # cap opponent branching at deep plies (root keeps opp_cap)
     seed: int = 0
 
 
@@ -47,14 +57,70 @@ def _swap_roles(text: str) -> str:
     return text.replace("p1", "\x00").replace("p2", "p1").replace("\x00", "p2")
 
 
-def _leaf_value(
-    pv: PolicyValue, live: AbstractBattle, res: dict[str, Any], role: str, shaped_coef: float
-) -> float | None:
-    """Value of the post-step leaf: terminal -> v_max/v_min/0, else V + shaped_coef * shaped.
+def _node_battle(
+    pv: PolicyValue, live: AbstractBattle, res: dict[str, Any], role: str
+) -> AbstractBattle:
+    """Poke-env battle at the post-step node: deepcopy ``live`` + feed the fog-of-war delta.
+
+    Reuses the validated leaf path (resim's ``_feed_line``: ``|request|`` -> ``parse_request``,
+    which also populates ``available_moves``/``available_switches`` for the action mask). The
+    delta/request are role-swapped when the live battle labels us p2 (the driver always p1=us).
+    """
+    delta = res.get("p1_delta") or ""
+    req = res.get("p1_request")
+    if role == "p2":
+        delta = _swap_roles(delta)
+        req = _swap_roles(req) if req else req
+    node = pv.deepcopy_battle(live)
+    for line in delta.split("\n"):
+        _feed_line(node, line)
+    if req:
+        _feed_line(node, req)
+    return node
+
+
+def _leaf_eval(pv: PolicyValue, node: AbstractBattle, shaped_coef: float) -> float:
+    """Leaf value: outcome ``V`` + ``shaped_coef`` * shaped state-value (tactical term).
 
     The outcome value head V is a coarse long-horizon estimator (nearly flat at one ply, so
     pure-V search over-switches); the shaped state-value adds the immediate tactical signal
-    (chip the opponent, preserve our HP) that makes a one-ply lookahead discriminative.
+    (chip the opponent, preserve our HP) that a shallow lookahead needs to discriminate.
+    """
+    v = pv.value(node)
+    if shaped_coef:
+        v += shaped_coef * state_value(node, _WEIGHTS)
+    return v
+
+
+def _top_k_by_prior(
+    choices: list[dict[str, Any]], node: AbstractBattle, pv: PolicyValue, k: int
+) -> list[dict[str, Any]]:
+    """Keep the ``k`` choices the GREEN policy rates highest at ``node`` (always returns >= 1)."""
+    if k <= 0 or len(choices) <= k:
+        return choices
+    logp = pv.action_log_probs(node)
+
+    def prior(label: dict[str, Any]) -> float:
+        a = _choice_action(label, node)
+        return logp.get(a, -20.0) if a is not None else -20.0
+
+    return sorted(choices, key=prior, reverse=True)[:k]
+
+
+def _node_value(
+    fm: ForwardModel,
+    pv: PolicyValue,
+    live: AbstractBattle,
+    res: dict[str, Any],
+    role: str,
+    cfg: SearchConfig,
+    depth: int,
+) -> float | None:
+    """Backed-up value of the node reached by ``res``, looking ``depth`` plies further ahead.
+
+    ``depth <= 0`` evaluates the shaped leaf. Otherwise recurse one ply: maximize over our
+    policy-pruned actions, aggregating the opponent's capped responses with ``opp_aggregation``
+    (``mean`` = expectimax, ``min`` = minimax). ``None`` if this branch was illegal.
     """
     if res.get("illegal"):
         return None
@@ -65,20 +131,30 @@ def _leaf_value(
         if winner == "p2":
             return pv.v_min
         return 0.0
-    delta = res.get("p1_delta") or ""
-    req = res.get("p1_request")
-    if role == "p2":
-        delta = _swap_roles(delta)
-        req = _swap_roles(req) if req else req
-    leaf = pv.deepcopy_battle(live)
-    for line in delta.split("\n"):
-        _feed_line(leaf, line)
-    if req:
-        _feed_line(leaf, req)
-    v = pv.value(leaf)
-    if shaped_coef:
-        v += shaped_coef * state_value(leaf, _WEIGHTS)
-    return v
+    node = _node_battle(pv, live, res, role)
+    if depth <= 0:
+        return _leaf_eval(pv, node, cfg.shaped_coef)
+
+    my2 = res.get("p1_choices") or []
+    if not my2:  # we can't move this ply (force-switch / wait) -> evaluate as a leaf
+        return _leaf_eval(pv, node, cfg.shaped_coef)
+    opp2 = [c for c in (res.get("p2_choices") or []) if c["type"] == "move"]
+    opp2 = (opp2 or res.get("p2_choices") or [])[: max(1, cfg.opp_cap_deep)]
+    my2 = _top_k_by_prior(my2, node, pv, cfg.top_k_my)
+
+    best: float | None = None
+    for mc in my2:
+        leaves: list[float] = []
+        for oc in opp2 or [None]:
+            res2 = fm.step(res["state"], mc["choice"], oc["choice"] if oc else None)
+            v = _node_value(fm, pv, node, res2, role, cfg, depth - 1)
+            if v is not None:
+                leaves.append(v)
+        if not leaves:
+            continue
+        agg = min(leaves) if cfg.opp_aggregation == "min" else statistics.fmean(leaves)
+        best = agg if best is None else max(best, agg)
+    return best if best is not None else _leaf_eval(pv, node, cfg.shaped_coef)
 
 
 def choose_order(
@@ -109,7 +185,7 @@ def choose_order(
             leaves: list[float] = []
             for oc in opp_moves or [None]:
                 res = fm.step(state, mc["choice"], oc["choice"] if oc else None)
-                v = _leaf_value(pv, battle, res, role, cfg.shaped_coef)
+                v = _node_value(fm, pv, battle, res, role, cfg, cfg.depth - 1)
                 if v is not None:
                     leaves.append(v)
             if not leaves:

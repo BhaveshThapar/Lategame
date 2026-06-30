@@ -47,6 +47,9 @@ def _set_search_env(args: argparse.Namespace) -> None:
     os.environ["LATEGAME_SEARCH_OPP_CAP"] = str(args.opp_cap)
     os.environ["LATEGAME_SEARCH_BLEND"] = str(args.blend)
     os.environ["LATEGAME_SEARCH_SHAPED"] = str(args.shaped)
+    os.environ["LATEGAME_SEARCH_DEPTH"] = str(args.depth)
+    os.environ["LATEGAME_SEARCH_TOPK_MY"] = str(args.top_k_my)
+    os.environ["LATEGAME_SEARCH_OPP_CAP_DEEP"] = str(args.opp_cap_deep)
     os.environ["LATEGAME_SEARCH_SEED"] = str(args.seed)
 
 
@@ -60,6 +63,9 @@ async def run_gate(args: argparse.Namespace) -> dict:
         "opp_cap": args.opp_cap,
         "blend": args.blend,
         "shaped_coef": args.shaped,
+        "depth": args.depth,
+        "top_k_my": args.top_k_my,
+        "opp_cap_deep": args.opp_cap_deep,
         "seed": args.seed,
     }
     print(f"Gate B: n={args.n}  search cfg={cfg}")
@@ -103,6 +109,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--opp-cap", type=int, default=6)
     p.add_argument("--blend", type=float, default=0.0)
     p.add_argument("--shaped", type=float, default=3.0, help="leaf = V + shaped*state_value")
+    p.add_argument("--depth", type=int, default=1, help="plies of lookahead (2 = Lever 12)")
+    p.add_argument("--top-k-my", type=int, default=3, help="prune our actions by prior, deep plies")
+    p.add_argument("--opp-cap-deep", type=int, default=3, help="opp branching cap, deep plies")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", default="results/rpredict_gate_b.json")
     p.add_argument("--format", dest="battle_format", default=DEFAULT_FORMAT)

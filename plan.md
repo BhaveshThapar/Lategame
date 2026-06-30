@@ -438,7 +438,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   next lever is no longer more on-policy gradient: it is the **R-PREDICT** direction
   (depth-limited search / opponent-modeling on the strong base policy + working value function) or
   a tougher opponent curriculum. Full grid in `results/ppo_continue_gate.json`.
-- **Lever 11 — R-PREDICT (depth-limited search on the frozen GREEN base) — IN PROGRESS.**
+- **Lever 11 — R-PREDICT (depth-1 search on the frozen GREEN base) — built + run; AMBER.**
   Acting on the Lever 10 verdict: layer test-time search on the frozen GREEN checkpoint (no
   retrain). The binding obstacle is that there is **no forward model** — the net gives V(s) and
   π(a|s) but not Q(s,a), and the vendored simulator was wired only for replay re-simulation. The
@@ -503,6 +503,44 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     trained to be tactically discriminative; an explicit learned opponent model (uniform/min are
     weak); or the tougher-opponent **curriculum** (the Lever-10 fallback). Did NOT re-tune to
     chase GREEN.
+
+- **Lever 12 — R-PREDICT depth-2 search on the frozen GREEN base — built + run; AMBER (does not
+  compound).** Acted on the Lever 11 verdict's lead candidate: L11 condemned *depth-1*, the
+  weakest lookahead (provably near-equivalent to the policy when the leaf is the value the policy
+  trained against). Depth-2 is where the shaped term (HP/faints) should bite — it can see 2-ply
+  sequences (switch → they KO my switch-in → revenge range) the 1-ply reactive policy cannot
+  represent. The build was the cheapest possible: **reuses ~100% of the L11 forward model +
+  determinization**; only the recursion is new. Generalized `search/expectimax.py` depth-1 into a
+  depth-limited `_node_value` (refactored `_leaf_value` → `_node_battle` + `_leaf_eval`; added
+  policy-prior pruning `_top_k_by_prior`), added one driver field (`step` now returns
+  `p1_choices`/`p2_choices` via the existing `legalChoices`, so recursion needs no request
+  re-parse), threaded `depth`/`top_k_my`/`opp_cap_deep` through `SearchConfig`→agent env→gate CLI.
+  Root expands all our actions; deeper plies prune to the top-k by policy prior and cap opponent
+  branching (≈ `opp_cap`×`top_k_my`×`opp_cap_deep` = 4×3×3 steps/decision), all serialized through
+  the one node subprocess per agent — so n=40 is ~75 min/arm. **Gate B2 (cheap), 2 arms, n=40:**
+  - **mean / expectimax — AMBER.** search vs random **1.000** (sanity; the depth-1 over-switch is
+    *gone* — depth-2 plays cleanly), **h2h vs base 0.500** (exact parity), search vs heuristic
+    **0.550** vs base **0.575** (**−0.025**, within noise). Depth-2 reaches **parity** with its
+    base — a clear improvement over depth-1's slightly-net-negative h2h 0.383 — but does **not**
+    exceed it. PROMISING needs h2h>0.52 **and** delta>+0.03; neither met.
+  - **min / minimax — RED.** sanity **0.925**, **h2h vs base 0.275** (search *loses* to its base),
+    vs heuristic **0.450** = base 0.450 (+0.000). Worst-case aggregation over the **weak uniform-
+    fill determinized opponent** is over-conservative (assumes the foe always plays the single
+    most-damaging line) — the same failure as L11's min arm (0.342), amplified one ply deeper.
+  - **Insight:** with one more ply of *ground-truth* dynamics + a tactical leaf, search ≈ the base
+    policy (expectimax) or worse (minimax). The limiter is not lookahead depth: the V/shaped leaf
+    encodes nothing the policy lacks, and the determinized opponent model is too weak for adversarial
+    search. This is the **third** independent mechanism — gradient (L10), depth-1 search (L11),
+    depth-2 search (L12) — to fail to compound on GREEN ⇒ a very strong **local-ceiling**
+    confirmation for gen9-RB vs the heuristic. `results/rpredict_gate_b2_{mean,min}.json`.
+  **Verdict: AMBER** (primary expectimax arm parity; minimax RED). Per cheap-gate-first, the
+  n=300×4×3 Gate C ladder was **not** run and GREEN was **not** re-tuned. **The search direction is
+  now retired on this base** — both the depth axis (L11→L12) and the aggregation axis (mean/min)
+  are exhausted, and the residual weakness is the *opponent model*, not the search. **Next lever =
+  the tougher-opponent curriculum (Lever 13):** change the learning *signal*, not the inference
+  machinery — consistent with the whole arc (every method that moved the needle was about data/
+  signal, not cleverness on fixed data). The forward model + determinization remain a reusable
+  asset for any future model-based opponent modeling.
 
 ---
 

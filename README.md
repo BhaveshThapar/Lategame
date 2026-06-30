@@ -19,15 +19,19 @@ n=200). The plateau was never one constraint — it breaks only at the *conjunct
 value-RL **×** a critic that can fit the value function (the transformer two-tower; value-MAE
 0.28 vs the MLP's 2.59, which collapses to ~4%) **×** data scale.
 
-**Two follow-ups both find the GREEN policy near a local ceiling (AMBER).** Lever 10 —
+**Three follow-ups all find the GREEN policy near a local ceiling (AMBER).** Lever 10 —
 on-policy PPO warm-started from the GREEN checkpoint — is stable (no collapse) but does not
 compound. Lever 11 (**R-PREDICT**) builds the infrastructure the project never had: a
 *faithful Showdown forward model* (serialize/fork/step, validated bit-for-bit, **0/9,734**
 transition mismatches) + *determinization* of the hidden opponent (live POV → full battle,
-**~100%** observable-faithful). But depth-1 test-time search on the frozen GREEN policy still
-doesn't beat it (head-to-head ~0.36 at n=120) — the value head is a coarse one-ply evaluator —
-so two independent mechanisms (gradient and search) confirm the local ceiling. See `plan.md`
-§13.1 for the full arc.
+**~100%** observable-faithful). But depth-1 test-time search on the frozen GREEN policy doesn't
+beat it (head-to-head ~0.36 at n=120). Lever 12 deepens it to **depth-2** (same forward model,
+recursion + policy-prior pruning): the over-switch is gone (vs random **1.000**) and search now
+reaches **parity** with its base (h2h **0.500**) but still does not exceed it (vs heuristic
+−0.025; the minimax arm regresses to h2h 0.275 — the determinized opponent model is too weak for
+worst-case search). Three independent mechanisms — gradient (L10), depth-1 (L11), depth-2 (L12) —
+confirm the local ceiling; the search direction is retired and the next lever is the
+tougher-opponent **curriculum** (change the signal, not the inference). See `plan.md` §13.1.
 
 ## Setup
 
@@ -56,7 +60,8 @@ python -m lategame.cli evaluate --p1 offrl --p2 heuristic --n 100
 ```
 
 Agent names: `random`, `maxbasepower`, `simpleheuristics`, `heuristic` (baselines);
-`bc`, `offrl`, `ppo` (learned — load their default checkpoint).
+`bc`, `offrl`, `ppo` (learned — load their default checkpoint); `search` (R-PREDICT
+depth-limited lookahead on the GREEN checkpoint — config via `LATEGAME_SEARCH_*` env vars).
 
 ### Data & training pipelines
 
@@ -75,6 +80,7 @@ python scripts/ppo_continue_gate.py    --out results/ppo_continue_gate.json  # L
 python scripts/rpredict_fidelity_gate.py --out results/rpredict_fidelity.json  # Lever 11 Gate A: forward-model fidelity (PASS)
 python scripts/rpredict_recon_gate.py    --out results/rpredict_recon.json     # Lever 11: reconstruction mini-gate (PASS)
 python scripts/rpredict_gate.py          --out results/rpredict_gate_b.json    # Lever 11 Gate B: depth-1 search (AMBER)
+python scripts/rpredict_gate.py --depth 2 --opp-cap 4 --out results/rpredict_gate_b2_mean.json  # Lever 12: depth-2 search (AMBER)
 
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
@@ -86,7 +92,7 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 80 tests; server-gated smokes run when the local server is up
+pytest            # 112 tests; server-gated smokes run when the local server is up
 ruff check .
 mypy lategame
 ```
