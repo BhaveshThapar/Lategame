@@ -55,6 +55,7 @@ class SelfPlayConfig:
     anchors: tuple[str, ...] = ("heuristic", "simpleheuristics")
     eval_baselines: tuple[str, ...] = ("random", "simpleheuristics", "heuristic")
     eval_n: int = 100
+    max_concurrent: int = 20  # concurrent battles during collection / eval (server-bound)
     # Per-iteration short fine-tune (not the M3 30-epoch full fit).
     epochs: int = 4
     batch_size: int = 256
@@ -87,16 +88,30 @@ async def _eval_point(iteration: int, ckpt_path: str, config: SelfPlayConfig) ->
     point: CurvePoint = {"iter": iteration}
     for base in config.eval_baselines:
         learner = build_player(
-            "offrl", config.battle_format, checkpoint_path=ckpt_path, sample=False
+            "offrl",
+            config.battle_format,
+            checkpoint_path=ckpt_path,
+            sample=False,
+            max_concurrent_battles=config.max_concurrent,
         )
-        opponent = build_player(base, config.battle_format)
+        opponent = build_player(
+            base, config.battle_format, max_concurrent_battles=config.max_concurrent
+        )
         point[f"vs_{base}"] = round(await evaluate_built(learner, opponent, config.eval_n), 4)
     if iteration > 0:
         learner = build_player(
-            "offrl", config.battle_format, checkpoint_path=ckpt_path, sample=False
+            "offrl",
+            config.battle_format,
+            checkpoint_path=ckpt_path,
+            sample=False,
+            max_concurrent_battles=config.max_concurrent,
         )
         iter0 = build_player(
-            "offrl", config.battle_format, checkpoint_path=config.init, sample=False
+            "offrl",
+            config.battle_format,
+            checkpoint_path=config.init,
+            sample=False,
+            max_concurrent_battles=config.max_concurrent,
         )
         point["vs_iter0"] = round(await evaluate_built(learner, iter0, config.eval_n), 4)
     return point
@@ -148,6 +163,7 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
             config.battle_format,
             config.weights,
             config.gamma,
+            max_concurrent=config.max_concurrent,
         )
         shard_path = str(data_dir / f"iter_{k:02d}.npz")
         save_rl(dataset, shard_path)

@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-06-28)
+### 13.1 Build status & findings (as of 2026-06-30)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -541,6 +541,49 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   machinery — consistent with the whole arc (every method that moved the needle was about data/
   signal, not cleverness on fixed data). The forward model + determinization remain a reusable
   asset for any future model-based opponent modeling.
+
+- **Lever 13 — tougher-opponent AWR self-play curriculum from the GREEN base — built + run;
+  AMBER (does not compound).** Acted on the Lever 12 verdict's lead: the search direction was
+  retired, so change the learning *signal*. The only mechanism that ever cleared the wall was L9
+  (AWR over all turns, winners + losers, at scale); GREEN still **loses** to two fast bots
+  stronger than itself (`simpleheuristics` ~42.5%, `heuristic` ~41.7%). Thesis: re-run the
+  wall-clearer on a tougher, *self-generated* opponent distribution, powered up. The M4 AWR
+  self-play loop (`train/selfplay.py`) was the right machine but had **never been run from GREEN**
+  (it defaulted to the old weak `offrl_gen9randombattle.pt`) and was underpowered — 4 epochs, and
+  the real bottleneck, collection/eval running **one battle at a time**. The build was minimal:
+  thread `max_concurrent` through `SelfPlayConfig`→`collect_selfplay`/`_build_recording_player`/
+  `_eval_point` (mirroring `ppo.py`; the AC→AC warm-start already auto-carries the ET+dex-prior
+  arch from the init ckpt, so no model change), expose `--max-concurrent`, and add
+  `scripts/curriculum_gate.py`. `heuristic` held **OUT** of training (anchor = `simpleheuristics`
+  + the fictitious-play league); win-rate reported vs the held-out heuristic — comparable to L9/L10.
+  Gated cheap-first.
+  - **Gate A — cheap KILL pre-flight (no training) — PASS.** Collect a small GREEN-vs-tough shard
+    (40 games/opp vs `simpleheuristics` + the iter-0 league member, both sides), confirm the AWR
+    signal before paying for the run: winner/loser **start-return gap 6.30** (≥1.0; L9 saw +5.48)
+    and **loser fraction 0.50** (GREEN and the tough opponents split games evenly, so the data is
+    full of tough winning lines to weight toward). 160 episodes / 4,392 turns.
+  - **Gate B — the powered-up run (3 seeds × 12 iters, eval n=200) — flat.** vs the held-out
+    heuristic the curve **wanders around the ~0.462 start with no trend**: best-iter mean
+    **0.472±0.013** (max single point 0.49 — max-over-13-noisy-evals inflation, +0.010 over start),
+    and the unbiased compounding check **final vs_iter0 = 0.443±0.006 < 0.50** — the end policy
+    marginally *loses* the head-to-head to its own start (≈ L10's 0.442). The sharpest diagnostic:
+    win-rate vs **`simpleheuristics` — the opponent it trained against — also did not rise**
+    (wanders 0.35–0.45, mostly at/below the ~0.44–0.47 start). The critic stayed healthy throughout
+    (value-MAE ~0.18–0.26, no blow-up), so this is *stable but flat*, not a training failure.
+  - **Gate C — not run.** Per cheap-gate-first the gate auto-skips the n=300 confirmatory ladder
+    when Gate B is AMBER-flat (mirrors L11/L12). GREEN was **not** re-tuned.
+  **Verdict: AMBER** (`results/curriculum_gate.json`). This is the **fourth** independent
+  mechanism — gradient (L10), depth-1 search (L11), depth-2 search (L12), tougher-opponent
+  curriculum (L13) — to fail to compound on GREEN. The local-ceiling conclusion is now very
+  strongly confirmed, and **the limiter is neither the inference machinery nor the opponent
+  distribution**: even fresh data dominated by stronger opponents, fed through the only mechanism
+  that ever worked, does not move the needle vs the heuristic on gen9-RB. **Implication:** the
+  remaining headroom is unlikely to live in the *training loop* on this format/data — candidate
+  directions shift to the *substrate*: a stronger/larger encoder+model trained on far more data, a
+  genuinely stronger expert to distill from (e.g. search-as-teacher via the reusable L11/L12
+  forward model, accepting its cost), or a different/harder **format** where the heuristic ceiling
+  is higher. Lasting assets from L13: a non-underpowered, concurrency-parallel self-play loop and a
+  reusable AWR-signal pre-flight gate.
 
 ---
 
