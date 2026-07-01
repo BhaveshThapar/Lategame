@@ -1,0 +1,731 @@
+=== Team 01: Tusk Balance ===
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Dragapult @ Choice Specs
+Ability: Infiltrator
+Tera Type: Ghost
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Draco Meteor
+- Shadow Ball
+- Flamethrower
+- U-turn
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 4 Atk / 252 Def
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- U-turn
+
+=== Team 02: Lando Balance ===
+Landorus-Therian @ Leftovers
+Ability: Intimidate
+Tera Type: Steel
+EVs: 252 HP / 220 Def / 36 Spe
+Impish Nature
+- Earthquake
+- U-turn
+- Stealth Rock
+- Taunt
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Kingambit @ Black Glasses
+Ability: Supreme Overlord
+Tera Type: Dark
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Iron Valiant @ Booster Energy
+Ability: Quark Drive
+Tera Type: Fairy
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Moonblast
+- Psyshock
+- Thunderbolt
+- Calm Mind
+
+Ting-Lu @ Leftovers
+Ability: Vessel of Ruin
+Tera Type: Poison
+EVs: 252 HP / 4 Atk / 252 SpD
+Careful Nature
+- Earthquake
+- Ruination
+- Whirlwind
+- Spikes
+
+Great Tusk @ Booster Energy
+Ability: Protosynthesis
+Tera Type: Ice
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Ice Spinner
+- Rapid Spin
+
+=== Team 03: Fat Balance ===
+Ting-Lu @ Leftovers
+Ability: Vessel of Ruin
+Tera Type: Ghost
+EVs: 252 HP / 4 Def / 252 SpD
+Careful Nature
+- Earthquake
+- Ruination
+- Whirlwind
+- Stealth Rock
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 168 Def / 88 SpD
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- Defog
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Gholdengo @ Leftovers
+Ability: Good as Gold
+Tera Type: Steel
+EVs: 252 HP / 252 SpA / 4 Spe
+Modest Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 HP / 4 Atk / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+Tera Type: Normal
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Earthquake
+- Extreme Speed
+- Roost
+
+=== Team 04: Zamazenta Bulky Offense ===
+Zamazenta @ Leftovers
+Ability: Dauntless Shield
+Tera Type: Steel
+EVs: 252 HP / 4 Atk / 252 Spe
+Jolly Nature
+- Body Press
+- Iron Defense
+- Crunch
+- Heavy Slam
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Iron Moth @ Heavy-Duty Boots
+Ability: Quark Drive
+Tera Type: Grass
+EVs: 124 Def / 132 SpA / 252 Spe
+Timid Nature
+- Fiery Dance
+- Sludge Wave
+- Energy Ball
+- Substitute
+
+=== Team 05: Dragonite Offense ===
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+Tera Type: Normal
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Earthquake
+- Extreme Speed
+- Roost
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Rotom-Wash @ Leftovers
+Ability: Levitate
+Tera Type: Steel
+EVs: 252 HP / 4 SpA / 252 SpD
+Calm Nature
+- Hydro Pump
+- Volt Switch
+- Will-O-Wisp
+- Pain Split
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Zamazenta @ Leftovers
+Ability: Dauntless Shield
+Tera Type: Steel
+EVs: 252 HP / 4 Atk / 252 Spe
+Jolly Nature
+- Body Press
+- Iron Defense
+- Crunch
+- Heavy Slam
+
+=== Team 06: Garganacl Stall-ish ===
+Garganacl @ Leftovers
+Ability: Purifying Salt
+Tera Type: Ghost
+EVs: 252 HP / 4 Def / 252 SpD
+Careful Nature
+- Salt Cure
+- Recover
+- Iron Defense
+- Earthquake
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 168 Def / 88 SpD
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- Defog
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Gholdengo @ Leftovers
+Ability: Good as Gold
+Tera Type: Steel
+EVs: 252 HP / 252 SpA / 4 Spe
+Modest Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 HP / 4 Atk / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Dragapult @ Choice Specs
+Ability: Infiltrator
+Tera Type: Ghost
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Draco Meteor
+- Shadow Ball
+- Flamethrower
+- U-turn
+
+=== Team 07: Valiant Offense ===
+Iron Valiant @ Booster Energy
+Ability: Quark Drive
+Tera Type: Fairy
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Moonblast
+- Psyshock
+- Thunderbolt
+- Calm Mind
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 4 Atk / 252 Def
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- U-turn
+
+Raging Bolt @ Booster Energy
+Ability: Protosynthesis
+Tera Type: Electric
+EVs: 64 HP / 252 SpA / 192 Spe
+Modest Nature
+- Thunderclap
+- Draco Meteor
+- Calm Mind
+- Thunderbolt
+
+=== Team 08: Raging Bolt Balance ===
+Raging Bolt @ Leftovers
+Ability: Protosynthesis
+Tera Type: Fairy
+EVs: 252 HP / 132 SpA / 124 Spe
+Modest Nature
+- Thunderclap
+- Draco Meteor
+- Calm Mind
+- Thunderbolt
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 168 Def / 88 SpD
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- Defog
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+=== Team 09: Ogerpon Bulky Offense ===
+Ogerpon-Wellspring @ Wellspring Mask
+Ability: Water Absorb
+Tera Type: Water
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Ivy Cudgel
+- Power Whip
+- Knock Off
+- Swords Dance
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Landorus-Therian @ Leftovers
+Ability: Intimidate
+Tera Type: Steel
+EVs: 252 HP / 220 Def / 36 Spe
+Impish Nature
+- Earthquake
+- U-turn
+- Stealth Rock
+- Taunt
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+=== Team 10: Iron Moth Offense ===
+Iron Moth @ Booster Energy
+Ability: Quark Drive
+Tera Type: Grass
+EVs: 124 Def / 132 SpA / 252 Spe
+Timid Nature
+- Fiery Dance
+- Sludge Wave
+- Energy Ball
+- Substitute
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 4 Atk / 252 Def
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- U-turn
+
+Dragapult @ Choice Specs
+Ability: Infiltrator
+Tera Type: Ghost
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Draco Meteor
+- Shadow Ball
+- Flamethrower
+- U-turn
+
+=== Team 11: Clefable Balance ===
+Clefable @ Leftovers
+Ability: Magic Guard
+Tera Type: Steel
+EVs: 252 HP / 252 Def / 4 SpD
+Bold Nature
+- Moonblast
+- Moonlight
+- Calm Mind
+- Thunder Wave
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Corviknight @ Leftovers
+Ability: Pressure
+Tera Type: Dragon
+EVs: 252 HP / 168 Def / 88 SpD
+Impish Nature
+- Body Press
+- Brave Bird
+- Roost
+- Defog
+
+Ting-Lu @ Leftovers
+Ability: Vessel of Ruin
+Tera Type: Poison
+EVs: 252 HP / 4 Atk / 252 SpD
+Careful Nature
+- Earthquake
+- Ruination
+- Whirlwind
+- Spikes
+
+=== Team 12: Dragonite Dual Offense ===
+Dragonite @ Heavy-Duty Boots
+Ability: Multiscale
+Tera Type: Flying
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Dragon Dance
+- Earthquake
+- Extreme Speed
+- Roost
+
+Great Tusk @ Leftovers
+Ability: Protosynthesis
+Tera Type: Steel
+EVs: 252 Atk / 4 Def / 252 Spe
+Jolly Nature
+- Headlong Rush
+- Close Combat
+- Rapid Spin
+- Stealth Rock
+
+Kingambit @ Leftovers
+Ability: Supreme Overlord
+Tera Type: Fairy
+EVs: 252 Atk / 4 Def / 252 Spe
+Adamant Nature
+- Sucker Punch
+- Iron Head
+- Swords Dance
+- Low Kick
+
+Gholdengo @ Air Balloon
+Ability: Good as Gold
+Tera Type: Flying
+EVs: 252 SpA / 4 Def / 252 Spe
+Timid Nature
+- Make It Rain
+- Shadow Ball
+- Nasty Plot
+- Recover
+
+Slowking-Galar @ Heavy-Duty Boots
+Ability: Regenerator
+Tera Type: Water
+EVs: 252 HP / 16 SpA / 240 SpD
+Calm Nature
+- Future Sight
+- Sludge Bomb
+- Flamethrower
+- Chilly Reception
+
+Landorus-Therian @ Leftovers
+Ability: Intimidate
+Tera Type: Steel
+EVs: 252 HP / 220 Def / 36 Spe
+Impish Nature
+- Earthquake
+- U-turn
+- Stealth Rock
+- Taunt

@@ -17,6 +17,7 @@ from poke_env.player import (
     SimpleHeuristicsPlayer,
     cross_evaluate,
 )
+from poke_env.teambuilder.teambuilder import Teambuilder
 
 from lategame.agents.bc_agent import BCAgent
 from lategame.agents.heuristic_agent import HeuristicAgent
@@ -64,6 +65,7 @@ def build_player(
     checkpoint_path: str | None = None,
     sample: bool = False,
     max_concurrent_battles: int | None = None,
+    team: str | Teambuilder | None = None,
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
@@ -77,6 +79,10 @@ def build_player(
     # so cross_evaluate keeps many battles in flight (the local server is the bottleneck).
     if max_concurrent_battles is not None:
         extra["max_concurrent_battles"] = max_concurrent_battles
+    # Teambuilt formats (e.g. gen9ou) need a team; Random Battles leave this None and the
+    # server supplies one. Accepts a packed/Showdown string or a Teambuilder (R-TEAM pool).
+    if team is not None:
+        extra["team"] = team
     return cls(
         account_configuration=local_account(_unique_username(name)),
         battle_format=battle_format,

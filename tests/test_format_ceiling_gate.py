@@ -97,3 +97,31 @@ def test_verdict_ambiguous_between_band_and_headroom():
 def test_mirror_sanity_flag_trips():
     d = gate.compute_verdict(*_signals(s=0.51, w=0.50, g=0.47, a=0.70, mirror=0.62))
     assert d["mirror_sanity_ok"] is False
+
+
+def _ou_m1(mirror=0.51, simple=0.60, maxbp=0.20, rand=0.03, green=0.30) -> dict:
+    return {
+        "mirror": {"rate": mirror},
+        "simpleheuristics": {"rate": simple},
+        "maxbasepower": {"rate": maxbp},
+        "random": {"rate": rand},
+        "offrl_green": {"rate": green},
+    }
+
+
+def test_assess_ou_clean_harness_wider_band():
+    a = gate.assess_ou(_ou_m1())
+    assert a["harness_ok"] is True
+    assert a["mirror_sanity_ok"] is True
+    assert a["gradient_ok"] is True
+    # width 0.60 - 0.03 = 0.57 vs RB 0.523 - 0.007 = 0.516 -> wider
+    assert a["band_width"]["wider_than_rb"] is True
+    # OU smoke never applies the RB FORMAT/MODEL verdict.
+    assert "verdict" not in a
+
+
+def test_assess_ou_flags_broken_mirror_and_gradient():
+    a = gate.assess_ou(_ou_m1(mirror=0.65, maxbp=0.70))  # mirror off; maxbp > simple
+    assert a["mirror_sanity_ok"] is False
+    assert a["gradient_ok"] is False
+    assert a["harness_ok"] is False
