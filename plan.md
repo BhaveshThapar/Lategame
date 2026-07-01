@@ -585,6 +585,52 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   is higher. Lasting assets from L13: a non-underpowered, concurrency-parallel self-play loop and a
   reusable AWR-signal pre-flight gate.
 
+- **Lever 14 — R-PREDICT with a real opponent model — built + run; AMBER (does not compound).**
+  Acted on the axis the search direction was retired on but never tested. L11/L12's own verdict
+  named the residual — *"the opponent model was too weak"* (uniform-mean / worst-case-min over the
+  determinized foe) — then L13 pivoted to curriculum and skipped it. Yet the eval opponent is a
+  **fixed, white-box, deterministic** rule (`HeuristicAgent`), so model it *exactly* and re-run the
+  depth-2 gate with **probability-weighted expectimax** (`agg = Σ_oc p(oc)·v(oc)`). Reuses the
+  entire validated L11/L12 forward model; only the opponent branch changes. Build: refactored the
+  eval rule into a pure `agents.heuristic_agent.heuristic_pick` (DRY); new `search/opponent_model.py`
+  with `WhiteBoxHeuristicOpponent` (one-hot on the exact heuristic move, computed from our-POV +
+  the driver's determinized `p2_choices` — **no** opponent POV battle, byte-faithful to the eval
+  opponent) and `LearnedOpponent` (the frozen GREEN policy on a reconstructed opponent POV, built
+  from new `p2_log`/`p2_request` emission in the driver's `reconstruct` + `build_opp_pov`); wove
+  `opp_aggregation="model"` through root + deep plies (`mean`/`min` untouched, L11/L12 reproducible);
+  new `scripts/rpredict_oppmodel_gate.py` + 16 tests (134 total). ruff + mypy clean.
+  - **Gate A — opponent-model fidelity (no battles) — PASS (decisive).** Over 239 determinized
+    nodes from re-simulated replays: opponent-POV team fidelity **1.000** (the learned arm's
+    prerequisite), white-box decodable **1.000**, and white-box agrees with the real
+    `HeuristicAgent` on the reconstructed opponent POV **0.958**. The opponent model faithfully
+    reproduces the exact eval opponent — the L11/L12 residual is genuinely *closed*, not GIGO.
+    `results/rpredict_oppmodel_gate_a.json`.
+  - **Gate B — depth-2 `model`-aggregation search (server) — AMBER.** *White-box* (the decisive
+    **upper bound** — a near-perfect model of the eval opponent): n=40 gave a **false-positive
+    spike** (search-vs-heuristic 0.600 vs base 0.375, delta **+0.225**) driven entirely by base's
+    unlucky low draw; the **n=120 confirmation regresses to PARITY** — base 0.483, search **0.500**,
+    delta **+0.017** (< the +0.03 bar), search-vs-random 0.800 (sanity; the depth-1 over-switch is
+    gone). The h2h-vs-base 0.317 is **confounded** — the white-box model assumes the heuristic, so
+    in the h2h (opponent = the *base*, not the heuristic) it mispredicts; the *valid* metric is
+    vs-heuristic, and it is parity. *Learned* (GREEN-as-opponent, generalizable, n=40): 0.550 vs
+    base 0.425 (delta +0.125) — the **same** base-low/search-high small-n inflation as white-box
+    n=40, and **bounded above** by white-box (a *less* accurate model of the heuristic can't beat
+    the exact one), so parity by transitivity. `results/rpredict_oppmodel_gate_b.json`.
+  - **Gate C — not run.** Gate B AMBER, and the white-box **upper bound is parity**, so there is no
+    stronger-than-base teacher to distill (the search-as-teacher premise fails at its root).
+  **Verdict: AMBER.** This is the **fifth** independent mechanism — gradient (L10), depth-1 (L11),
+  depth-2 (L12), curriculum (L13), and now depth-2 with a *validated real opponent model* (L14) —
+  to fail to compound on GREEN, and the sharpest: it **closes the exact axis the search direction
+  was retired on**. The residual was *not* the opponent model. **The search/inference family is now
+  exhausted on every axis** — depth (1→2), aggregation (mean/min/model), *and* opponent-model
+  quality (uniform → worst-case → near-perfect white-box). The gen9-RB-vs-heuristic local ceiling
+  lives in **neither the training loop nor the inference machinery**. **Next = Lever 15: the
+  substrate/format pivot** (bigger encoder+model on far more data, or a genuinely harder format
+  where the heuristic ceiling is higher) — now justified on evidence, not assumed. Lasting assets:
+  a Gate-A-validated (1.000 team fidelity) opponent-POV reconstruction (driver `p2_log`/`p2_request`
+  + `build_opp_pov`) and probability-weighted expectimax, reusable for any future model-based
+  opponent modeling.
+
 ---
 
 ## 14. Risks & mitigations
