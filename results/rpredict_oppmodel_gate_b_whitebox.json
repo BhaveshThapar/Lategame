@@ -1,0 +1,16 @@
+{
+  "gate": "rpredict_oppmodel_gate_b",
+  "init": "checkpoints/offrl_scale_et_prior_s0.pt",
+  "n": 40,
+  "depth": 2,
+  "base_vs_heuristic": 0.375,
+  "arms": {
+    "whitebox": {
+      "search_vs_random": 0.9,
+      "search_vs_heuristic": 0.6,
+      "search_vs_base": 0.275,
+      "delta_vs_base_at_heuristic": 0.225,
+      "verdict": "RED"
+    }
+  }
+}

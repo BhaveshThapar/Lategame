@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder
@@ -36,13 +36,16 @@ from lategame.features.encoder import embed_battle
 from lategame.search.determinize import battle_to_spec
 from lategame.search.forward import ForwardModel
 
+if TYPE_CHECKING:
+    from lategame.search.opponent_model import OpponentModel
+
 _WEIGHTS = RewardWeights()
 
 
 @dataclass
 class SearchConfig:
     determinizations: int = 1  # opponent-team samples averaged per decision
-    opp_aggregation: str = "mean"  # "mean" (uniform expectimax) | "min" (worst-case)
+    opp_aggregation: str = "mean"  # "mean" uniform | "min" worst-case | "model" p-weighted (L14)
     opp_cap: int = 6  # cap opponent branching at the ROOT (their moves first)
     policy_blend: float = 0.0  # lambda in [0,1]: mix z-scored search value with log-pi prior
     shaped_coef: float = 0.0  # leaf = V + shaped_coef * shaped state-value (tactical term)
@@ -50,6 +53,54 @@ class SearchConfig:
     top_k_my: int = 3  # prune OUR actions by policy prior at deep plies (root expands all)
     opp_cap_deep: int = 3  # cap opponent branching at deep plies (root keeps opp_cap)
     seed: int = 0
+
+
+def _opp_weights(
+    pov_battle: AbstractBattle,
+    opp_choices: list[dict[str, Any]],
+    cfg: SearchConfig,
+    opp_model: OpponentModel | None,
+    cap: int,
+    opp_pov: AbstractBattle | None = None,
+) -> list[tuple[dict[str, Any] | None, float]]:
+    """The opponent branches to expand, with weights (Lever 14).
+
+    ``model`` aggregation asks ``opp_model`` for p(oc) over the *full* legal set (so a modeled
+    switch is representable), keeps the top-``cap`` by probability, and returns those weights;
+    ``mean``/``min`` reproduce L11/L12 exactly -- uniform weights over the moves-first,
+    ``cap``-capped pool. ``[(None, 1.0)]`` when the side can't move this ply.
+    """
+    result: list[tuple[dict[str, Any] | None, float]] = []
+    if not opp_choices:
+        return [(None, 1.0)]
+    cap = max(1, cap)
+    if cfg.opp_aggregation == "model" and opp_model is not None:
+        probs = opp_model.distribution(pov_battle, opp_choices, opp_pov)
+        ranked = sorted(opp_choices, key=lambda c: probs.get(c["choice"], 0.0), reverse=True)
+        for c in ranked[:cap]:
+            w = probs.get(c["choice"], 0.0)
+            if w > 0.0:
+                result.append((c, w))
+        if result:
+            return result
+        w = 1.0 / min(len(opp_choices), cap)  # model gave nothing -> uniform fallback
+        for c in opp_choices[:cap]:
+            result.append((c, w))
+        return result
+    pool = ([c for c in opp_choices if c["type"] == "move"] or opp_choices)[:cap]
+    w = 1.0 / len(pool)
+    for c in pool:
+        result.append((c, w))
+    return result
+
+
+def _combine(evaluated: list[tuple[float, float]], aggregation: str) -> float:
+    """Aggregate ``(weight, value)`` pairs: ``min`` = worst-case, else weight-normalized mean."""
+    if aggregation == "min":
+        return min(v for _, v in evaluated)
+    num = sum(w * v for w, v in evaluated)
+    den = sum(w for w, _ in evaluated)
+    return num / den if den > 0 else statistics.fmean([v for _, v in evaluated])
 
 
 def _swap_roles(text: str) -> str:
@@ -115,12 +166,16 @@ def _node_value(
     role: str,
     cfg: SearchConfig,
     depth: int,
+    opp_model: OpponentModel | None = None,
+    live_opp: AbstractBattle | None = None,
 ) -> float | None:
     """Backed-up value of the node reached by ``res``, looking ``depth`` plies further ahead.
 
     ``depth <= 0`` evaluates the shaped leaf. Otherwise recurse one ply: maximize over our
-    policy-pruned actions, aggregating the opponent's capped responses with ``opp_aggregation``
-    (``mean`` = expectimax, ``min`` = minimax). ``None`` if this branch was illegal.
+    policy-pruned actions, aggregating the opponent's responses with ``opp_aggregation``
+    (``mean`` = uniform expectimax, ``min`` = minimax, ``model`` = ``opp_model``-weighted
+    expectimax, Lever 14). ``live_opp`` is the parent opponent-POV battle (learned arm), advanced
+    one ply here. ``None`` if this branch was illegal.
     """
     if res.get("illegal"):
         return None
@@ -138,29 +193,47 @@ def _node_value(
     my2 = res.get("p1_choices") or []
     if not my2:  # we can't move this ply (force-switch / wait) -> evaluate as a leaf
         return _leaf_eval(pv, node, cfg.shaped_coef)
-    opp2 = [c for c in (res.get("p2_choices") or []) if c["type"] == "move"]
-    opp2 = (opp2 or res.get("p2_choices") or [])[: max(1, cfg.opp_cap_deep)]
+    node_opp = _advance_opp_pov(opp_model, live_opp, res)
+    opp_weights = _opp_weights(
+        node, res.get("p2_choices") or [], cfg, opp_model, cfg.opp_cap_deep, node_opp
+    )
     my2 = _top_k_by_prior(my2, node, pv, cfg.top_k_my)
 
     best: float | None = None
     for mc in my2:
-        leaves: list[float] = []
-        for oc in opp2 or [None]:
+        evaluated: list[tuple[float, float]] = []
+        for oc, w in opp_weights:
             res2 = fm.step(res["state"], mc["choice"], oc["choice"] if oc else None)
-            v = _node_value(fm, pv, node, res2, role, cfg, depth - 1)
+            v = _node_value(fm, pv, node, res2, role, cfg, depth - 1, opp_model, node_opp)
             if v is not None:
-                leaves.append(v)
-        if not leaves:
+                evaluated.append((w, v))
+        if not evaluated:
             continue
-        agg = min(leaves) if cfg.opp_aggregation == "min" else statistics.fmean(leaves)
+        agg = _combine(evaluated, cfg.opp_aggregation)
         best = agg if best is None else max(best, agg)
     return best if best is not None else _leaf_eval(pv, node, cfg.shaped_coef)
 
 
+def _advance_opp_pov(
+    opp_model: OpponentModel | None, live_opp: AbstractBattle | None, res: dict[str, Any]
+) -> AbstractBattle | None:
+    """Advance the opponent-POV battle one ply, only when the model needs it (learned arm)."""
+    if opp_model is None or not getattr(opp_model, "needs_opp_pov", False) or live_opp is None:
+        return None
+    from lategame.search.opponent_model import opp_pov_child
+
+    return opp_pov_child(live_opp, res)
+
+
 def choose_order(
-    fm: ForwardModel, pv: PolicyValue, battle: AbstractBattle, cfg: SearchConfig
+    fm: ForwardModel,
+    pv: PolicyValue,
+    battle: AbstractBattle,
+    cfg: SearchConfig,
+    opp_model: OpponentModel | None = None,
 ) -> BattleOrder | None:
-    """Pick an action by depth-1 expectimax; ``None`` if search can't run (caller falls back)."""
+    """Pick an action by depth-limited expectimax; ``None`` if search can't run (caller falls
+    back). ``opp_model`` (Lever 14) enables ``opp_aggregation="model"`` probability-weighting."""
     role = battle.player_role or "p1"
     values: dict[str, list[float]] = {}
     labels: dict[str, dict[str, Any]] = {}
@@ -174,24 +247,23 @@ def choose_order(
         state = recon["state"]
         my_choices = recon.get("p1_choices") or []
         opp_choices = recon.get("p2_choices") or []
-        opp_moves = [c for c in opp_choices if c["type"] == "move"] or opp_choices
-        opp_moves = opp_moves[: max(1, cfg.opp_cap)]
+        root_opp = _root_opp_pov(opp_model, recon, battle)
+        opp_weights = _opp_weights(battle, opp_choices, cfg, opp_model, cfg.opp_cap, root_opp)
         if not my_choices:
             continue
 
         for mc in my_choices:
             key = mc["choice"]
             labels[key] = mc
-            leaves: list[float] = []
-            for oc in opp_moves or [None]:
+            evaluated: list[tuple[float, float]] = []
+            for oc, w in opp_weights:
                 res = fm.step(state, mc["choice"], oc["choice"] if oc else None)
-                v = _node_value(fm, pv, battle, res, role, cfg, cfg.depth - 1)
+                v = _node_value(fm, pv, battle, res, role, cfg, cfg.depth - 1, opp_model, root_opp)
                 if v is not None:
-                    leaves.append(v)
-            if not leaves:
+                    evaluated.append((w, v))
+            if not evaluated:
                 continue
-            agg = min(leaves) if cfg.opp_aggregation == "min" else statistics.fmean(leaves)
-            values.setdefault(key, []).append(agg)
+            values.setdefault(key, []).append(_combine(evaluated, cfg.opp_aggregation))
 
     if not values:
         return None
@@ -202,6 +274,18 @@ def choose_order(
 
     best = max(scored, key=lambda k: scored[k])
     return _to_order(labels[best], battle)
+
+
+def _root_opp_pov(
+    opp_model: OpponentModel | None, recon: dict[str, Any], battle: AbstractBattle
+) -> AbstractBattle | None:
+    """Reconstruct the opponent-POV battle at the search root, only for the learned arm."""
+    if opp_model is None or not getattr(opp_model, "needs_opp_pov", False):
+        return None
+    from lategame.search.opponent_model import build_opp_pov
+
+    gen = int(getattr(battle, "gen", 9) or 9)
+    return build_opp_pov(recon, tag=f"opp-{battle.battle_tag}", gen=gen)
 
 
 def _blend_policy_prior(

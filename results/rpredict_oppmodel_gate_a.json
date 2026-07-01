@@ -1,0 +1,11 @@
+{
+  "gate": "rpredict_oppmodel_gate_a",
+  "snapshots": 239,
+  "errored": 0,
+  "opp_pov_team_fidelity": 1.0,
+  "whitebox_decodable_rate": 1.0,
+  "whitebox_vs_heuristic_agreement": 0.9582,
+  "agreement_n": 239,
+  "learned_arm_ok": true,
+  "gate_a_pass": true
+}

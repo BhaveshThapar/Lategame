@@ -231,6 +231,23 @@ function legalChoices(side) {
 	return out;
 }
 
+/** A `|request|` line for `side` with each mon's condition patched to the post-edit hp/status.
+ * applyState mutates hp/status directly (no protocol), so the raw activeRequest is stale;
+ * poke-env reads a side's own team hp from its request, so we correct it here (Lever 14). */
+function stateRequest(side) {
+	const r = side.activeRequest;
+	if (!r || r.wait) return null;
+	const clone = JSON.parse(JSON.stringify(r));
+	const mons = clone.side && Array.isArray(clone.side.pokemon) ? clone.side.pokemon : [];
+	for (let k = 0; k < side.pokemon.length && k < mons.length; k++) {
+		const mon = side.pokemon[k];
+		mons[k].condition = mon.fainted
+			? "0 fnt"
+			: `${mon.hp}/${mon.maxhp}${mon.status ? " " + mon.status : ""}`;
+	}
+	return "|request|" + JSON.stringify(clone);
+}
+
 function reconstruct(spec) {
 	const rng = mulberry32((spec.seed || 0) >>> 0);
 	// Build teams; record the active-first reordering so per-slot state lines up.
@@ -255,11 +272,18 @@ function reconstruct(spec) {
 	);
 	const battle = stream.battle;
 	applyState(battle, spec);
+	// Per-side POV logs (Lever 14): channel-filter the omniscient init log so a fresh poke-env
+	// Battle can be built from the opponent's perspective (leads revealed, own team full).
+	const ch = extractChannelMessages(battle.log.join("\n"), [1, 2]);
 	return {
 		state: State.serializeBattle(battle),
 		digest: digest(battle),
 		p1_choices: legalChoices(battle.sides[0]),
 		p2_choices: legalChoices(battle.sides[1]),
+		p1_log: (ch[1] || []).join("\n"),
+		p2_log: (ch[2] || []).join("\n"),
+		p1_request: stateRequest(battle.sides[0]),
+		p2_request: stateRequest(battle.sides[1]),
 	};
 }
 

@@ -1,0 +1,48 @@
+{
+  "gate": "rpredict_oppmodel_gate_b",
+  "init": "checkpoints/offrl_scale_et_prior_s0.pt",
+  "depth": 2,
+  "opp_aggregation": "model",
+  "verdict": "AMBER",
+  "summary": "Even a near-perfect model of the eval opponent (Gate A white-box <-> HeuristicAgent agreement 0.958) reaches only PARITY vs the heuristic at n=120 (search 0.500 vs base 0.483, delta +0.017 < +0.03). The n=40 +0.225 spike was base's unlucky low draw; the learned arm shows the same small-n inflation and is bounded above by white-box. Fifth independent mechanism to fail to compound on GREEN; the residual the search direction was retired on (opponent model) is now closed. Search/inference family exhausted on every axis (depth, aggregation, opponent-model quality).",
+  "arms": {
+    "whitebox": {
+      "note": "decisive upper bound -- perfect (heuristic) opponent model; h2h-vs-base is CONFOUNDED (models heuristic, plays base)",
+      "n40": {
+        "base_vs_heuristic": 0.375,
+        "search_vs_random": 0.9,
+        "search_vs_heuristic": 0.6,
+        "search_vs_base": 0.275,
+        "delta_vs_base_at_heuristic": 0.225,
+        "verdict": "RED (small-n; base low draw)"
+      },
+      "n120_confirmation": {
+        "base_vs_heuristic": 0.4833,
+        "search_vs_random": 0.8,
+        "search_vs_heuristic": 0.5,
+        "search_vs_base": 0.3167,
+        "delta_vs_base_at_heuristic": 0.0167,
+        "verdict": "AMBER (parity)"
+      }
+    },
+    "learned": {
+      "note": "GREEN-as-opponent; generalizable arm, bounded above by white-box (a less accurate model of the heuristic). n=40 shows the same base-low/search-high inflation as white-box n=40 -> parity by transitivity.",
+      "n40": {
+        "base_vs_heuristic": 0.425,
+        "search_vs_random": 0.95,
+        "search_vs_heuristic": 0.55,
+        "search_vs_base": 0.35,
+        "delta_vs_base_at_heuristic": 0.125,
+        "verdict": "RED (small-n inflation)"
+      }
+    }
+  },
+  "gate_a": {
+    "file": "results/rpredict_oppmodel_gate_a.json",
+    "opp_pov_team_fidelity": 1.0,
+    "whitebox_decodable_rate": 1.0,
+    "whitebox_vs_heuristic_agreement": 0.9582,
+    "gate_a_pass": true
+  },
+  "gate_c": "not run -- Gate B AMBER; white-box upper bound is parity, so there is no stronger-than-base teacher to distill"
+}

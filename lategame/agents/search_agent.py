@@ -51,6 +51,7 @@ class SearchAgent(Player):
 
         from lategame.search.expectimax import PolicyValue, choose_order
         from lategame.search.forward import ForwardModel
+        from lategame.search.opponent_model import build_opponent_model
 
         self._choose_order = choose_order
 
@@ -62,6 +63,11 @@ class SearchAgent(Player):
             )
         self._cfg = _config_from_env()
         self._pv = PolicyValue(str(path), policy_blend=self._cfg.policy_blend)
+        # Lever 14: an opponent policy for probability-weighted expectimax (opp_agg="model").
+        # The learned arm reuses the same frozen GREEN policy as the modeled opponent.
+        self._opp_model = build_opponent_model(
+            os.environ.get("LATEGAME_SEARCH_OPP_MODEL", "none"), pv=self._pv
+        )
         self._fm = ForwardModel()
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
@@ -69,7 +75,7 @@ class SearchAgent(Player):
             return self.choose_default_move()
         order: BattleOrder | None = None
         try:
-            order = self._choose_order(self._fm, self._pv, battle, self._cfg)
+            order = self._choose_order(self._fm, self._pv, battle, self._cfg, self._opp_model)
         except Exception:  # noqa: BLE001 -- search must never crash a live battle
             order = None
         return order if order is not None else self._pv.greedy_order(battle)

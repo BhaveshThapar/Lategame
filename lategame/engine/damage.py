@@ -47,17 +47,18 @@ def expected_power(
     return base_power * stab * type_multiplier * accuracy
 
 
-def score_move(move: Move, attacker: Pokemon, defender: Pokemon | None) -> float:
+def score_move(move: Move, attacker: Pokemon | None, defender: Pokemon | None) -> float:
     """Expected-value score for using ``move`` from ``attacker`` into ``defender``.
 
     Status (non-damaging) moves score 0 here -- the policy treats them as a
-    fallback rather than valuing them through this damage proxy.
+    fallback rather than valuing them through this damage proxy. ``attacker`` may be
+    ``None`` (e.g. modeling a foe with no active mon), in which case STAB is dropped.
     """
     base_power = move.base_power or 0
     if move.category == MoveCategory.STATUS or base_power == 0:
         return 0.0
 
     type_multiplier = defender.damage_multiplier(move) if defender is not None else 1.0
-    stab = stab_multiplier(move.type, attacker.types)
+    stab = stab_multiplier(move.type, attacker.types if attacker is not None else ())
     accuracy = normalize_accuracy(move.accuracy)
     return expected_power(base_power, stab, type_multiplier, accuracy)
