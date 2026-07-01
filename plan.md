@@ -631,6 +631,49 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   + `build_opp_pov`) and probability-weighted expectimax, reusable for any future model-based
   opponent modeling.
 
+- **Lever 15 — format-ceiling diagnostic (is the wall the *format* or the *model*?) — built + run;
+  verdict FORMAT_BOUND → OU pivot.** Levers 10–14 all showed only that *our* model + inference can't
+  beat the heuristic on gen9-RB; **none directly measured the *achievable* ceiling.** Before paying
+  for either expensive branch of the "substrate/format pivot" — (A) scale the model, (B) pivot to a
+  harder format — measure the ceiling directly. Cheap, no-training, decisive; new
+  `scripts/format_ceiling_gate.py` (+ 8 tests → 137 pass / 5 skip; ruff/mypy clean) reusing `eval.arena`,
+  `data.resim`, `features.embed_prior`, and the L14 white-box result. `results/format_ceiling_gate.json`.
+  - **M1 — bot-skill-gradient sweep vs `heuristic` (server, n=300, Wilson CIs).** How far can *play*
+    move the needle? `heuristic`-mirror **0.513** (sanity ≈0.50 ✓), `simpleheuristics` (poke-env's
+    strongest built-in) **0.523** [0.467, 0.579], `maxbasepower` **0.107**, `random` **0.007**, GREEN
+    `offrl` **0.430** [0.375, 0.487]. The heuristic *crushes* the naive bots (99.3% vs random, 89.3%
+    vs maxbp) but the **strongest competent bot is at statistical parity** (0.523, CI spans 0.50) and
+    **GREEN — the product of 9 levers — loses to it (0.430)**.
+  - **M2 — strongest-inference upper bound (reuse L14).** Depth-2 expectimax with a *near-perfect
+    white-box opponent model* + faithful forward model = **0.500** vs heuristic. Near-optimal inference
+    is at parity — the ceiling holds *from above*.
+  - **M3 — team-RNG variance decomposition (node re-sim, no live server, n=500).** AUC of
+    (team-strength difference → winner): effective level-adjusted stats (`mon.stats`) **0.495**
+    [0.444, 0.546], level-blind base-stat z-sum **0.469** (0 OOV). **Team strength does *not* predict
+    the winner** — gen9-RB is balanced by design (the RB generator equalizes gross power via level:
+    Jirachi lvl 80, Breloom lvl 83…). So the wall is *not* gross team RNG; it is a genuinely balanced,
+    competitive format where a good heuristic sits near the achievable skill ceiling.
+  - **Decision rule (M1/M2 primary, M3 corroborating — a hand-crafted strength proxy can't *prove*
+    play-dominance, so it must not gate the branch).** Best competent agent = max(0.523, 0.500, 0.430)
+    = **0.523 ≤ 0.53** (band top), below the 0.58 headroom bar ⇒ **FORMAT_BOUND**.
+  **Verdict: FORMAT_BOUND → OU pivot.** Nothing we can field — poke-env's best bot, near-optimal
+  search, or 9 levers of learned RL — meaningfully beats this heuristic on gen9-RB; the achievable
+  ceiling vs a competent heuristic is ~parity. **Honest nuance:** GREEN (0.430) sits *below* that
+  ceiling (~0.52), so ~0.09 of *model* headroom exists — but closing it only reaches **parity**, never
+  a *decisive* win, so **G2 (clearly beat the heuristic / strong-human) is unreachable in gen9-RB no
+  matter the model** ⇒ scaling the model on this format is unjustified. This is the **first direct
+  ceiling measurement** in the project (levers 1–14 measured *our methods'* failure; this measures
+  what *any* agent can achieve) and it selects **format over substrate**: pivot to **Gen 9 OU** (PRD
+  G4/M6) — teambuilt, higher skill ceiling, abundant high-ladder human data, and the encoder/action
+  head are already singles-native (`config.OU_FORMAT`; `--format` threaded everywhere). The only new
+  build is **R-TEAM** team provisioning (a poke-env `Teambuilder` over a curated packed-team pool),
+  needed for live play/eval/self-play; replay *training* data reconstructs teams from logs. **Lasting
+  asset:** a reusable, gate-validated format-ceiling probe (skill band + inference upper bound +
+  team-RNG AUC) to re-run on OU and confirm the new ceiling is genuinely higher before committing the
+  full pipeline. **Two lessons:** (1) the mirror-match sanity (0.513 ≈ 0.50) is a cheap harness check
+  worth keeping; (2) raw BST is the wrong strength proxy for a level-balanced format — use realized
+  `mon.stats`, and don't let a caveated proxy hard-gate a strategic decision.
+
 ---
 
 ## 14. Risks & mitigations

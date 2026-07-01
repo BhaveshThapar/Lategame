@@ -44,7 +44,19 @@ and fed to **probability-weighted expectimax**. Even this near-perfect opponent 
 +0.225 was base's unlucky low draw). Five independent mechanisms — gradient (L10), depth-1 (L11),
 depth-2 (L12), curriculum (L13), real-opponent-model search (L14) — confirm the local ceiling; it
 lives in neither the training loop nor the inference machinery (now exhausted on every axis: depth,
-aggregation, *and* opponent-model quality). Next = the substrate/format pivot. See `plan.md` §13.1.
+aggregation, *and* opponent-model quality).
+
+**Lever 15 measures the ceiling *directly* and pivots the format (FORMAT_BOUND).** Levers 1–14 only
+showed *our* methods fail; none measured what *any* agent can achieve vs the heuristic on gen9-RB. A
+cheap, no-training gate does: (M1, n=300) the heuristic crushes naive bots (99.3% vs random, 89.3% vs
+maxbp) but poke-env's **strongest** built-in `simpleheuristics` is at **statistical parity** (0.523,
+CI [0.467, 0.579]) and GREEN — 9 levers of RL — **loses** to it (0.430); (M2) near-optimal depth-2
+search with a near-perfect opponent model is **0.500**; (M3, n=500) team strength does **not** predict
+the winner (effective-stat AUC **0.495**) — gen9-RB is balanced by design. The achievable ceiling vs a
+competent heuristic is ~parity, so **G2 (decisively beat the heuristic) is unreachable no matter the
+model** ⇒ scaling on gen9-RB is unjustified. **Next = the Gen 9 OU pivot** (PRD G4/M6): teambuilt,
+higher skill ceiling, abundant human data; encoder/action head already singles-native, the one new
+build is R-TEAM team provisioning. See `plan.md` §13.1.
 
 ## Setup
 
