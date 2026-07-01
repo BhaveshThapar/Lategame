@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import glob
+import itertools
 import json
 import math
 from pathlib import Path
@@ -64,6 +65,16 @@ _MATCHUPS: list[tuple[str, str, str, str | None]] = [
     ("random", "random", "heuristic", None),
     ("offrl_green", "offrl", "heuristic", _GREEN_CKPT),
 ]
+
+# On-record gen9-RB M1 band (results/format_ceiling_gate.json, Lever 15) for a side-by-side
+# read on the teambuilt (OU) smoke. GREEN there is the RB-trained offrl checkpoint.
+_RB_BAND = {
+    "mirror": 0.513,
+    "simpleheuristics": 0.523,
+    "maxbasepower": 0.107,
+    "random": 0.007,
+    "offrl_green": 0.430,
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -293,23 +304,88 @@ def _species_index_fn():  # noqa: ANN202 -- returns a closure over the loaded vo
 # --------------------------------------------------------------------------- #
 # M1 -- bot-skill-gradient sweep (server).
 # --------------------------------------------------------------------------- #
-async def run_m1(n: int, concurrency: int) -> dict[str, Any]:
-    """Head-to-heads vs ``heuristic`` for the fixed skill gradient + GREEN, at n each."""
+async def run_m1(n: int, concurrency: int, battle_format: str, team_pool: str) -> dict[str, Any]:
+    """Head-to-heads vs ``heuristic`` for the fixed skill gradient + GREEN, at n each.
+
+    Random Battles leave teams to the server. For teambuilt formats (e.g. gen9ou) each player
+    draws from the R-TEAM pool via its own ``TeamPool`` seeded distinctly, so the two sides get
+    independent (non-locked) team draws -- varied matchups, mirror-fair in expectation."""
     from lategame.eval.arena import build_player, evaluate_built
 
-    block: dict[str, Any] = {"n": n}
-    fmt = "gen9randombattle"
+    teams: list[str] | None = None
+    if "randombattle" not in battle_format:
+        from lategame.teambuilding.pool import TeamPool
+
+        teams = TeamPool.from_packed_file(team_pool).teams
+
+    seeds = itertools.count()
+
+    def _pool() -> object | None:  # fresh pool per player so p1/p2 draw independently
+        if teams is None:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool(teams, seed=next(seeds))
+
+    block: dict[str, Any] = {"n": n, "format": battle_format}
     for label, p1, p2, ckpt in _MATCHUPS:
         player1 = build_player(
-            p1, fmt, checkpoint_path=ckpt, max_concurrent_battles=concurrency
+            p1, battle_format, checkpoint_path=ckpt,
+            max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
         )
-        player2 = build_player(p2, fmt, max_concurrent_battles=concurrency)
+        player2 = build_player(
+            p2, battle_format, max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
+        )
         rate = await evaluate_built(player1, player2, n)
         k = round(rate * n)
         lo, hi = wilson_ci(k, n)
         block[label] = {"p1": p1, "p2": p2, "rate": float(rate), "wins": k, "ci95": [lo, hi]}
         print(f"  M1 {label:>16}: {p1} vs {p2}  {rate:.3f}  ci95 [{lo:.3f}, {hi:.3f}]  (n={n})")
     return block
+
+
+# --------------------------------------------------------------------------- #
+# Teambuilt (OU) smoke -- harness/sanity read, NOT a FORMAT/MODEL verdict.
+# --------------------------------------------------------------------------- #
+def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
+    """Score the teambuilt M1 smoke: is the harness clean and the band at least as wide as RB?
+
+    Deliberately does not apply the RB BAND_TOP/HEADROOM thresholds -- poke-env's bots sit far
+    below OU's skill ceiling and there's no OU near-optimal reference yet (M2/M3 deferred)."""
+    rate = {k: m1[k]["rate"] for k in _RB_BAND if k in m1}
+    mirror_ok = abs(rate.get("mirror", 0.5) - 0.5) <= MIRROR_TOL
+    gradient_ok = (
+        rate.get("random", 1.0) < rate.get("maxbasepower", 0.0) < rate.get("simpleheuristics", 0.0)
+    )
+    ou_width = rate.get("simpleheuristics", 0.0) - rate.get("random", 0.0)
+    rb_width = _RB_BAND["simpleheuristics"] - _RB_BAND["random"]
+    return {
+        "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+        "mirror_sanity_ok": mirror_ok,
+        "gradient_ok": gradient_ok,
+        "harness_ok": mirror_ok and gradient_ok,
+        "ou_band": rate,
+        "rb_band_reference": _RB_BAND,
+        "band_width": {"ou": ou_width, "rb": rb_width, "wider_than_rb": ou_width >= rb_width},
+    }
+
+
+def _print_ou_summary(a: dict[str, Any]) -> None:
+    print("\n[OU smoke] band vs on-record gen9-RB band:")
+    for k in _RB_BAND:
+        ou = a["ou_band"].get(k)
+        ou_s = f"{ou:.3f}" if ou is not None else "  -  "
+        print(f"  {k:>16}: OU {ou_s}   RB {_RB_BAND[k]:.3f}")
+    bw = a["band_width"]
+    print(
+        f"  mirror sanity: {'OK' if a['mirror_sanity_ok'] else 'FAIL'}   "
+        f"gradient: {'OK' if a['gradient_ok'] else 'FAIL'}   "
+        f"band width OU {bw['ou']:.3f} vs RB {bw['rb']:.3f} "
+        f"({'wider' if bw['wider_than_rb'] else 'not wider'})"
+    )
+    print(f"  {a['note']}")
+    if not a["harness_ok"]:
+        print("  !! harness NOT clean -- investigate before trusting the OU band")
 
 
 # --------------------------------------------------------------------------- #
@@ -331,16 +407,16 @@ def load_m2() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 # Orchestration.
 # --------------------------------------------------------------------------- #
-def _load() -> dict[str, Any]:
-    if _RESULTS.exists():
-        return json.loads(_RESULTS.read_text())
+def _load(path: Path) -> dict[str, Any]:
+    if path.exists():
+        return json.loads(path.read_text())
     return {"gate": "format_ceiling"}
 
 
-def _save(data: dict[str, Any]) -> None:
-    _RESULTS.parent.mkdir(parents=True, exist_ok=True)
-    _RESULTS.write_text(json.dumps(data, indent=2))
-    print(f"  -> wrote {_RESULTS}")
+def _save(data: dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2))
+    print(f"  -> wrote {path}")
 
 
 def _maybe_decide(data: dict[str, Any]) -> None:
@@ -355,12 +431,36 @@ def _maybe_decide(data: dict[str, Any]) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", choices=["m1", "m3", "decide", "all"], default="all")
+    ap.add_argument("--format", dest="battle_format", default="gen9randombattle")
+    ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed",
+                    help="packed team pool for teambuilt formats (R-TEAM)")
+    ap.add_argument("--out", default=None, help="results JSON (default derived from --format)")
     ap.add_argument("--n", type=int, default=300, help="battles per M1 matchup")
     ap.add_argument("--concurrency", type=int, default=20, help="M1 max concurrent battles")
     ap.add_argument("--limit", type=int, default=300, help="M3 replays to re-sim")
     args = ap.parse_args()
 
-    data = _load()
+    fmt = args.battle_format
+    teambuilt = "randombattle" not in fmt
+    out = (
+        Path(args.out) if args.out
+        else (Path("results/format_ceiling_gate_ou.json") if teambuilt else _RESULTS)
+    )
+
+    data = _load(out)
+    data["format"] = fmt
+
+    if teambuilt:
+        # OU path: M1-only smoke that de-risks the teambuilt harness (legal teams, mirror ~0.50,
+        # skill gradient). M2 (OU near-optimal search) and M3 (OU replays) don't exist yet, so no
+        # RB FORMAT/MODEL verdict is forced -- see assess_ou.
+        print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt; M1-only smoke)...")
+        data["m1"] = asyncio.run(run_m1(args.n, args.concurrency, fmt, args.team_pool))
+        data["ou_assessment"] = assess_ou(data["m1"])
+        _print_ou_summary(data["ou_assessment"])
+        _save(data, out)
+        return
+
     data.setdefault("m2", load_m2())  # always cheap; keep it fresh
 
     if args.stage in ("m3", "all"):
@@ -368,14 +468,14 @@ def main() -> None:
         data["m3"] = run_m3(args.limit)
         print(f"  M3 AUC {data['m3']['auc']:.3f} ci95 {data['m3']['auc_ci95']} "
               f"(n={data['m3']['n_battles_used']})")
-        _save(data)
+        _save(data, out)
     if args.stage in ("m1", "all"):
         print("[M1] bot-skill-gradient sweep (server)...")
-        data["m1"] = asyncio.run(run_m1(args.n, args.concurrency))
-        _save(data)
+        data["m1"] = asyncio.run(run_m1(args.n, args.concurrency, fmt, args.team_pool))
+        _save(data, out)
 
     _maybe_decide(data)
-    _save(data)
+    _save(data, out)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** In progress — see §13.1 for build status & findings (updated 2026-06-28).
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-01).
 
 ---
 
@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-06-30)
+### 13.1 Build status & findings (as of 2026-07-01)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -673,6 +673,36 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   full pipeline. **Two lessons:** (1) the mirror-match sanity (0.513 ≈ 0.50) is a cheap harness check
   worth keeping; (2) raw BST is the wrong strength proxy for a level-balanced format — use realized
   `mon.stats`, and don't let a caveated proxy hard-gate a strategic decision.
+
+- **OU pivot — Build 1: R-TEAM + OU ceiling re-run — built + run; GREEN (the OU ceiling is genuinely
+  higher).** The cheap gate the L15 pivot demanded *before* committing the full OU pipeline. **R-TEAM
+  built:** `lategame/teambuilding/pool.py` — `TeamPool` (a poke-env `Teambuilder` yielding a
+  seeded-random team per battle from a curated, pre-validated packed pool); `scripts/build_ou_teampool.py`
+  — a Gate-A legality preflight that packs Showdown-paste teams via poke-env and validates each against
+  the bundled Showdown `validate-team gen9ou` (kill-gate if < 8 pass). 12/12 curated teams legal →
+  `lategame/teambuilding/data/teams_gen9ou.packed`; the validator caught real illegalities while authoring (Zamazenta can't
+  learn Roost; Gouging Fire and Baxcalibur are Uber-banned in this build). `team=` threaded through
+  `eval.arena.build_player` (backward-compatible; RB leaves it `None`); `format_ceiling_gate.py`
+  parameterized (`--format`/`--team-pool`/`--out`) — the teambuilt path runs an **M1-only smoke** to a
+  separate `results/format_ceiling_gate_ou.json` and does **not** apply the RB FORMAT/MODEL thresholds
+  (`assess_ou`). Suite 137→**145 pass / 5 skip** (+8 tests), ruff/mypy clean.
+  - **M1 skill band on gen9ou (server, n=300, Wilson CIs).** `heuristic`-mirror **0.487** [0.431, 0.543]
+    (sanity ≈0.50 ✓), `simpleheuristics` **0.633** [0.577, 0.686], `maxbasepower` **0.040**, `random`
+    **0.023**, GREEN `offrl` (RB-trained, **OOD** on OU) **0.383** [0.330, 0.439]. Harness clean (mirror
+    ~0.50; monotone gradient 0.023 < 0.040 < 0.633; 12/12 legal teams); band width **0.610 > RB 0.516**.
+  - **Decisive read.** The *exact quantity* that forced FORMAT_BOUND on gen9-RB — the strongest competent
+    bot (`simpleheuristics`) vs the heuristic — was **0.523 (parity, CI spans 0.50)** on RB but is
+    **0.633 on OU with the whole CI above the 0.58 headroom bar**. So **OU is *not* capped at parity**:
+    real, capturable headroom exists above the heuristic, confirming the "higher skill ceiling" premise
+    of the pivot by direct measurement. **PASS ⇒ greenlight the OU data/training build.**
+  - **Honest scope.** This is an M1-only smoke: it removes the FORMAT_BOUND objection but does **not**
+    itself measure how high a *strong learned* agent can reach — **M2** (port the L14 white-box depth-2
+    search to OU) and **M3** (needs scraped gen9ou replays) are deferred to the next gate. GREEN's 0.383
+    is out-of-distribution transfer (RB-trained, never saw OU teams/mons), which motivates OU-specific
+    training — not a format verdict. **Next:** scrape gen9ou replays → reconstruct teams from logs
+    (`data.resim` is already format-agnostic) → train OU checkpoints, then re-run this probe + M2 on the
+    trained agent. **Lesson:** the `assess_ou` mirror-sanity flag needs a real `n` — at n=30 the mirror
+    read 0.633 (CI [0.455, 0.781]) and tripped a false "harness NOT clean"; at n=300 it settled to 0.487.
 
 ---
 
