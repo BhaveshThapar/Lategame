@@ -85,6 +85,26 @@ random play. Team preview closes *species*, not *detail* — the log-vs-request 
 which OU can't use. **Next lever: two-pass own-team completion.** Suite **154 pass**;
 `results/ou_ingest_gate.json`, `results/format_ceiling_gate_ou_trained.json`.
 
+**OU pivot Build 3 — two-pass own-team completion (AMBER/negative: log-only completion can't close the
+POV gap).** Built `ingest._prescan_kits` (Pass 1: read each own mon's full-game-revealed moves/item/ability
+off `battle.team`; item recovered from the raw `|-item|`/`|-enditem|` lines since poke-env resets a consumed
+item to `None`) + `_complete_own_team` (backfill before every `embed_battle`: `_add_move` missing moves, fill
+item only if the `unknown_item` sentinel so a consumed item stays `None` as live, ability only if unknown),
+threaded via `_reconstruct_pov(kits=…)` with a default-on `complete_own_team` toggle (`--no-complete-own-team`).
+Upgraded `ou_ingest_gate.py` to measure the **encoder ID channels** (item/ability/move) ON-vs-OFF with
+teeth + ceiling + residual — the Build-2 lesson made concrete. **Gate A PASS** (n=200): two-pass lifts item
++0.114 and moves +0.604, but **ability is irreducible from public logs** (+0.016 — poke-env already
+auto-assigns single-option abilities, so the unknowns are multi-ability mons that never triggered); residuals
+vs the live POV stay large (item 0.70, ability 0.53, moves 1.38). Re-trained BC (val-acc 0.651) + 3 AWR seeds
+(value-MAE 0.54–0.62). **Gate B still dead:** offrl **0.020** vs heuristic (Build-2 0.007), **0.16–0.45 vs
+random** across seeds. A controlled OFF-vs-ON eval + a live-obs probe confirmed **no bug**: eval obs is *full*
+(own-active item 0.89 / ability 1.00 / moves 4.00) while two-pass training reaches only 0.30/0.47/2.62 — a
+real, large OOD gap. Log-only completion moves training toward eval but nowhere near it; **a partial POV fix
+is functionally neutral** (OFF ≈ ON, both ~0.02 vs heuristic). **Next lever: usage-prior imputation** — fill
+each own mon's *unrevealed* item/ability/moves from the species' standard competitive set so all six reach the
+live full-kit detail. Suite **152 pass / 5 skip**; `results/ou_ingest_gate.json`,
+`results/format_ceiling_gate_ou_v3.json`.
+
 ## Setup
 
 ```bash

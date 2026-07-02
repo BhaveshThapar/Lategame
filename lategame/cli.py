@@ -213,6 +213,7 @@ def _run_ingest_replays(args: argparse.Namespace) -> None:
         weights=weights,
         gamma=args.gamma,
         battle_format=args.battle_format,
+        complete_own_team=args.complete_own_team,
     )
 
 
@@ -470,6 +471,13 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
     )
+    ingest.add_argument(
+        "--no-complete-own-team",
+        dest="complete_own_team",
+        action="store_false",
+        help="Disable two-pass own-team completion (reproduce the v1 progressive-reveal POV)",
+    )
+    ingest.set_defaults(complete_own_team=True)
 
     resim = sub.add_parser(
         "resim-replays",
