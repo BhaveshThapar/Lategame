@@ -304,12 +304,21 @@ def _species_index_fn():  # noqa: ANN202 -- returns a closure over the loaded vo
 # --------------------------------------------------------------------------- #
 # M1 -- bot-skill-gradient sweep (server).
 # --------------------------------------------------------------------------- #
-async def run_m1(n: int, concurrency: int, battle_format: str, team_pool: str) -> dict[str, Any]:
+async def run_m1(
+    n: int,
+    concurrency: int,
+    battle_format: str,
+    team_pool: str,
+    offrl_ckpt: str | None = None,
+) -> dict[str, Any]:
     """Head-to-heads vs ``heuristic`` for the fixed skill gradient + GREEN, at n each.
 
     Random Battles leave teams to the server. For teambuilt formats (e.g. gen9ou) each player
     draws from the R-TEAM pool via its own ``TeamPool`` seeded distinctly, so the two sides get
-    independent (non-locked) team draws -- varied matchups, mirror-fair in expectation."""
+    independent (non-locked) team draws -- varied matchups, mirror-fair in expectation.
+
+    ``offrl_ckpt`` overrides the ``offrl`` arm's checkpoint (default: the RB GREEN ckpt), so the
+    OU probe can score an OU-trained agent while the RB band stays the on-record RB GREEN."""
     from lategame.eval.arena import build_player, evaluate_built
 
     teams: list[str] | None = None
@@ -329,6 +338,8 @@ async def run_m1(n: int, concurrency: int, battle_format: str, team_pool: str) -
 
     block: dict[str, Any] = {"n": n, "format": battle_format}
     for label, p1, p2, ckpt in _MATCHUPS:
+        if offrl_ckpt and p1 == "offrl":
+            ckpt = offrl_ckpt
         player1 = build_player(
             p1, battle_format, checkpoint_path=ckpt,
             max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
@@ -437,6 +448,8 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="results JSON (default derived from --format)")
     ap.add_argument("--n", type=int, default=300, help="battles per M1 matchup")
     ap.add_argument("--concurrency", type=int, default=20, help="M1 max concurrent battles")
+    ap.add_argument("--offrl-checkpoint", default=None,
+                    help="checkpoint for the offrl M1 arm (default: RB GREEN); set to an OU ckpt")
     ap.add_argument("--limit", type=int, default=300, help="M3 replays to re-sim")
     args = ap.parse_args()
 
@@ -455,7 +468,9 @@ def main() -> None:
         # skill gradient). M2 (OU near-optimal search) and M3 (OU replays) don't exist yet, so no
         # RB FORMAT/MODEL verdict is forced -- see assess_ou.
         print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt; M1-only smoke)...")
-        data["m1"] = asyncio.run(run_m1(args.n, args.concurrency, fmt, args.team_pool))
+        data["m1"] = asyncio.run(
+            run_m1(args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint)
+        )
         data["ou_assessment"] = assess_ou(data["m1"])
         _print_ou_summary(data["ou_assessment"])
         _save(data, out)
@@ -471,7 +486,9 @@ def main() -> None:
         _save(data, out)
     if args.stage in ("m1", "all"):
         print("[M1] bot-skill-gradient sweep (server)...")
-        data["m1"] = asyncio.run(run_m1(args.n, args.concurrency, fmt, args.team_pool))
+        data["m1"] = asyncio.run(
+            run_m1(args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint)
+        )
         _save(data, out)
 
     _maybe_decide(data)

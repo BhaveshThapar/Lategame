@@ -1,0 +1,37 @@
+{
+  "n_replays": 500,
+  "with_preview": {
+    "povs": 1000.0,
+    "parse_rate": 1.0,
+    "turns": 21862.0,
+    "drop_rate": 0.02410499062583698,
+    "species_coverage": 0.9997789162321236,
+    "winner_return": 4.607666666666668,
+    "loser_return": -1.9035562248995983
+  },
+  "stripped_preview_control": {
+    "povs": 1000.0,
+    "parse_rate": 1.0,
+    "turns": 20385.0,
+    "drop_rate": 0.09003660387465405,
+    "species_coverage": 0.6845351974490884,
+    "winner_return": 3.4336746987951803,
+    "loser_return": -3.2382710843373497
+  },
+  "coverage_lift": 0.31524371878303514,
+  "reward_gap": 6.511222891566266,
+  "thresholds": {
+    "min_parse_rate": 0.8,
+    "min_coverage": 0.95,
+    "max_drop_rate": 0.4,
+    "min_coverage_lift": 0.1
+  },
+  "checks": {
+    "parse_rate_ok": true,
+    "coverage_ok": true,
+    "drop_rate_ok": true,
+    "reward_sign_ok": true,
+    "negative_control_has_teeth": true
+  },
+  "verdict": "PASS"
+}

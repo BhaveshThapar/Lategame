@@ -261,10 +261,26 @@ def _encode_global(battle: AbstractBattle) -> np.ndarray:
     return np.concatenate([weather, fields, own_side, opp_side, flags])
 
 
+def _opponent_mons(battle: AbstractBattle) -> list[Pokemon]:
+    """Opponent Pokemon to encode: revealed (detailed) first, then team-preview species.
+
+    In team-choice formats a real player sees all six opponent species from team preview; poke-env
+    keeps the not-yet-revealed ones in ``teampreview_opponent_team`` (separate from the revealed
+    ``opponent_team``). Merging them -- revealed first, preview filling the rest -- makes the
+    encoded opponent roster identical at offline reconstruction (``data.ingest``) and live, same
+    order by construction, so the policy is never trained on more than it sees at eval. This is a
+    no-op for random battles (no team preview, so ``teampreview_opponent_team`` is empty)."""
+    revealed = list(battle.opponent_team.values())
+    seen = {m.species for m in revealed}
+    teampreview = getattr(battle, "teampreview_opponent_team", []) or []
+    preview = [m for m in teampreview if m.species not in seen]
+    return revealed + preview
+
+
 def embed_battle(battle: AbstractBattle) -> np.ndarray:
     """Encode ``battle`` (our POV) into a fixed-size ``float32`` vector of ``OBS_DIM``."""
     team = _padded(battle.team.values(), _TEAM_SIZE)
-    opp_team = _padded(battle.opponent_team.values(), _TEAM_SIZE)
+    opp_team = _padded(_opponent_mons(battle), _TEAM_SIZE)
 
     blocks = [_encode_pokemon(m) for m in team]
     blocks += [_encode_pokemon(m) for m in opp_team]

@@ -125,3 +125,133 @@ def test_rating_filter_helper() -> None:
     assert _rating_of({"rating": None}) is None
     assert _rating_of({}) is None
     assert _rating_of("not a dict") is None
+
+
+# --- OU (team-choice) reconstruction: team preview fills all 12 species from turn 0 ---
+
+# p1 (Alice) wins. Order: lead Gholdengo (Make It Rain); turn 2 switch to the
+# previewed-but-unseen Dragonite (a *first-reveal* switch -- dropped in RB, but kept
+# here because preview seeded it); Earthquake x2. p2 (Bob) leads Garganacl, KO'd turn 4.
+OU_LOG = "\n".join(
+    [
+        "|player|p1|Alice|1|",
+        "|player|p2|Bob|2|",
+        "|teamsize|p1|6",
+        "|teamsize|p2|6",
+        "|gen|9",
+        "|tier|[Gen 9] OU",
+        "|clearpoke",
+        "|poke|p1|Gholdengo|",
+        "|poke|p1|Dragonite, F|",
+        "|poke|p1|Kingambit, M|",
+        "|poke|p1|Landorus-Therian|",
+        "|poke|p1|Great Tusk|",
+        "|poke|p1|Zamazenta|",
+        "|poke|p2|Garganacl, M|",
+        "|poke|p2|Dragapult, M|",
+        "|poke|p2|Kingambit, F|",
+        "|poke|p2|Slowking-Galar, M|",
+        "|poke|p2|Corviknight, F|",
+        "|poke|p2|Ogerpon-Wellspring, F|",
+        "|teampreview",
+        "|start",
+        "|switch|p1a: Gholdengo|Gholdengo|100/100",
+        "|switch|p2a: Garganacl|Garganacl, M|100/100",
+        "|turn|1",
+        "|move|p1a: Gholdengo|Make It Rain|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|70/100",
+        "|move|p2a: Garganacl|Salt Cure|p1a: Gholdengo",
+        "|-damage|p1a: Gholdengo|80/100",
+        "|turn|2",
+        "|switch|p1a: Dragonite|Dragonite, F|100/100",
+        "|move|p2a: Garganacl|Recover|p2a: Garganacl",
+        "|-heal|p2a: Garganacl|100/100",
+        "|turn|3",
+        "|move|p1a: Dragonite|Earthquake|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|40/100",
+        "|move|p2a: Garganacl|Salt Cure|p1a: Dragonite",
+        "|-damage|p1a: Dragonite|85/100",
+        "|turn|4",
+        "|move|p1a: Dragonite|Earthquake|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|0 fnt",
+        "|faint|p2a: Garganacl",
+        "|win|Alice",
+    ]
+)
+
+
+def test_ou_preview_gives_full_rosters_in_encoded_obs() -> None:
+    from lategame.features.encoder import OBS_LAYOUT, embed_battle
+
+    battle, records, _, _ = _reconstruct_pov(OU_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    # Own six are seeded into battle.team from preview (poke-env drops the ego preview).
+    assert {m.base_species for m in battle.team.values()} == {
+        "gholdengo", "dragonite", "kingambit", "landorus", "greattusk", "zamazenta"
+    }
+    # The opponent's six live in teampreview_opponent_team; the encoder merges them so the
+    # encoded POV shows all twelve species -- identical to what a live player sees at eval.
+    assert {m.base_species for m in battle.teampreview_opponent_team} == {
+        "garganacl", "dragapult", "kingambit", "slowking", "corviknight", "ogerpon"
+    }
+    pdim = OBS_LAYOUT.pokemon_dim
+    obs = records[0][0]  # first p1 decision obs (present flag is index 0 of each mon block)
+    ego_present = sum(1 for i in range(6) if obs[i * pdim] > 0.5)
+    opp_present = sum(1 for i in range(6, 12) if obs[i * pdim] > 0.5)
+    assert ego_present == 6 and opp_present == 6
+
+    obs = embed_battle(battle)  # end-of-battle POV also carries the full opponent roster
+    assert sum(1 for i in range(6, 12) if obs[i * pdim] > 0.5) == 6
+
+
+def test_ou_first_reveal_switch_is_labelled_not_dropped() -> None:
+    _, records, _, dropped = _reconstruct_pov(OU_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    # Make It Rain (slot 6), switch to previewed Dragonite (team slot 1), Earthquake x2.
+    # The turn-2 switch would be a dropped first-reveal in RB; preview makes it labelable.
+    assert [a for _, a, _ in records] == [6, 1, 6, 6]
+    assert dropped == 0
+
+
+def test_ou_masks_keep_taken_action_legal() -> None:
+    _, records, _, _ = _reconstruct_pov(OU_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    for _, action, mask in records:
+        assert mask.shape == (26,) and mask.dtype == bool
+        assert mask[action]
+
+
+# A nicknamed mon: preview shows the species ("Dragonite"), the switch shows the
+# nickname ("Draco"). The preview entry must re-key onto the switch, not duplicate.
+NICK_LOG = "\n".join(
+    [
+        "|player|p1|Alice|1|",
+        "|player|p2|Bob|2|",
+        "|teamsize|p1|2",
+        "|teamsize|p2|1",
+        "|gen|9",
+        "|tier|[Gen 9] OU",
+        "|clearpoke",
+        "|poke|p1|Gholdengo|",
+        "|poke|p1|Dragonite, F|",
+        "|poke|p2|Garganacl, M|",
+        "|teampreview",
+        "|start",
+        "|switch|p1a: Gholdengo|Gholdengo|100/100",
+        "|switch|p2a: Garganacl|Garganacl, M|100/100",
+        "|turn|1",
+        "|switch|p1a: Draco|Dragonite, F|100/100",
+        "|move|p2a: Garganacl|Salt Cure|p1a: Draco",
+        "|-damage|p1a: Draco|85/100",
+        "|turn|2",
+        "|move|p1a: Draco|Earthquake|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|0 fnt",
+        "|faint|p2a: Garganacl",
+        "|win|Alice",
+    ]
+)
+
+
+def test_ou_preview_switch_reconciles_nickname_without_duplicate() -> None:
+    battle, _, _, _ = _reconstruct_pov(NICK_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    # Preview seeded 2 mons; the nicknamed switch re-keys the Dragonite entry rather
+    # than adding a 3rd. Species appears exactly once.
+    assert len(battle.team) == 2
+    assert sum(1 for m in battle.team.values() if m.base_species == "dragonite") == 1
