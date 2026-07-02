@@ -744,6 +744,46 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     *species* coverage but not *detail* coverage — a fidelity gate must check the channels the encoder
     actually feeds the model (item/ability/move IDs), not just presence.
 
+- **OU pivot — Build 3: two-pass own-team completion — built + run; AMBER/negative (log-only completion
+  cannot close the POV gap; confirmed no bug).**
+  - **Built.** `ingest._prescan_kits` (Pass 1: reconstruct the full POV once, read each own mon's
+    full-game-revealed moves/item/ability off `battle.team`; the item is recovered from the raw
+    `|-item|`/`|-enditem|` lines because poke-env's `Pokemon.end_item` resets a consumed item to `None`) +
+    `_complete_own_team` (backfill before every `embed_battle`: `_add_move` missing moves; fill the item only
+    when it is still the `unknown_item` sentinel, **never** overwriting `None` so a consumed item stays `None`
+    as the live POV shows post-consumption; fill the ability only when unknown). Threaded via
+    `_reconstruct_pov(kits=…)` with a default-on `complete_own_team` toggle (`ingest_replays`/`ingest_and_save`
+    /CLI `--no-complete-own-team`). Upgraded `ou_ingest_gate.py` to read the **encoder ID channels**
+    (own-active item/ability at each Pokémon block's trailing channels, move-count at each move block's ID
+    channel) WITH two-pass and WITH it OFF (v1 control): teeth = ON must beat OFF on item + moves; reports the
+    absolute ceiling and the residual vs the live 1.0/1.0/4.0.
+  - **Gate A PASS** (n=200): parse 1.0, species 1.0, drop 0.023, reward gap +6.68; item ON 0.297 / OFF 0.183
+    (**+0.114**), moves ON 2.62 / OFF 2.02 (**+0.604**), ability ON 0.466 / OFF 0.450 (**+0.016, negligible**).
+    **Ability is irreducible from public logs:** poke-env's `_update_from_pokedex` already auto-assigns
+    single-option abilities, so the ~55% unknown are multi-ability species whose ability never triggered.
+    Residual vs live stays large: item 0.70, ability 0.53, moves 1.38.
+  - **Retrained & Gate B still dead.** Re-ingested 120,001 turns / 61,731 BC (same scale — two-pass changes
+    channel *values*, not turn count); BC val-acc 0.651 (lower than v1's 0.71, as expected for a richer/more
+    honest obs); 3 AWR seeds, value-MAE 0.54–0.62 (healthy). **Gate B (n=300):** offrl **0.020** vs heuristic
+    (≈ Build-2 0.007); offrl **0.16 / 0.45** vs random across seeds. Harness valid (mirror 0.493, gradient
+    random 0.013 < maxbp 0.090 < simpleheuristics 0.630).
+  - **Regression investigation → no bug.** A controlled OFF-vs-ON eval across all three seeds: vs heuristic
+    OFF ≈ ON (both ~0.02, dead); vs random OFF is tight 0.45–0.52 while ON is seed-dependent (s1 0.455, but
+    s0/s2 0.13–0.16). Seed-dependence rules out a deterministic obs bug; a live-encoder probe (2,918
+    decisions) confirmed the **eval obs is full** (own-active item 0.89 / ability 1.00 / moves 4.00) while
+    two-pass training reaches only 0.30/0.47/2.62 — a real, large OOD gap. The apparent v3<v1 dip is a minor
+    perturbation of an already-dead agent (amplified by the log codec labelling moves in reveal/set order
+    while the live request uses declaration order), not the binding failure.
+  - **Verdict AMBER/negative; next lever = usage-prior imputation.** A **partial** POV fix is functionally
+    neutral (OFF ≈ ON) — it lands in a third distribution matching neither train-sparse nor eval-full. The fix
+    must reach **eval-full**: fill each own mon's *unrevealed* item/ability/moves from the species' standard
+    competitive set (Smogon usage / a sets DB), which for the own team approximates the truth the live request
+    provides. Lasting assets: two-pass completion, the channel-measuring Gate A, the tests (a multi-ability
+    Kingambit fixture with a knocked-off item exercises every backfill path incl. consumed-item recovery).
+    **Lesson:** a partial fix on an OOD channel can be *worse* than none — verify the fix reaches the eval
+    distribution, not merely closer to it. Suite **152 pass / 5 skip**; `results/ou_ingest_gate.json`,
+    `results/format_ceiling_gate_ou_v3.json`.
+
 ---
 
 ## 14. Risks & mitigations

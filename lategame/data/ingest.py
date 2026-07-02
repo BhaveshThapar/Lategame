@@ -20,13 +20,24 @@ are empty and the live ``order_to_action``/``action_mask`` can't run. We instead
 * compute the shaped reward from public HP/faint/status (``data.reward.state_value``),
   diffing decision points exactly like ``collect._battle_rewards``.
 
-The accepted v1 fidelity gap: a player's own bench is revealed only as mons switch in
-(live play sees all six from the request). In *team-choice* formats (e.g. gen9ou) the
-log opens with ``|poke|`` team-preview lines that name all six species on both sides,
-so ``_register_preview`` fills every slot from turn 0 -- the encoder then sees all
-twelve species immediately, closing this gap for OU (random battles carry no preview,
-so the path is a no-op there and the v1 gap remains). Movesets/items are still revealed
-only as used; imputing those is a later lever, not this build.
+Two POV gaps separate a public-log reconstruction from live play, and both are closed here:
+
+* **Species presence** -- a player's own bench is revealed only as mons switch in, but live
+  play sees all six from the request. Team-choice formats open with ``|poke|`` team-preview
+  lines naming all six species per side, so ``_register_preview`` fills every own slot from
+  turn 0 (poke-env keeps the opponent's preview separately; the encoder merges it). Random
+  battles carry no preview, so this path is a no-op there.
+
+* **Own-team detail** -- the log reveals the player's *own* item/ability/moves only progressively
+  as they are used, but the live ``|request|`` hands over the full team from turn 1. Training on
+  "my kit unknown" and playing on "my kit known" makes the identity-embedding channels
+  (item/ability/move IDs in ``features.encoder``) out-of-distribution. We close this with
+  **two-pass own-team completion**: ``_prescan_kits`` reads each own mon's full-game-revealed
+  moves/item/ability (item recovered from the raw ``|-item|``/``|-enditem|`` lines, since
+  poke-env resets a consumed item to ``None``), then ``_complete_own_team`` populates that kit
+  onto the own team before every ``embed_battle`` so the training obs matches the live POV. The
+  residual is inherent to public logs: kit a mon never revealed (e.g. an ability that never
+  triggered) stays unknown -- imputing those from usage priors is the documented next lever.
 """
 
 from __future__ import annotations
@@ -58,6 +69,23 @@ _LOGGER.setLevel(logging.CRITICAL)
 
 _Record = tuple[np.ndarray, int, np.ndarray]  # (obs, action, mask) -- matches collect._Record
 _Sample = tuple[_Record, float]  # record + its shaped state-value
+
+# poke-env's GenData.UNKNOWN_ITEM sentinel: an item slot that was never revealed. This is
+# distinct from ``None`` (item consumed/knocked off) -- backfill fills the former, never the
+# latter, so a consumed item stays ``None`` exactly as the live POV shows it post-consumption.
+_UNKNOWN_ITEM = "unknown_item"
+
+
+@dataclass
+class _Kit:
+    """One own mon's full-game-revealed kit, for two-pass own-team completion."""
+
+    moves: set[str] = field(default_factory=set)
+    item: str | None = None
+    ability: str | None = None
+
+
+_Kits = dict[str, _Kit]  # keyed by ``_team_key(ident)`` -> the mon's completed kit
 
 
 @dataclass
@@ -123,7 +151,11 @@ def _register_preview(battle: AbstractBattle, parts: list[str]) -> None:
 
 
 def _move_sample(
-    battle: AbstractBattle, parts: list[str], tera: bool, weights: RewardWeights
+    battle: AbstractBattle,
+    parts: list[str],
+    tera: bool,
+    weights: RewardWeights,
+    kits: _Kits | None,
 ) -> _Sample | None:
     """Label the move just parsed (it is now in ``active.moves``) from this state."""
     active = battle.active_pokemon
@@ -132,6 +164,10 @@ def _move_sample(
     move = active.moves.get(to_id_str(parts[3]))
     if move is None:
         return None
+    # Complete the own team before both labelling and encoding, so the positional move slot
+    # (label_action) and the obs move blocks read the same full moveset -- mutually consistent.
+    if kits is not None:
+        _complete_own_team(battle, kits)
     try:
         action = label_action(SingleBattleOrder(move, terastallize=tera), battle)
     except Exception:  # noqa: BLE001
@@ -142,7 +178,9 @@ def _move_sample(
     return (obs, action, synthesize_action_mask(battle, action)), state_value(battle, weights)
 
 
-def _switch_sample(battle: AbstractBattle, ident: str, weights: RewardWeights) -> _Sample | None:
+def _switch_sample(
+    battle: AbstractBattle, ident: str, weights: RewardWeights, kits: _Kits | None
+) -> _Sample | None:
     """Label a voluntary switch *before* applying it -- only if the target is known.
 
     Recorded only when the incoming mon is already in ``team`` (a pivot back to a
@@ -154,6 +192,10 @@ def _switch_sample(battle: AbstractBattle, ident: str, weights: RewardWeights) -
     target = battle.team.get(_team_key(ident))
     if target is None or target.active or target.fainted:
         return None
+    # Backfill adds moves/item/ability to existing mons only, so the team roster and its
+    # ``values()`` order (which the switch index depends on) are unchanged.
+    if kits is not None:
+        _complete_own_team(battle, kits)
     try:
         action = label_action(SingleBattleOrder(target), battle)
     except Exception:  # noqa: BLE001
@@ -164,14 +206,72 @@ def _switch_sample(battle: AbstractBattle, ident: str, weights: RewardWeights) -
     return (obs, action, synthesize_action_mask(battle, action)), state_value(battle, weights)
 
 
-def _reconstruct_pov(
+def _complete_own_team(battle: AbstractBattle, kits: _Kits) -> None:
+    """Populate each own mon with its full-game-revealed kit (two-pass completion).
+
+    Idempotent and monotonic: adds only missing moves, fills an item only if the slot is
+    still the unrevealed sentinel (never overwrites ``None``, which marks a consumed item the
+    live POV also shows as ``None``), and fills an ability only if still unknown. Applied
+    before every ``embed_battle`` so the training obs matches the live request-based POV.
+    """
+    for key, mon in battle.team.items():
+        kit = kits.get(key)
+        if kit is None:
+            continue
+        for move_id in kit.moves:
+            if move_id not in mon.moves:
+                mon._add_move(move_id)
+        if kit.item is not None and mon.item == _UNKNOWN_ITEM:
+            mon.item = kit.item
+        if kit.ability is not None and mon.ability is None:
+            mon.ability = kit.ability
+
+
+def _prescan_kits(
     lines: list[str], username: str, battle_tag: str, gen: int, weights: RewardWeights
+) -> _Kits:
+    """Pass 1: reconstruct the full POV once and read each own mon's full-game-revealed kit.
+
+    Moves and abilities are read off the fully-parsed ``battle.team``; the item is read there
+    too, but poke-env resets a consumed/knocked-off item to ``None`` (``Pokemon.end_item``), so
+    those are recovered from the raw ``|-item|``/``|-enditem|`` reveal lines. Kit a mon never
+    revealed stays unknown -- the inherent public-log residual.
+    """
+    battle, _, _, _ = _reconstruct_pov(lines, username, battle_tag, gen, weights, kits=None)
+    kits: _Kits = {}
+    for key, mon in battle.team.items():
+        item = mon.item if mon.item and mon.item != _UNKNOWN_ITEM else None
+        kits[key] = _Kit(moves=set(mon.moves.keys()), item=item, ability=mon.ability or None)
+
+    for raw in lines:
+        if not raw.startswith("|"):
+            continue
+        parts = raw.split("|")
+        if len(parts) < 4 or parts[1] not in ("-item", "-enditem") or not _own(parts, battle):
+            continue
+        kit = kits.get(_team_key(parts[2]))
+        if kit is not None and kit.item is None:
+            kit.item = to_id_str(parts[3])
+    return kits
+
+
+def _reconstruct_pov(
+    lines: list[str],
+    username: str,
+    battle_tag: str,
+    gen: int,
+    weights: RewardWeights,
+    kits: _Kits | None = None,
 ) -> tuple[AbstractBattle, list[_Record], list[float], int]:
     """Replay ``lines`` into one player's POV; return its battle + labelled decisions.
 
     A decision is the first ``|move|`` or qualifying voluntary ``|switch|`` the player
     makes each turn. Move obs is snapshotted *after* the move line (so the move is
     revealed and indexable); switch obs *before* (so the old active is still shown).
+
+    When ``kits`` is provided (two-pass own-team completion), the own team is backfilled to its
+    full-game kit before each obs snapshot; ``None`` reproduces the v1 progressive-reveal POV
+    (used by Pass 1 and as the fidelity gate's negative control).
     """
     battle = Battle(battle_tag=battle_tag, username=username, gen=gen, logger=_LOGGER)
     records: list[_Record] = []
@@ -213,7 +313,7 @@ def _reconstruct_pov(
             continue
 
         if tag == "switch" and started and not acted and not fainted and _own(parts, battle):
-            sample = _switch_sample(battle, parts[2], weights)
+            sample = _switch_sample(battle, parts[2], weights, kits)
             if sample is not None:
                 records.append(sample[0])
                 values.append(sample[1])
@@ -229,7 +329,7 @@ def _reconstruct_pov(
         elif tag == "-terastallize" and _own(parts, battle):
             tera = True
         elif tag == "move" and started and not acted and _own(parts, battle):
-            sample = _move_sample(battle, parts, tera, weights)
+            sample = _move_sample(battle, parts, tera, weights, kits)
             if sample is not None:
                 records.append(sample[0])
                 values.append(sample[1])
@@ -347,12 +447,16 @@ def ingest_replays(
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
+    complete_own_team: bool = True,
 ) -> tuple[TrajectoryDataset, Dataset | None, IngestStats]:
     """Reconstruct ``replays`` into an offline-RL shard (+ a winners-only BC shard).
 
     Returns ``(rl_dataset, bc_dataset_or_None, stats)``. The RL shard keeps every
     labelled turn of every finished POV; the BC shard keeps only the winning POVs'
     turns (the M2 reward filter). Both use the exact ``collect`` on-disk schema.
+
+    ``complete_own_team`` (default on) enables two-pass own-team completion so the training
+    obs matches the live request-based POV; ``False`` reproduces the v1 progressive-reveal POV.
     """
     weights = weights or RewardWeights()
     builder = _ShardBuilder()
@@ -376,8 +480,14 @@ def ingest_replays(
 
         try:
             for username in players:
+                pov_tag = f"{tag}-{username}"
+                kits = (
+                    _prescan_kits(lines, str(username), pov_tag, gen, weights)
+                    if complete_own_team
+                    else None
+                )
                 battle, records, values, dropped = _reconstruct_pov(
-                    lines, str(username), f"{tag}-{username}", gen, weights
+                    lines, str(username), pov_tag, gen, weights, kits=kits
                 )
                 stats.dropped_turns += dropped
                 kept = builder.add_pov(battle, records, values, weights)
@@ -398,6 +508,7 @@ def ingest_replay_files(
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
+    complete_own_team: bool = True,
 ) -> tuple[TrajectoryDataset, Dataset | None, IngestStats]:
     """Load cached replay ``.json`` files and ingest them (see ``data.replays``)."""
     import json
@@ -410,7 +521,7 @@ def ingest_replay_files(
             except (OSError, ValueError):
                 continue
 
-    return ingest_replays(_load(), weights, gamma, battle_format)
+    return ingest_replays(_load(), weights, gamma, battle_format, complete_own_team)
 
 
 def ingest_and_save(
@@ -420,9 +531,12 @@ def ingest_and_save(
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
+    complete_own_team: bool = True,
 ) -> IngestStats:
     """Ingest cached replay files and write the RL shard (+ optional BC shard)."""
-    rl, bc, stats = ingest_replay_files(paths, weights, gamma, battle_format)
+    rl, bc, stats = ingest_replay_files(
+        paths, weights, gamma, battle_format, complete_own_team
+    )
     save_rl(rl, rl_out)
     if bc is not None and bc_out is not None:
         save(bc, bc_out)

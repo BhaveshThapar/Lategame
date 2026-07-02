@@ -1,37 +1,69 @@
 {
-  "n_replays": 500,
-  "with_preview": {
-    "povs": 1000.0,
+  "n_replays": 200,
+  "with_completion": {
+    "povs": 400.0,
     "parse_rate": 1.0,
-    "turns": 21862.0,
-    "drop_rate": 0.02410499062583698,
-    "species_coverage": 0.9997789162321236,
-    "winner_return": 4.607666666666668,
-    "loser_return": -1.9035562248995983
+    "turns": 8898.0,
+    "drop_rate": 0.022842082143641557,
+    "species_coverage": 1.0,
+    "item_known": 0.29658350191054167,
+    "ability_known": 0.4662845583277141,
+    "move_count": 2.623623286131715,
+    "winner_return": 4.6993,
+    "loser_return": -1.97815
   },
   "stripped_preview_control": {
-    "povs": 1000.0,
+    "povs": 400.0,
     "parse_rate": 1.0,
-    "turns": 20385.0,
-    "drop_rate": 0.09003660387465405,
-    "species_coverage": 0.6845351974490884,
-    "winner_return": 3.4336746987951803,
-    "loser_return": -3.2382710843373497
+    "turns": 8318.0,
+    "drop_rate": 0.08653634965956512,
+    "species_coverage": 0.6771860222810043,
+    "item_known": 0.29826881461889876,
+    "ability_known": 0.4687424861745612,
+    "move_count": 2.656047126713152,
+    "winner_return": 3.5172950000000003,
+    "loser_return": -3.33291
   },
-  "coverage_lift": 0.31524371878303514,
-  "reward_gap": 6.511222891566266,
+  "no_completion_control": {
+    "povs": 400.0,
+    "parse_rate": 1.0,
+    "turns": 8898.0,
+    "drop_rate": 0.022842082143641557,
+    "species_coverage": 1.0,
+    "item_known": 0.18262530905821533,
+    "ability_known": 0.45032591593616544,
+    "move_count": 2.0197797257810746,
+    "winner_return": 4.6993,
+    "loser_return": -1.97815
+  },
+  "coverage_lift": 0.32281397771899567,
+  "reward_gap": 6.67745,
+  "detail_lift": {
+    "item": 0.11395819285232633,
+    "ability": 0.01595864239154865,
+    "moves": 0.6038435603506405
+  },
+  "residual_vs_live": {
+    "item": 0.7034164980894584,
+    "ability": 0.5337154416722859,
+    "moves": 1.376376713868285
+  },
   "thresholds": {
     "min_parse_rate": 0.8,
     "min_coverage": 0.95,
     "max_drop_rate": 0.4,
-    "min_coverage_lift": 0.1
+    "min_coverage_lift": 0.1,
+    "min_item_lift": 0.05,
+    "min_move_lift": 0.3
   },
   "checks": {
     "parse_rate_ok": true,
     "coverage_ok": true,
     "drop_rate_ok": true,
     "reward_sign_ok": true,
-    "negative_control_has_teeth": true
+    "species_control_has_teeth": true,
+    "item_completion_has_teeth": true,
+    "move_completion_has_teeth": true
   },
   "verdict": "PASS"
 }

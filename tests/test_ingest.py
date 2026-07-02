@@ -255,3 +255,104 @@ def test_ou_preview_switch_reconciles_nickname_without_duplicate() -> None:
     # than adding a 3rd. Species appears exactly once.
     assert len(battle.team) == 2
     assert sum(1 for m in battle.team.values() if m.base_species == "dragonite") == 1
+
+
+# --- Two-pass own-team completion: fill own item/ability/moves to the live-request POV ---
+
+# p1 (Alice) leads Kingambit (a *multi*-ability species, so poke-env does NOT auto-assign its
+# ability). Turn 1 it uses Kowtow Cleave (its only revealed move so far). Turn 2 reveals the rest
+# of its kit: ability Supreme Overlord (|-ability|), then its Air Balloon is *knocked off*
+# (|-enditem| -> poke-env resets .item to None), then it uses Sucker Punch. So at the turn-1
+# decision the v1 POV knows almost nothing about the mon, while the live |request| would have
+# shown item+ability+full moveset from turn 0.
+COMPLETE_LOG = "\n".join(
+    [
+        "|player|p1|Alice|1|",
+        "|player|p2|Bob|2|",
+        "|teamsize|p1|2",
+        "|teamsize|p2|1",
+        "|gen|9",
+        "|tier|[Gen 9] OU",
+        "|clearpoke",
+        "|poke|p1|Kingambit, M|",
+        "|poke|p1|Gholdengo|",
+        "|poke|p2|Garganacl, M|",
+        "|teampreview",
+        "|start",
+        "|switch|p1a: Kingambit|Kingambit, M|100/100",
+        "|switch|p2a: Garganacl|Garganacl, M|100/100",
+        "|turn|1",
+        "|move|p1a: Kingambit|Kowtow Cleave|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|60/100",
+        "|move|p2a: Garganacl|Salt Cure|p1a: Kingambit",
+        "|-damage|p1a: Kingambit|80/100",
+        "|turn|2",
+        "|-ability|p1a: Kingambit|Supreme Overlord",
+        "|move|p2a: Garganacl|Knock Off|p1a: Kingambit",
+        "|-damage|p1a: Kingambit|70/100",
+        "|-enditem|p1a: Kingambit|Air Balloon|[from] move: Knock Off|[of] p2a: Garganacl",
+        "|move|p1a: Kingambit|Sucker Punch|p2a: Garganacl",
+        "|-damage|p2a: Garganacl|0 fnt",
+        "|faint|p2a: Garganacl",
+        "|win|Alice",
+    ]
+)
+
+
+def _own_active_detail(obs: np.ndarray) -> tuple[bool, bool, int]:
+    """(item-known, ability-known, active-move-count) read from the encoder ID channels."""
+    from lategame.features.encoder import OBS_LAYOUT
+
+    pdim = OBS_LAYOUT.pokemon_dim
+    ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
+    for i in range(6):
+        if obs[i * pdim + 1] > 0.5:  # own active block (active flag = channel 1)
+            item = bool(obs[i * pdim + pdim - 2] > 0.5)
+            ability = bool(obs[i * pdim + pdim - 1] > 0.5)
+            moves = sum(1 for j in range(4) if obs[ms + j * md + md - 1] > 0.5)
+            return item, ability, moves
+    raise AssertionError("no own active mon block found in obs")
+
+
+def test_prescan_recovers_full_kit_including_consumed_item() -> None:
+    from lategame.data.ingest import _prescan_kits, _team_key
+
+    kits = _prescan_kits(COMPLETE_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    kit = kits[_team_key("p1a: Kingambit")]
+    # Air Balloon is recovered from the raw -enditem line even though end-of-game .item is None.
+    assert kit.item == "airballoon"
+    assert kit.ability == "supremeoverlord"
+    assert {"kowtowcleave", "suckerpunch"} <= kit.moves
+
+
+def test_two_pass_completes_active_kit_at_early_decision() -> None:
+    from lategame.data.ingest import _prescan_kits
+    from lategame.features import vocab
+    from lategame.features.encoder import OBS_LAYOUT
+
+    lines = COMPLETE_LOG.split("\n")
+    _, off, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=None)
+    kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
+    _, on, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=kits)
+
+    # Decision 0 is the turn-1 move, before the mon revealed its item/ability/2nd move in-line.
+    assert _own_active_detail(off[0][0]) == (False, False, 1)  # v1 progressive-reveal POV
+    assert _own_active_detail(on[0][0]) == (True, True, 2)  # completed to the live POV
+
+    # The completed ID channels carry the real vocab ids the gate reads at those exact offsets.
+    obs, pdim = on[0][0], OBS_LAYOUT.pokemon_dim
+    active = next(i for i in range(6) if obs[i * pdim + 1] > 0.5)
+    assert obs[active * pdim + pdim - 2] == vocab.load_vocab().index("items", "airballoon")
+    assert obs[active * pdim + pdim - 1] == vocab.load_vocab().index("abilities", "supremeoverlord")
+
+
+def test_two_pass_keeps_consumed_item_unknown_after_knockoff() -> None:
+    from lategame.data.ingest import _prescan_kits
+
+    lines = COMPLETE_LOG.split("\n")
+    kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
+    _, on, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=kits)
+    # Decision 1 is the turn-2 move, AFTER Air Balloon was knocked off: backfill must not
+    # re-reveal a consumed item -- it reads None, exactly as the live POV shows post-knock.
+    item_known, _, _ = _own_active_detail(on[1][0])
+    assert item_known is False

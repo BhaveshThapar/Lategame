@@ -8,22 +8,37 @@ per side, so the *v1 log-based* ``data.ingest`` path is the right reconstructor 
 seeds those species from turn 0 (``ingest._register_preview``). This gate measures
 whether that reconstruction is faithful before we spend anything on training.
 
+This upgrade (Build 3) checks the channels the encoder actually feeds the model -- the
+identity-embedding IDs (item/ability/move) -- not just species presence. Build 2's Gate A
+passed on species but was blind to the own-team *detail* gap that made the trained agent OOD:
+the log reveals the player's own item/ability/moves only progressively, while the live
+``|request|`` hands over the full team from turn 1. ``ingest`` now closes this with two-pass
+own-team completion (``_prescan_kits`` + ``_complete_own_team``); this gate measures how far
+that goes on the exact channels that matter.
+
 Measurements over a sample of cached gen9ou replays (no server, no training):
 
   * parse rate      -- POV-episodes reconstructed without a fatal error.
-  * species coverage -- mean over decisions of (ego + opp species present)/12, read from
-                        the encoder's per-Pokemon "present" flag. Preview should push
-                        this to ~1.0 from the first turn.
+  * species coverage -- mean over decisions of (ego + opp species present)/12, from the
+                        per-Pokemon "present" flag. Preview should push this to ~1.0.
   * drop rate       -- decisions seen but undecodable (forced/first-reveal-nickname switches).
-  * reward sign     -- winner-POV mean episode return must exceed loser-POV mean (the
-                        shaped terminal reward must carry the right sign).
-  * negative control (teeth) -- re-run with ``|poke|`` lines stripped (RB-style progressive
-                        reveal). Coverage must drop materially; a metric that can't fall is
-                        not a gate (Lever 11 lesson).
+  * reward sign     -- winner-POV mean episode return must exceed loser-POV mean.
+  * species control (teeth) -- re-run with ``|poke|`` stripped; coverage must drop materially.
+  * own-active detail channels -- over decisions, the own active mon's item-known rate,
+                        ability-known rate, and move-count (/4), read from the encoder's ID
+                        channels via ``OBS_LAYOUT``. Reported WITH two-pass and WITH it OFF
+                        (the v1 progressive-reveal control); the ON-vs-OFF *lift* is the teeth,
+                        and the absolute ON value is the log *ceiling* (residual = ideal - ON,
+                        where ideal = live 1.0/1.0/4.0).
 
-KILL (do NOT train; the residual is fidelity -> next lever is two-pass own-team completion):
-  parse rate < 0.80, or species coverage < 0.95, or drop rate > 0.40, or reward gap <= 0,
-  or the negative control fails to lower coverage (lift < 0.10).
+Known residual: ability is essentially irreducible from public logs -- poke-env already
+auto-assigns single-option abilities, so the unknowns are multi-ability species whose ability
+never triggered. If Gate B (functional test) underperforms, the low item/ability ceiling is the
+trigger to escalate to usage-prior (Smogon) imputation -- the documented next lever.
+
+KILL (do NOT train): parse rate < 0.80, species coverage < 0.95, drop rate > 0.40, reward gap
+  <= 0, species control lift < 0.10, OR two-pass fails to lift the channels logs *can* fix
+  (item-known lift < 0.05 or move-count lift < 0.30 vs the no-completion control).
 
     python scripts/ou_ingest_gate.py --cache-dir replays/gen9ou --sample 200
 """
@@ -40,6 +55,7 @@ import numpy as np
 from lategame.data.ingest import (
     _episode_rewards,
     _gen_from_log,
+    _prescan_kits,
     _reconstruct_pov,
 )
 from lategame.data.replays import cached_replay_paths, fetch_replays
@@ -48,12 +64,20 @@ from lategame.features.encoder import OBS_LAYOUT
 
 _RESULTS = Path("results/ou_ingest_gate.json")
 _PDIM = OBS_LAYOUT.pokemon_dim  # each of the first 12 obs blocks is one Pokemon
+# Trailing per-Pokemon ID channels (POKEMON_ID_FIELDS = species, item, ability).
+_ITEM_CH = _PDIM - 2
+_ABILITY_CH = _PDIM - 1
 
 # KILL thresholds.
 MIN_PARSE_RATE = 0.80
 MIN_COVERAGE = 0.95
 MAX_DROP_RATE = 0.40
 MIN_COVERAGE_LIFT = 0.10  # preview must lift coverage vs the stripped-|poke| control
+MIN_ITEM_LIFT = 0.05  # two-pass must lift own-active item-known vs the no-completion control
+MIN_MOVE_LIFT = 0.30  # two-pass must lift own-active move-count vs the no-completion control
+IDEAL_ITEM = 1.0  # live request reveals every own item...
+IDEAL_ABILITY = 1.0  # ...ability...
+IDEAL_MOVES = 4.0  # ...and full moveset from turn 1 (residual = ideal - ceiling)
 
 
 def _present_counts(obs: np.ndarray) -> tuple[int, int]:
@@ -63,16 +87,43 @@ def _present_counts(obs: np.ndarray) -> tuple[int, int]:
     return ego, opp
 
 
+def _active_detail(obs: np.ndarray) -> tuple[float, float, float] | None:
+    """Own active mon's (item-known, ability-known, move-count/4) from the encoder ID channels.
+
+    Finds the own active block by its active flag (channel 1), then reads its trailing item/
+    ability ID channels (nonzero = a real vocab id = known) and counts the active-move blocks
+    whose move-ID channel is nonzero. Returns ``None`` if no own mon is active this decision.
+    """
+    for i in range(6):
+        if obs[i * _PDIM + 1] > 0.5:  # active flag
+            item = 1.0 if obs[i * _PDIM + _ITEM_CH] > 0.5 else 0.0
+            ability = 1.0 if obs[i * _PDIM + _ABILITY_CH] > 0.5 else 0.0
+            ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
+            moves = sum(1.0 for j in range(4) if obs[ms + j * md + md - 1] > 0.5)
+            return item, ability, moves
+    return None
+
+
 def _strip_preview(lines: list[str]) -> list[str]:
     """Drop ``|poke|`` team-preview lines -> RB-style progressive reveal (negative control)."""
     return [ln for ln in lines if not ln.startswith("|poke|")]
 
 
-def _score(replays: list[dict[str, Any]], weights: RewardWeights, strip: bool) -> dict[str, float]:
-    """Reconstruct every POV; return coverage + health counters (optionally preview-stripped)."""
+def _score(
+    replays: list[dict[str, Any]],
+    weights: RewardWeights,
+    strip: bool = False,
+    complete: bool = True,
+) -> dict[str, float]:
+    """Reconstruct every POV; return coverage, detail channels + health counters.
+
+    ``strip`` drops ``|poke|`` preview (species negative control); ``complete`` toggles two-pass
+    own-team completion (``False`` = the v1 progressive-reveal detail control).
+    """
     povs = fatal = 0
     turns = dropped = 0
     cov_sum = cov_n = 0.0
+    item_sum = ability_sum = moves_sum = detail_n = 0.0
     winner_returns: list[float] = []
     loser_returns: list[float] = []
 
@@ -88,9 +139,15 @@ def _score(replays: list[dict[str, Any]], weights: RewardWeights, strip: bool) -
         tag = str(replay.get("id") or "r")
         for username in players:
             povs += 1
+            pov_tag = f"{tag}-{username}"
             try:
+                kits = (
+                    _prescan_kits(lines, str(username), pov_tag, gen, weights)
+                    if complete
+                    else None
+                )
                 battle, records, values, drop = _reconstruct_pov(
-                    lines, str(username), f"{tag}-{username}", gen, weights
+                    lines, str(username), pov_tag, gen, weights, kits=kits
                 )
             except Exception:  # noqa: BLE001 -- one bad POV must not abort the gate
                 fatal += 1
@@ -101,6 +158,12 @@ def _score(replays: list[dict[str, Any]], weights: RewardWeights, strip: bool) -
                 ego, opp = _present_counts(obs)
                 cov_sum += (ego + opp) / 12.0
                 cov_n += 1.0
+                detail = _active_detail(obs)
+                if detail is not None:
+                    item_sum += detail[0]
+                    ability_sum += detail[1]
+                    moves_sum += detail[2]
+                    detail_n += 1.0
             rewards = _episode_rewards(battle, records, values, weights)
             if rewards:
                 ret = float(sum(rewards))
@@ -113,6 +176,9 @@ def _score(replays: list[dict[str, Any]], weights: RewardWeights, strip: bool) -
         "turns": float(turns),
         "drop_rate": dropped / seen if seen else 0.0,
         "species_coverage": cov_sum / cov_n if cov_n else 0.0,
+        "item_known": item_sum / detail_n if detail_n else 0.0,
+        "ability_known": ability_sum / detail_n if detail_n else 0.0,
+        "move_count": moves_sum / detail_n if detail_n else 0.0,
         "winner_return": float(np.mean(winner_returns)) if winner_returns else 0.0,
         "loser_return": float(np.mean(loser_returns)) if loser_returns else 0.0,
     }
@@ -153,33 +219,52 @@ def main() -> None:
         raise SystemExit(f"no cached replays under {args.cache_dir} -- scrape first (or --fetch N)")
 
     weights = RewardWeights()
-    main_m = _score(replays, weights, strip=False)
-    neg_m = _score(replays, weights, strip=True)
+    main_m = _score(replays, weights, strip=False, complete=True)  # real training reconstruction
+    species_ctrl = _score(replays, weights, strip=True, complete=True)  # species lift control
+    detail_ctrl = _score(replays, weights, strip=False, complete=False)  # v1 no-completion control
 
     coverage = main_m["species_coverage"]
-    lift = coverage - neg_m["species_coverage"]
+    lift = coverage - species_ctrl["species_coverage"]
     reward_gap = main_m["winner_return"] - main_m["loser_return"]
+    item_lift = main_m["item_known"] - detail_ctrl["item_known"]
+    ability_lift = main_m["ability_known"] - detail_ctrl["ability_known"]
+    move_lift = main_m["move_count"] - detail_ctrl["move_count"]
 
     checks = {
         "parse_rate_ok": main_m["parse_rate"] >= MIN_PARSE_RATE,
         "coverage_ok": coverage >= MIN_COVERAGE,
         "drop_rate_ok": main_m["drop_rate"] <= MAX_DROP_RATE,
         "reward_sign_ok": reward_gap > 0.0,
-        "negative_control_has_teeth": lift >= MIN_COVERAGE_LIFT,
+        "species_control_has_teeth": lift >= MIN_COVERAGE_LIFT,
+        "item_completion_has_teeth": item_lift >= MIN_ITEM_LIFT,
+        "move_completion_has_teeth": move_lift >= MIN_MOVE_LIFT,
     }
     verdict = "PASS" if all(checks.values()) else "KILL"
 
+    # Absolute ON-value = log ceiling; residual = live-ideal - ceiling. The ability residual is
+    # inherent to public logs -> escalation trigger to usage-prior imputation if Gate B is weak.
+    residual = {
+        "item": IDEAL_ITEM - main_m["item_known"],
+        "ability": IDEAL_ABILITY - main_m["ability_known"],
+        "moves": IDEAL_MOVES - main_m["move_count"],
+    }
+
     result = {
         "n_replays": len(replays),
-        "with_preview": main_m,
-        "stripped_preview_control": neg_m,
+        "with_completion": main_m,
+        "stripped_preview_control": species_ctrl,
+        "no_completion_control": detail_ctrl,
         "coverage_lift": lift,
         "reward_gap": reward_gap,
+        "detail_lift": {"item": item_lift, "ability": ability_lift, "moves": move_lift},
+        "residual_vs_live": residual,
         "thresholds": {
             "min_parse_rate": MIN_PARSE_RATE,
             "min_coverage": MIN_COVERAGE,
             "max_drop_rate": MAX_DROP_RATE,
             "min_coverage_lift": MIN_COVERAGE_LIFT,
+            "min_item_lift": MIN_ITEM_LIFT,
+            "min_move_lift": MIN_MOVE_LIFT,
         },
         "checks": checks,
         "verdict": verdict,
@@ -191,12 +276,26 @@ def main() -> None:
     print(f"parse rate     {main_m['parse_rate']:.3f}   (>= {MIN_PARSE_RATE})")
     print(
         f"species cover  {coverage:.3f}   (>= {MIN_COVERAGE}); "
-        f"stripped {neg_m['species_coverage']:.3f}; lift {lift:+.3f} (>= {MIN_COVERAGE_LIFT})"
+        f"stripped {species_ctrl['species_coverage']:.3f}; "
+        f"lift {lift:+.3f} (>= {MIN_COVERAGE_LIFT})"
     )
     print(f"drop rate      {main_m['drop_rate']:.3f}   (<= {MAX_DROP_RATE})")
     print(
         f"reward sign    winner {main_m['winner_return']:+.3f} vs loser "
         f"{main_m['loser_return']:+.3f}  gap {reward_gap:+.3f} (> 0)"
+    )
+    print("own-active detail channels (ON two-pass | OFF v1 | lift | residual-vs-live):")
+    print(
+        f"  item-known   {main_m['item_known']:.3f} | {detail_ctrl['item_known']:.3f} | "
+        f"{item_lift:+.3f} (>= {MIN_ITEM_LIFT}) | {residual['item']:.3f}"
+    )
+    print(
+        f"  ability-known {main_m['ability_known']:.3f} | {detail_ctrl['ability_known']:.3f} | "
+        f"{ability_lift:+.3f} (reported) | {residual['ability']:.3f}"
+    )
+    print(
+        f"  move-count   {main_m['move_count']:.3f} | {detail_ctrl['move_count']:.3f} | "
+        f"{move_lift:+.3f} (>= {MIN_MOVE_LIFT}) | {residual['moves']:.3f}"
     )
     print(f"turns kept     {int(main_m['turns'])} over {int(main_m['povs'])} POV-episodes")
     print(f"\nVERDICT: {verdict}  -> {args.out}")
