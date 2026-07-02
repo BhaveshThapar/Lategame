@@ -214,6 +214,7 @@ def _run_ingest_replays(args: argparse.Namespace) -> None:
         gamma=args.gamma,
         battle_format=args.battle_format,
         complete_own_team=args.complete_own_team,
+        impute_usage=args.impute_usage,
     )
 
 
@@ -477,7 +478,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Disable two-pass own-team completion (reproduce the v1 progressive-reveal POV)",
     )
-    ingest.set_defaults(complete_own_team=True)
+    ingest.add_argument(
+        "--no-impute-usage",
+        dest="impute_usage",
+        action="store_false",
+        help="Disable usage-prior imputation of still-unrevealed own item/ability/moves",
+    )
+    ingest.set_defaults(complete_own_team=True, impute_usage=True)
 
     resim = sub.add_parser(
         "resim-replays",
