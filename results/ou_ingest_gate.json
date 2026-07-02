@@ -1,16 +1,48 @@
 {
   "n_replays": 200,
+  "with_imputation": {
+    "povs": 400.0,
+    "parse_rate": 1.0,
+    "turns": 8898.0,
+    "drop_rate": 0.022842082143641557,
+    "species_coverage": 1.0,
+    "item_known": 0.7597212856821758,
+    "ability_known": 0.9986513823331086,
+    "move_count": 3.990222521915037,
+    "winner_return": 4.708645000000001,
+    "loser_return": -1.9748949999999998,
+    "imputed_mons": 2380.0,
+    "usage_missing_mons": 20.0,
+    "usage_missing_rate": 0.008333333333333333,
+    "item_top1": 0.5414480587618048,
+    "item_topk": 0.9034627492130115,
+    "ability_top1": 0.9724444444444444,
+    "ability_topk": 0.9946666666666667,
+    "moves_topk_containment": 0.9383717981232564,
+    "n_item_truth": 953.0,
+    "n_ability_truth": 1125.0
+  },
   "with_completion": {
     "povs": 400.0,
     "parse_rate": 1.0,
     "turns": 8898.0,
     "drop_rate": 0.022842082143641557,
     "species_coverage": 1.0,
-    "item_known": 0.29658350191054167,
+    "item_known": 0.29635873229939314,
     "ability_known": 0.4662845583277141,
-    "move_count": 2.623623286131715,
+    "move_count": 2.623173746909418,
     "winner_return": 4.6993,
-    "loser_return": -1.97815
+    "loser_return": -1.97815,
+    "imputed_mons": 0.0,
+    "usage_missing_mons": 0.0,
+    "usage_missing_rate": 0.0,
+    "item_top1": 0.0,
+    "item_topk": 0.0,
+    "ability_top1": 0.0,
+    "ability_topk": 0.0,
+    "moves_topk_containment": 0.0,
+    "n_item_truth": 0.0,
+    "n_ability_truth": 0.0
   },
   "stripped_preview_control": {
     "povs": 400.0,
@@ -18,11 +50,21 @@
     "turns": 8318.0,
     "drop_rate": 0.08653634965956512,
     "species_coverage": 0.6771860222810043,
-    "item_known": 0.29826881461889876,
+    "item_known": 0.2981485934118779,
     "ability_known": 0.4687424861745612,
-    "move_count": 2.656047126713152,
+    "move_count": 2.6556864630920893,
     "winner_return": 3.5172950000000003,
-    "loser_return": -3.33291
+    "loser_return": -3.33291,
+    "imputed_mons": 0.0,
+    "usage_missing_mons": 0.0,
+    "usage_missing_rate": 0.0,
+    "item_top1": 0.0,
+    "item_topk": 0.0,
+    "ability_top1": 0.0,
+    "ability_topk": 0.0,
+    "moves_topk_containment": 0.0,
+    "n_item_truth": 0.0,
+    "n_ability_truth": 0.0
   },
   "no_completion_control": {
     "povs": 400.0,
@@ -34,27 +76,67 @@
     "ability_known": 0.45032591593616544,
     "move_count": 2.0197797257810746,
     "winner_return": 4.6993,
-    "loser_return": -1.97815
+    "loser_return": -1.97815,
+    "imputed_mons": 0.0,
+    "usage_missing_mons": 0.0,
+    "usage_missing_rate": 0.0,
+    "item_top1": 0.0,
+    "item_topk": 0.0,
+    "ability_top1": 0.0,
+    "ability_topk": 0.0,
+    "moves_topk_containment": 0.0,
+    "n_item_truth": 0.0,
+    "n_ability_truth": 0.0
   },
   "coverage_lift": 0.32281397771899567,
   "reward_gap": 6.67745,
   "detail_lift": {
-    "item": 0.11395819285232633,
+    "item": 0.1137334232411778,
     "ability": 0.01595864239154865,
-    "moves": 0.6038435603506405
+    "moves": 0.6033940211283433
   },
   "residual_vs_live": {
-    "item": 0.7034164980894584,
+    "item": 0.7036412677006069,
     "ability": 0.5337154416722859,
-    "moves": 1.376376713868285
+    "moves": 1.3768262530905822
   },
+  "residual_vs_live_imputed": {
+    "item": 0.24027871431782422,
+    "ability": 0.0013486176668914274,
+    "moves": 0.009777478084962876
+  },
+  "live_reference": {
+    "item": 0.894,
+    "ability": 1.0,
+    "moves": 4.0
+  },
+  "item_state_decomposition": {
+    "known_rate": 0.7597212856821758,
+    "consumed_none_rate": 0.23342324117779276,
+    "unfilled_rate": 0.006855473140031468,
+    "n_decisions": 8898.0
+  },
+  "imputation_accuracy": {
+    "item_top1": 0.5414480587618048,
+    "item_topk": 0.9034627492130115,
+    "ability_top1": 0.9724444444444444,
+    "ability_topk": 0.9946666666666667,
+    "moves_topk_containment": 0.9383717981232564,
+    "n_item_truth": 953.0,
+    "n_ability_truth": 1125.0
+  },
+  "usage_prior_version": "d0db8c8db84e",
   "thresholds": {
     "min_parse_rate": 0.8,
     "min_coverage": 0.95,
     "max_drop_rate": 0.4,
     "min_coverage_lift": 0.1,
     "min_item_lift": 0.05,
-    "min_move_lift": 0.3
+    "min_move_lift": 0.3,
+    "max_item_unfilled": 0.02,
+    "min_impute_ability": 0.99,
+    "min_impute_moves": 3.95,
+    "max_usage_missing": 0.02
   },
   "checks": {
     "parse_rate_ok": true,
@@ -63,7 +145,11 @@
     "reward_sign_ok": true,
     "species_control_has_teeth": true,
     "item_completion_has_teeth": true,
-    "move_completion_has_teeth": true
+    "move_completion_has_teeth": true,
+    "impute_item_unfilled_ok": true,
+    "impute_ability_full": true,
+    "impute_moves_full": true,
+    "usage_species_coverage_ok": true
   },
   "verdict": "PASS"
 }
