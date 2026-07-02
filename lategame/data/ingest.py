@@ -21,7 +21,12 @@ are empty and the live ``order_to_action``/``action_mask`` can't run. We instead
   diffing decision points exactly like ``collect._battle_rewards``.
 
 The accepted v1 fidelity gap: a player's own bench is revealed only as mons switch in
-(live play sees all six from the request). v2 can fill this from randbats set data.
+(live play sees all six from the request). In *team-choice* formats (e.g. gen9ou) the
+log opens with ``|poke|`` team-preview lines that name all six species on both sides,
+so ``_register_preview`` fills every slot from turn 0 -- the encoder then sees all
+twelve species immediately, closing this gap for OU (random battles carry no preview,
+so the path is a no-op there and the v1 gap remains). Movesets/items are still revealed
+only as used; imputing those is a later lever, not this build.
 """
 
 from __future__ import annotations
@@ -89,6 +94,34 @@ def _safe_parse(battle: AbstractBattle, parts: list[str]) -> None:
         pass
 
 
+def _register_preview(battle: AbstractBattle, parts: list[str]) -> None:
+    """Seed an *own*-side previewed species into ``battle.team`` from a ``|poke|`` line.
+
+    Team-choice formats reveal all six species per side at team preview. poke-env already
+    keeps the *opponent's* preview mons (in ``teampreview_opponent_team``, which the encoder
+    merges), but drops the player's *own* preview entirely -- so without this the ego bench is
+    revealed only as mons switch in (the v1 gap). We inject each own previewed mon into
+    ``battle.team`` via ``get_pokemon`` (the same path ``switch`` uses), so a later switch
+    reconciles onto it by species -- nicknames included, since preview shows the species while a
+    switch shows the nickname -- rather than creating a duplicate. Handling only the own side
+    keeps the encoded POV identical to live play, where the request supplies the full own team and
+    the opponent is seen via preview + reveals. Random battles carry no ``|poke|`` lines, so this
+    is never called there.
+    """
+    if len(parts) < 4 or battle.player_role is None:
+        return
+    player, details = parts[2], parts[3]
+    if player != battle.player_role:  # opponent preview is handled by the encoder merge
+        return
+    species = details.split(",")[0].strip()
+    if not species:
+        return
+    try:
+        battle.get_pokemon(f"{player}: {species}", details=details)
+    except Exception:  # noqa: BLE001 -- a malformed preview line must not abort a replay
+        pass
+
+
 def _move_sample(
     battle: AbstractBattle, parts: list[str], tera: bool, weights: RewardWeights
 ) -> _Sample | None:
@@ -151,6 +184,13 @@ def _reconstruct_pov(
             continue
         parts = raw.split("|")
         tag = parts[1] if len(parts) > 1 else ""
+
+        if tag == "poke":
+            # Team preview, before turn 1: seed both sides' full six-species rosters so
+            # the encoder and switch mask see them from the start (team-choice formats).
+            _safe_parse(battle, parts)
+            _register_preview(battle, parts)
+            continue
 
         if tag == "turn":
             started, acted, fainted, tera = True, False, False, False

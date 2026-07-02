@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-07-01)
+### 13.1 Build status & findings (as of 2026-07-02)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -703,6 +703,46 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     (`data.resim` is already format-agnostic) → train OU checkpoints, then re-run this probe + M2 on the
     trained agent. **Lesson:** the `assess_ou` mirror-sanity flag needs a real `n` — at n=30 the mirror
     read 0.633 (CI [0.455, 0.781]) and tripped a false "harness NOT clean"; at n=300 it settled to 0.487.
+
+- **OU pivot — Build 2: OU human-replay ingestion → first OU checkpoint — built + run; AMBER (pipeline
+  works, agent is non-functional; a deeper POV gap than Build 1 assumed is precisely diagnosed).**
+  The full data→train→probe chain, gated on reconstruction fidelity. **Empirical premise correction:**
+  gen9ou public replays carry **no `inputlog`** (keys: format/id/log/players/rating/… — confirmed by
+  direct fetch), so the RB `resim` path (re-simulate from the random-battle PRNG *seed*, fill opponents
+  from randbats) **cannot** be used — Build 1's "`data.resim` is format-agnostic" note was wrong. But OU
+  logs open with `|poke|` **team-preview** lines naming all six species per side, so the v1 log-based
+  `data.ingest` (seed-free) is the right reconstructor once it seeds those species.
+  - **Built.** `ingest._register_preview` (own-side team-preview → `battle.team` via `get_pokemon`, so a
+    later switch reconciles by species, nicknames included, no duplicate); `encoder._opponent_mons`
+    (merge revealed + `teampreview_opponent_team`, revealed-first, so the opponent roster is identical at
+    offline reconstruction and live play — no-op for RB); `scripts/ou_ingest_gate.py` (Gate-A fidelity
+    KILL gate: species coverage, drop rate, reward-sign, + a strip-`|poke|` negative control with teeth);
+    `--seed` threaded into the `train-rl` CLI (was hardwired to 0); `--offrl-checkpoint` override on
+    `format_ceiling_gate.py`. Suite 145→**154 pass**, ruff/mypy clean.
+  - **Data (Gate A PASS).** Scraped **2,760** rated gen9ou replays (≥1200; index exhausts ~page 100, ~2×
+    the RB 1,424) → ingested **120,012** all-turns turns + 61,740 BC samples (0 skipped, drop 2.8%,
+    >RB's 82k). Gate A on n=500: parse 1.000, **species coverage 1.000** (stripped-`|poke|` control
+    0.685, **lift +0.315** = teeth), drop 0.024, winner−loser return gap +6.5. `results/ou_ingest_gate.json`.
+  - **Trained** BC (val-acc 0.71) + 3 AWR seeds (EntityTransformer + dex-prior; value-MAE **~0.47–0.52**,
+    healthy — the two-tower critic fits fine, not the M4 MLP crater).
+  - **Gate B (M1, n=300, seed 0): RED for the agent.** offrl vs heuristic **0.007** ≈ random 0.013
+    (harness fine: `simpleheuristics` 0.573, monotone gradient; mirror 0.437 is n=300 noise). offrl vs
+    **random 0.495** (no signal), vs maxbasepower 0.150. `results/format_ceiling_gate_ou_trained.json`.
+  - **Diagnosis (airtight, two obs mismatches; the project's train==eval lesson).** (1) *Opponent roster*
+    — training injected all 6 opp species but live `opponent_team` is revealed-only (mean 2.95, 9% full);
+    **fixed** by the `_opponent_mons` encoder merge (verified 6/6 at eval), but alone insufficient.
+    (2) *Own-team detail* — the log reveals the player's **own** item/ability/moves only progressively,
+    while the live `|request|` supplies the full team from turn 1: own-active **item known 0.18→0.82,
+    ability 0.45→1.00, moves present 2.18→4.00** (train→eval). The policy trains on "my kit unknown" and
+    plays on "my kit known" → OOD on the identity-embedding channels → random-quality despite 0.71
+    imitation accuracy. Same log-vs-request POV gap that sank RB v1 and needed resim — which OU cannot
+    use. Team preview closes *species*, not *detail*.
+  - **Verdict AMBER; next lever = two-pass own-team completion.** Lasting assets: OU reconstruction, the
+    fidelity gate, the encoder opp-roster fix, CLI seed. **Next:** pre-scan each replay for every own mon's
+    full-game-revealed moves/item/ability and populate them at every timestep so training obs matches the
+    live POV, then re-ingest + re-train + re-run Gate B (its own gated build). **Lesson:** Gate A measured
+    *species* coverage but not *detail* coverage — a fidelity gate must check the channels the encoder
+    actually feeds the model (item/ability/move IDs), not just presence.
 
 ---
 

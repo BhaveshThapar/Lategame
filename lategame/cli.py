@@ -115,6 +115,7 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         n_heads=args.n_heads,
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
+        seed=args.seed,
     )
     train_offline_rl(args.data, args.out, config)
 
@@ -358,6 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
     train_rl.add_argument("--beta", type=float, default=1.0, help="AWR temperature")
     train_rl.add_argument("--value-coef", type=float, default=0.5, help="Value-loss weight")
     train_rl.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    train_rl.add_argument("--seed", type=int, default=0, help="Init + train/val-split seed")
 
     selfplay = sub.add_parser("selfplay", help="Run the M4 self-play improvement loop")
     selfplay.add_argument(

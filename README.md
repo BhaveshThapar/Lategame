@@ -69,6 +69,22 @@ quantity that forced FORMAT_BOUND on RB shows **real headroom** on OU ⇒ the ce
 **greenlight the OU pipeline.** M2 (OU near-optimal search) + M3 (OU replays) deferred to the next gate;
 GREEN's OOD transfer to OU is 0.383. Suite 145 pass / 5 skip; `results/format_ceiling_gate_ou.json`.
 
+**OU pivot Build 2 — human-replay ingestion → first OU checkpoint (AMBER: pipeline works, agent
+non-functional, deeper POV gap diagnosed).** gen9ou public replays carry **no `inputlog`**, so `resim`
+(seed-based) is impossible — but the logs open with `|poke|` team preview, so the seed-free `data.ingest`
+is the right reconstructor. Built: `ingest._register_preview` (own team preview → `battle.team`),
+`encoder._opponent_mons` (merge revealed + `teampreview_opponent_team` so the opponent roster matches at
+train and eval — no-op for RB), `scripts/ou_ingest_gate.py` (fidelity KILL gate + strip-`|poke|` negative
+control), `train-rl --seed`, `format_ceiling_gate.py --offrl-checkpoint`. Scraped **2,760** replays →
+**120,012** all-turns turns; **Gate A PASS** (species coverage 1.000, control lift +0.315). Trained BC +
+3 AWR seeds (value-MAE ~0.47–0.52, healthy). **Gate B:** offrl **0.007** vs heuristic, **0.495 vs random**
+(no signal) despite 0.71 imitation accuracy. **Diagnosed:** the log reveals the player's *own*
+item/ability/moves only progressively (own-active item 0.18→0.82, ability 0.45→1.00, moves 2.18→4.00
+train→eval) while the live `|request|` gives the full team from turn 1 → OOD on identity channels →
+random play. Team preview closes *species*, not *detail* — the log-vs-request gap that needed resim on RB,
+which OU can't use. **Next lever: two-pass own-team completion.** Suite **154 pass**;
+`results/ou_ingest_gate.json`, `results/format_ceiling_gate_ou_trained.json`.
+
 ## Setup
 
 ```bash
