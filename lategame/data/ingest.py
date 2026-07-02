@@ -35,9 +35,13 @@ Two POV gaps separate a public-log reconstruction from live play, and both are c
   **two-pass own-team completion**: ``_prescan_kits`` reads each own mon's full-game-revealed
   moves/item/ability (item recovered from the raw ``|-item|``/``|-enditem|`` lines, since
   poke-env resets a consumed item to ``None``), then ``_complete_own_team`` populates that kit
-  onto the own team before every ``embed_battle`` so the training obs matches the live POV. The
-  residual is inherent to public logs: kit a mon never revealed (e.g. an ability that never
-  triggered) stays unknown -- imputing those from usage priors is the documented next lever.
+  onto the own team before every ``embed_battle`` so the training obs matches the live POV.
+  Build 3 showed the log-only residual (kit a mon never revealed) still leaves those channels
+  far from the live density -- and a *partial* POV fix is worthless. So ``_impute_kits`` fills
+  each kit's still-unrevealed slots from the species' Smogon usage prior (``data.usage_prior``,
+  usage-weighted + stably seeded per POV/mon, revealed truth always wins), taking every own mon
+  to the full-kit detail the live request provides. For the own team this approximates the
+  truth the player actually had.
 """
 
 from __future__ import annotations
@@ -55,6 +59,7 @@ from poke_env.player import SingleBattleOrder
 from lategame.config import DEFAULT_FORMAT
 from lategame.data.collect import Dataset, TrajectoryDataset, save, save_rl
 from lategame.data.reward import RewardWeights, state_value
+from lategame.data.usage_prior import UsagePrior, kit_seed, load_usage_prior, sample_kit
 from lategame.features.action_space import (
     GEN9_ACTION_SPACE_SIZE,
     label_action,
@@ -83,6 +88,7 @@ class _Kit:
     moves: set[str] = field(default_factory=set)
     item: str | None = None
     ability: str | None = None
+    species: str | None = None  # usage-prior lookup key (poke-env id-str)
 
 
 _Kits = dict[str, _Kit]  # keyed by ``_team_key(ident)`` -> the mon's completed kit
@@ -98,6 +104,8 @@ class IngestStats:
     episodes: int = 0  # per-player trajectories kept
     turns: int = 0  # labelled decision turns kept
     dropped_turns: int = 0  # decisions seen but undecodable
+    imputed_mons: int = 0  # own mons whose kit was usage-prior imputed
+    usage_missing_mons: int = 0  # own mons with no usage-prior entry (left log-only)
 
     @property
     def drop_rate(self) -> float:
@@ -216,9 +224,9 @@ def _complete_own_team(battle: AbstractBattle, kits: _Kits) -> None:
     """
     for key, mon in battle.team.items():
         kit = kits.get(key)
-        if kit is None:
+        if kit is None or mon.transformed:  # a transformed mon's live request shows the copy
             continue
-        for move_id in kit.moves:
+        for move_id in sorted(kit.moves):  # stable slot order -> byte-reproducible shards
             if move_id not in mon.moves:
                 mon._add_move(move_id)
         if kit.item is not None and mon.item == _UNKNOWN_ITEM:
@@ -241,7 +249,12 @@ def _prescan_kits(
     kits: _Kits = {}
     for key, mon in battle.team.items():
         item = mon.item if mon.item and mon.item != _UNKNOWN_ITEM else None
-        kits[key] = _Kit(moves=set(mon.moves.keys()), item=item, ability=mon.ability or None)
+        kits[key] = _Kit(
+            moves=set(mon.moves.keys()),
+            item=item,
+            ability=mon.ability or None,
+            species=mon.species,
+        )
 
     for raw in lines:
         if not raw.startswith("|"):
@@ -253,6 +266,43 @@ def _prescan_kits(
         if kit is not None and kit.item is None:
             kit.item = to_id_str(parts[3])
     return kits
+
+
+def _impute_kits(kits: _Kits, battle_tag: str, prior: UsagePrior) -> tuple[int, int]:
+    """Fill each kit's still-unrevealed slots from the species' usage prior (Build 4).
+
+    Runs once per POV between pass 1 and pass 2, so the sampled kit is constant across the
+    replay's timesteps, and only ever touches kits -- revealed truth wins by construction
+    (moves pad the never-used slots up to 4, so the labelled action is never imputed; item
+    and ability fill only still-unknown slots; a drawn ``"nothing"`` item stays ``None``,
+    encoder-identical to a live no-item mon). Returns ``(imputed_mons, missing_mons)`` where
+    missing counts own mons whose species has no usage entry (left log-only, the fallback).
+    """
+    imputed = missing = 0
+    for key, kit in kits.items():
+        sampled = (
+            sample_kit(
+                prior,
+                kit.species,
+                kit.moves,
+                need_item=kit.item is None,
+                need_ability=kit.ability is None,
+                seed=kit_seed(battle_tag, key),
+            )
+            if kit.species is not None
+            else None
+        )
+        if sampled is None:
+            missing += 1
+            continue
+        moves, item, ability = sampled
+        kit.moves.update(moves)
+        if item is not None and kit.item is None:
+            kit.item = item
+        if ability is not None and kit.ability is None:
+            kit.ability = ability
+        imputed += 1
+    return imputed, missing
 
 
 def _reconstruct_pov(
@@ -448,6 +498,7 @@ def ingest_replays(
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
     complete_own_team: bool = True,
+    impute_usage: bool = True,
 ) -> tuple[TrajectoryDataset, Dataset | None, IngestStats]:
     """Reconstruct ``replays`` into an offline-RL shard (+ a winners-only BC shard).
 
@@ -457,10 +508,13 @@ def ingest_replays(
 
     ``complete_own_team`` (default on) enables two-pass own-team completion so the training
     obs matches the live request-based POV; ``False`` reproduces the v1 progressive-reveal POV.
+    ``impute_usage`` (default on) additionally fills the still-unrevealed kit slots from the
+    format's committed usage prior; it is a no-op when no artifact exists for the format.
     """
     weights = weights or RewardWeights()
     builder = _ShardBuilder()
     stats = IngestStats()
+    prior = load_usage_prior(battle_format) if (impute_usage and complete_own_team) else None
 
     for replay in replays:
         stats.replays += 1
@@ -486,6 +540,10 @@ def ingest_replays(
                     if complete_own_team
                     else None
                 )
+                if kits is not None and prior is not None:
+                    imputed, missing = _impute_kits(kits, pov_tag, prior)
+                    stats.imputed_mons += imputed
+                    stats.usage_missing_mons += missing
                 battle, records, values, dropped = _reconstruct_pov(
                     lines, str(username), pov_tag, gen, weights, kits=kits
                 )
@@ -509,6 +567,7 @@ def ingest_replay_files(
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
     complete_own_team: bool = True,
+    impute_usage: bool = True,
 ) -> tuple[TrajectoryDataset, Dataset | None, IngestStats]:
     """Load cached replay ``.json`` files and ingest them (see ``data.replays``)."""
     import json
@@ -521,7 +580,7 @@ def ingest_replay_files(
             except (OSError, ValueError):
                 continue
 
-    return ingest_replays(_load(), weights, gamma, battle_format, complete_own_team)
+    return ingest_replays(_load(), weights, gamma, battle_format, complete_own_team, impute_usage)
 
 
 def ingest_and_save(
@@ -532,10 +591,11 @@ def ingest_and_save(
     gamma: float = 0.99,
     battle_format: str = DEFAULT_FORMAT,
     complete_own_team: bool = True,
+    impute_usage: bool = True,
 ) -> IngestStats:
     """Ingest cached replay files and write the RL shard (+ optional BC shard)."""
     rl, bc, stats = ingest_replay_files(
-        paths, weights, gamma, battle_format, complete_own_team
+        paths, weights, gamma, battle_format, complete_own_team, impute_usage
     )
     save_rl(rl, rl_out)
     if bc is not None and bc_out is not None:
@@ -543,6 +603,7 @@ def ingest_and_save(
     print(
         f"ingested {stats.parsed}/{stats.replays} replays "
         f"({stats.skipped_replays} skipped) -> {stats.turns} turns from "
-        f"{stats.episodes} POV-episodes; drop rate {stats.drop_rate:.1%}"
+        f"{stats.episodes} POV-episodes; drop rate {stats.drop_rate:.1%}; "
+        f"usage-imputed {stats.imputed_mons} mons ({stats.usage_missing_mons} missing species)"
     )
     return stats

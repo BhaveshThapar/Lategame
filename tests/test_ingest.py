@@ -356,3 +356,142 @@ def test_two_pass_keeps_consumed_item_unknown_after_knockoff() -> None:
     # re-reveal a consumed item -- it reads None, exactly as the live POV shows post-knock.
     item_known, _, _ = _own_active_detail(on[1][0])
     assert item_known is False
+
+
+# --- Usage-prior imputation (Build 4): fill the still-unrevealed kit to eval-full detail ---
+
+def _fake_prior():
+    """Single-item distributions per species -> deterministic draws for assertions.
+
+    Kingambit's prior item is deliberately NOT its true Air Balloon, to prove revealed
+    truth always beats the prior. Move lists carry exactly the mass needed to fill to 4.
+    """
+    from lategame.data.usage_prior import SpeciesUsage, UsagePrior
+
+    return UsagePrior(
+        version="test",
+        vocab_version="test",
+        source="",
+        month="",
+        cutoff=0,
+        battle_format="gen9ou",
+        species={
+            "kingambit": SpeciesUsage(
+                moves=(
+                    ("kowtowcleave", 0.3),
+                    ("suckerpunch", 0.3),
+                    ("swordsdance", 0.2),
+                    ("ironhead", 0.2),
+                ),
+                items=(("leftovers", 1.0),),
+                abilities=(("defiant", 1.0),),
+            ),
+            "gholdengo": SpeciesUsage(
+                moves=(
+                    ("makeitrain", 0.3),
+                    ("shadowball", 0.3),
+                    ("nastyplot", 0.2),
+                    ("recover", 0.2),
+                ),
+                items=(("airballoon", 1.0),),
+                abilities=(("goodasgold", 1.0),),
+            ),
+        },
+    )
+
+
+def test_impute_fills_unrevealed_kit_to_full() -> None:
+    from lategame.data.ingest import _impute_kits, _prescan_kits, _team_key
+    from lategame.features import vocab
+    from lategame.features.encoder import OBS_LAYOUT
+
+    lines = COMPLETE_LOG.split("\n")
+    kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
+    imputed, missing = _impute_kits(kits, "t", _fake_prior())
+    assert imputed == 2 and missing == 0
+    battle, on, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=kits)
+
+    # Decision 0 (turn 1) now reads eval-full: item + ability + all 4 moves.
+    assert _own_active_detail(on[0][0]) == (True, True, 4)
+    # Revealed truth beats the prior: the item channel carries Air Balloon, not Leftovers.
+    obs, pdim = on[0][0], OBS_LAYOUT.pokemon_dim
+    active = next(i for i in range(6) if obs[i * pdim + 1] > 0.5)
+    assert obs[active * pdim + pdim - 2] == vocab.load_vocab().index("items", "airballoon")
+    assert obs[active * pdim + pdim - 1] == vocab.load_vocab().index(
+        "abilities", "supremeoverlord"
+    )
+
+    # The never-switched-in bench Gholdengo (preview-only, zero reveals) reaches a full kit
+    # too: 4 imputed moves + the prior item (its single-option ability was already assigned).
+    bench = battle.team[_team_key("p1a: Gholdengo")]
+    assert len(bench.moves) == 4 and bench.item == "airballoon" and bench.ability == "goodasgold"
+
+
+def test_impute_deterministic_across_runs_and_timesteps() -> None:
+    from lategame.data.ingest import _impute_kits, _prescan_kits
+    from lategame.data.usage_prior import load_usage_prior
+
+    prior = load_usage_prior("gen9ou")  # the committed artifact -- also exercises its ids
+    assert prior is not None
+    lines = COMPLETE_LOG.split("\n")
+
+    runs = []
+    for _ in range(2):
+        kits = _prescan_kits(lines, "t-Alice", "t-Alice", 9, _WEIGHTS)
+        _impute_kits(kits, "t-Alice", prior)
+        _, records, _, _ = _reconstruct_pov(lines, "Alice", "t-Alice", 9, _WEIGHTS, kits=kits)
+        runs.append(records)
+    assert len(runs[0]) == len(runs[1]) > 0
+    for (obs_a, act_a, mask_a), (obs_b, act_b, mask_b) in zip(runs[0], runs[1], strict=True):
+        assert act_a == act_b and np.array_equal(obs_a, obs_b) and np.array_equal(mask_a, mask_b)
+
+
+def test_impute_never_overwrites_consumed_item() -> None:
+    from lategame.data.ingest import _impute_kits, _prescan_kits
+
+    lines = COMPLETE_LOG.split("\n")
+    kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
+    _impute_kits(kits, "t", _fake_prior())
+    _, on, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=kits)
+    # Post-Knock-Off decision: the consumed item stays None (live POV parity), never imputed.
+    item_known, _, _ = _own_active_detail(on[1][0])
+    assert item_known is False
+
+
+def test_impute_missing_species_counts_and_falls_back() -> None:
+    from lategame.data.ingest import _impute_kits, _prescan_kits, _team_key
+    from lategame.data.usage_prior import UsagePrior
+
+    prior = _fake_prior()
+    gholdengo_only = UsagePrior(
+        version="test",
+        vocab_version="test",
+        source="",
+        month="",
+        cutoff=0,
+        battle_format="gen9ou",
+        species={"gholdengo": prior.species["gholdengo"]},
+    )
+    kits = _prescan_kits(COMPLETE_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
+    imputed, missing = _impute_kits(kits, "t", gholdengo_only)
+    assert imputed == 1 and missing == 1
+    # The missing-species mon keeps its log-only two-pass kit, untouched.
+    kit = kits[_team_key("p1a: Kingambit")]
+    assert kit.moves == {"kowtowcleave", "suckerpunch"}
+    assert kit.item == "airballoon" and kit.ability == "supremeoverlord"
+
+
+def test_ingest_replays_impute_flag() -> None:
+    replay = {"id": "t", "format": "gen9ou", "players": ["Alice", "Bob"], "log": COMPLETE_LOG}
+
+    rl_on, _, stats_on = ingest_replays([replay], weights=_WEIGHTS, battle_format="gen9ou")
+    assert stats_on.imputed_mons > 0 and stats_on.usage_missing_mons == 0
+    # p1's decision 0 (turn-1 move) reaches eval-full detail via the committed artifact.
+    assert _own_active_detail(rl_on.obs[0]) == (True, True, 4)
+
+    rl_off, _, stats_off = ingest_replays(
+        [replay], weights=_WEIGHTS, battle_format="gen9ou", impute_usage=False
+    )
+    assert stats_off.imputed_mons == 0
+    # OFF reproduces the Build-3 log-only ceiling at the same decision.
+    assert _own_active_detail(rl_off.obs[0]) == (True, True, 2)
