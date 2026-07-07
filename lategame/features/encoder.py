@@ -11,9 +11,10 @@ Layout (all dims derived from poke-env enums, so they can't silently drift):
 
 * 12 Pokemon blocks: 6 ego (``battle.team``) + 6 opponent (``battle.opponent_team``),
   zero-padded for empty/unrevealed slots.
-* 4 move blocks for the ego active Pokemon, in ``list(active.moves.values())[:4]``
-  order -- the same order the action codec uses, so move features align with move
-  action logits.
+* 4 move blocks for the ego active Pokemon, in canonical order (``canonical_moves``:
+  sorted by move id, first four) -- the same order the action codec uses, so move
+  features align with move action logits regardless of the ``moves`` dict's insertion
+  order (log reveal offline vs request declaration live).
 * 1 global block: weather / field / both sides' hazards+screens / turn / flags.
 
 ``OBS_VERSION`` + ``OBS_DIM`` are stamped into datasets and checkpoints; loaders
@@ -42,10 +43,13 @@ from poke_env.battle.side_condition import STACKABLE_CONDITIONS
 
 from lategame.engine.damage import normalize_accuracy, score_move
 from lategame.features import vocab
+from lategame.features.action_space import canonical_moves
 
 # Folds the vocab content hash into the version, so the existing obs-version guard on
 # shards/checkpoints also rejects an obs encoded against a different identity vocab.
-OBS_VERSION = f"v2-{vocab.vocab_version()}"
+# v3 = Build-5 canonical move-slot order: slot semantics changed, so every v2-era shard
+# and checkpoint must be rejected rather than silently mix orderings.
+OBS_VERSION = f"v3-{vocab.vocab_version()}"
 
 # Stable index maps. Enum iteration order is fixed (aliases excluded), so these
 # define a deterministic, versioned feature layout.
@@ -287,7 +291,7 @@ def embed_battle(battle: AbstractBattle) -> np.ndarray:
 
     active = battle.active_pokemon
     defender = battle.opponent_active_pokemon
-    move_values = active.moves.values() if active is not None else []
+    move_values = canonical_moves(active) if active is not None else []
     moves = _padded(move_values, _N_MOVES)
     blocks += [_encode_move(m, active, defender) for m in moves]
 

@@ -116,3 +116,30 @@ def test_embed_battle_is_fixed_size_float32():
 def test_embed_battle_is_deterministic():
     battle = FakeBattle()
     np.testing.assert_array_equal(embed_battle(battle), embed_battle(battle))
+
+
+def test_obs_version_v3_marks_canonical_move_slots():
+    assert encoder.OBS_VERSION.startswith("v3-")  # bump rejects v2-era shards/checkpoints
+
+
+def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
+    from poke_env.battle import Move
+
+    from lategame.features import vocab
+    from lategame.features.encoder import OBS_LAYOUT
+
+    def build(insertion_order):
+        battle = FakeBattle()
+        mon = FakePokemon(types=[PokemonType.ELECTRIC], species="pikachu")
+        mon.moves = {mid: Move(mid, gen=9) for mid in insertion_order}
+        battle.team = {"p1: Pikachu": mon}
+        battle.active_pokemon = mon  # no opponent: score_move handles a None defender
+        return embed_battle(battle)
+
+    reveal = build(["voltswitch", "surf"])  # offline: reveal/backfill insertion order
+    declared = build(["surf", "voltswitch"])  # live: request declaration order
+    np.testing.assert_array_equal(reveal, declared)  # obs is a function of the move SET
+    ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
+    v = vocab.load_vocab()
+    assert reveal[ms + md - 1] == v.index("moves", "surf")  # canonical slot 0
+    assert reveal[ms + md + md - 1] == v.index("moves", "voltswitch")  # canonical slot 1

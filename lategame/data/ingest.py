@@ -12,8 +12,9 @@ side): public replays carry no ``|request|`` JSON, so ``available_moves``/``_swi
 are empty and the live ``order_to_action``/``action_mask`` can't run. We instead:
 
 * feed each ``|...|`` line into a poke-env ``Battle`` via ``parse_message`` (server-free);
-* label the **move** a player used the instant it's revealed, positionally, with
-  ``label_action`` (fake=True codec) -- self-consistent with the encoder's move order;
+* label the **move** a player used the instant it's revealed with ``label_action``
+  (request-free codec) -- Build 5: both it and the encoder use the *canonical* move-slot
+  order (sorted by move id), so the slot semantics match live play by construction;
 * label a **switch** only when the target was already revealed earlier in the game (a
   pivot back), so the pre-switch obs and the switch index agree; first-reveal switches
   and forced/post-faint switches are *dropped*, not guessed;
@@ -172,7 +173,7 @@ def _move_sample(
     move = active.moves.get(to_id_str(parts[3]))
     if move is None:
         return None
-    # Complete the own team before both labelling and encoding, so the positional move slot
+    # Complete the own team before both labelling and encoding, so the canonical move slots
     # (label_action) and the obs move blocks read the same full moveset -- mutually consistent.
     if kits is not None:
         _complete_own_team(battle, kits)
@@ -226,7 +227,9 @@ def _complete_own_team(battle: AbstractBattle, kits: _Kits) -> None:
         kit = kits.get(key)
         if kit is None or mon.transformed:  # a transformed mon's live request shows the copy
             continue
-        for move_id in sorted(kit.moves):  # stable slot order -> byte-reproducible shards
+        # sorted() keeps shards byte-reproducible; slot semantics no longer depend on this
+        # insertion order -- the codec/encoder canonicalize (Build 5, features.action_space).
+        for move_id in sorted(kit.moves):
             if move_id not in mon.moves:
                 mon._add_move(move_id)
         if kit.item is not None and mon.item == _UNKNOWN_ITEM:

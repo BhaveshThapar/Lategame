@@ -72,10 +72,24 @@ def test_p1_decisions_labelled_with_pivot_and_tera() -> None:
     assert dropped == 1
 
 
-def test_p2_move_indices_track_reveal_order() -> None:
+def test_p2_move_indices_use_canonical_slots() -> None:
     _, records, _, _ = _reconstruct_pov(LOG.split("\n"), "Bob", "t", 9, _WEIGHTS)
-    # Tackle (first move -> slot 6), Tackle again (still slot 6), Vine Whip (second
-    # revealed move -> slot 7). No 4th-turn decision: Bulbasaur faints first.
+    # Canonical (sorted) slots: tackle < vinewhip, so Tackle stays slot 6 and Vine Whip
+    # slot 7 (here reveal order coincides with canonical order). No 4th-turn decision:
+    # Bulbasaur faints first.
+    assert [a for _, a, _ in records] == [6, 6, 7]
+
+
+def test_move_labels_track_canonical_slots_not_reveal_order() -> None:
+    # Make Bob's reveal order anti-canonical: Vine Whip (t1), Tackle (t2), Vine Whip (t3).
+    # The old reveal-order codec labelled first-revealed = slot 6 forever -> [6, 7, 6].
+    # Canonical slots re-rank as the known set grows: Vine Whip alone -> slot 0 (6); once
+    # Tackle is known it sorts first (6), pushing Vine Whip to slot 1 (7).
+    anti = LOG.split("\n")
+    anti[anti.index("|move|p2a: Bulbasaur|Tackle|p1a: Pikachu")] = (
+        "|move|p2a: Bulbasaur|Vine Whip|p1a: Pikachu"
+    )
+    _, records, _, _ = _reconstruct_pov(anti, "Bob", "t", 9, _WEIGHTS)
     assert [a for _, a, _ in records] == [6, 6, 7]
 
 
@@ -356,6 +370,24 @@ def test_two_pass_keeps_consumed_item_unknown_after_knockoff() -> None:
     # re-reveal a consumed item -- it reads None, exactly as the live POV shows post-knock.
     item_known, _, _ = _own_active_detail(on[1][0])
     assert item_known is False
+
+
+def test_backfilled_move_claims_its_canonical_slot() -> None:
+    from lategame.data.ingest import _prescan_kits
+
+    # Swap the reveal order: Sucker Punch turn 1, Kowtow Cleave turn 2. Two-pass backfill
+    # gives the turn-1 decision the full {kowtowcleave, suckerpunch} set, and kowtowcleave
+    # sorts FIRST -- so the used Sucker Punch labels canonical slot 1 (action 7) where the
+    # old insertion-order codec pinned the first-revealed move to slot 0 (action 6).
+    swapped = (
+        COMPLETE_LOG.replace("Kowtow Cleave", "__TMP__")
+        .replace("Sucker Punch", "Kowtow Cleave")
+        .replace("__TMP__", "Sucker Punch")
+    )
+    lines = swapped.split("\n")
+    kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
+    _, on, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=kits)
+    assert [a for _, a, _ in on] == [7, 6]
 
 
 # --- Usage-prior imputation (Build 4): fill the still-unrevealed kit to eval-full detail ---
