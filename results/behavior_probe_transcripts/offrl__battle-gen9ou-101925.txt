@@ -1,0 +1,41 @@
+=== offrl | battle-gen9ou-101925 | won=False turns=34 | preview=/team 156243
+team packed: ironmoth,greattusk,kingambit,gholdengo,corviknight,dragapult | live: ironmoth,greattusk,kingambit,gholdengo,corviknight,dragapult | ORDER MATCH
+T1   ironmoth 100% vs ironvaliant 100% | legal=13 | -> tera0 '/choose move energyball terastallize' p=0.85 | alt: tera2 0.05, tera3 0.04
+T2   ironmoth 64% vs ironvaliant 24% | legal=9 | -> move0 '/choose move energyball' p=0.67 | alt: switch1 0.08, switch4 0.08
+T3   ironmoth 64% vs landorustherian 54% | legal=9 | -> move0 '/choose move energyball' p=0.57 | alt: switch4 0.12, switch1 0.10
+T4   ironmoth 64% vs landorustherian 54% | legal=9 | -> move0 '/choose move energyball' p=0.57 | alt: switch4 0.12, switch1 0.10
+T5   ironmoth 64% vs gholdengo 72% | legal=9 | -> move0 '/choose move energyball' p=0.47 | alt: switch4 0.15, switch1 0.12
+T6   ironmoth 64% vs tinglu 65% | legal=9 | -> move0 '/choose move energyball' p=0.82 | alt: switch2 0.04, switch4 0.04
+T7   ironmoth 64% vs tinglu 33% | legal=9 | -> move0 '/choose move energyball' p=0.82 | alt: switch4 0.04, switch2 0.04
+T8   ironmoth 64% vs kingambit 76% | legal=9 | -> move0 '/choose move energyball' p=0.54 | alt: switch4 0.12, switch1 0.10
+T9   ironmoth 64% vs landorustherian 13% | legal=9 | -> move0 '/choose move energyball' p=0.59 | alt: switch4 0.10, switch1 0.09
+T10  ironmoth 64% vs kingambit 52% | legal=9 | -> move0 '/choose move energyball' p=0.53 | alt: switch4 0.12, switch1 0.11
+T11  ironmoth 64% vs ironvaliant 24% | legal=9 | -> move0 '/choose move energyball' p=0.63 | alt: switch4 0.08, switch1 0.08
+T12  ironmoth 64% vs kingambit 52% | legal=9 | -> move0 '/choose move energyball' p=0.51 | alt: switch4 0.12, switch1 0.12
+T13  ironmoth 18% vs kingambit 25% | legal=9 | -> move0 '/choose move energyball' p=0.51 | alt: switch4 0.12, switch1 0.12
+T14  ironmoth 18% vs gholdengo 44% | legal=9 | -> move0 '/choose move energyball' p=0.50 | alt: switch1 0.12, switch4 0.12
+T15  ironmoth 18% vs gholdengo 16% | legal=9 | -> move0 '/choose move energyball' p=0.52 | alt: switch1 0.11, switch4 0.11
+T16  ironmoth 18% vs gholdengo 16% | legal=9 | -> move0 '/choose move energyball' p=0.49 | alt: switch1 0.12, switch4 0.12
+T17  ironmoth 18% vs kingambit 25% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.25 | alt: switch4 0.24, switch2 0.20
+T18  greattusk 44% vs kingambit 25% | legal=9 | -> switch4 '/choose switch Corviknight' p=0.21 | alt: move2 0.19, switch3 0.18
+T19  corviknight 100% vs kingambit 25% | legal=9 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.21, switch5 0.17
+T20  greattusk 38% vs kingambit 25% | legal=9 | -> move2 '/choose move rapidspin' p=0.21 | alt: switch4 0.19, switch3 0.18
+T20  greattusk 0% vs kingambit 18% | legal=5 | -> switch4 '/choose switch Corviknight' p=0.26 | alt: switch3 0.25, switch2 0.19 | FORCED
+T21  corviknight 100% vs kingambit 18% | legal=8 | -> switch3 '/choose switch Gholdengo' p=0.30 | alt: switch2 0.25, switch5 0.24
+T22  gholdengo 100% vs kingambit 18% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.44 | alt: switch5 0.23, switch2 0.19
+T23  corviknight 54% vs kingambit 18% | legal=8 | -> switch3 '/choose switch Gholdengo' p=0.30 | alt: switch2 0.26, switch5 0.24
+T24  gholdengo 100% vs kingambit 18% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.45 | alt: switch5 0.22, switch2 0.19
+T25  corviknight 60% vs kingambit 18% | legal=8 | -> switch3 '/choose switch Gholdengo' p=0.30 | alt: switch2 0.27, switch5 0.20
+T25  gholdengo 0% vs kingambit 18% | legal=4 | -> switch4 '/choose switch Corviknight' p=0.47 | alt: switch5 0.21, switch2 0.20 | FORCED
+T26  corviknight 60% vs kingambit 18% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.37 | alt: switch5 0.28, switch0 0.25
+T27  kingambit 100% vs kingambit 18% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.56 | alt: switch5 0.25, switch0 0.16
+T28  corviknight 66% vs kingambit 18% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.37 | alt: switch5 0.29, switch0 0.25
+T28  kingambit 0% vs kingambit 18% | legal=3 | -> switch4 '/choose switch Corviknight' p=0.58 | alt: switch5 0.26, switch0 0.16 | FORCED
+T29  corviknight 66% vs kingambit 18% | legal=6 | -> switch5 '/choose switch Dragapult' p=0.45 | alt: switch0 0.39, move0 0.08
+T30  dragapult 100% vs kingambit 18% | legal=6 | -> switch4 '/choose switch Corviknight' p=0.76 | alt: switch0 0.21, move2 0.02
+T31  corviknight 72% vs kingambit 18% | legal=6 | -> switch5 '/choose switch Dragapult' p=0.46 | alt: switch0 0.39, move0 0.08
+T32  dragapult 100% vs kingambit 18% | legal=6 | -> switch4 '/choose switch Corviknight' p=0.76 | alt: switch0 0.20, move2 0.02
+T32  corviknight 0% vs kingambit 18% | legal=2 | -> switch5 '/choose switch Dragapult' p=0.52 | alt: switch0 0.48 | FORCED
+T33  dragapult 100% vs kingambit 18% | legal=5 | -> switch0 '/choose switch Iron Moth' p=0.82 | alt: move2 0.13, move0 0.02
+T33  ironmoth 0% vs kingambit 18% | legal=1 | -> switch5 '/choose switch Dragapult' p=1.00 | FORCED
+T34  dragapult 100% vs kingambit 18% | legal=4 | -> move2 '/choose move shadowball' p=0.70 | alt: move0 0.12, move1 0.10

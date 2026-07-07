@@ -1,0 +1,76 @@
+=== bc | battle-gen9ou-101912 | won=False turns=63 | preview=/team 146253
+team packed: landorustherian,gholdengo,kingambit,ironvaliant,tinglu,greattusk | live: landorustherian,gholdengo,kingambit,ironvaliant,tinglu,greattusk | ORDER MATCH
+T1   landorustherian 100% vs greattusk 100% | legal=13 | -> tera3 '/choose move uturn terastallize' p=0.61 | alt: tera1 0.18, tera0 0.18
+T1   landorustherian 96% vs greattusk 92% | legal=5 | -> switch1 '/choose switch Gholdengo' p=0.32 | alt: switch3 0.25, switch4 0.17 | FORCED
+T2   gholdengo 100% vs greattusk 99% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.38 | alt: switch4 0.25, switch5 0.16
+T3   ironvaliant 100% vs kingambit 100% | legal=9 | -> switch1 '/choose switch Gholdengo' p=0.27 | alt: switch4 0.27, switch2 0.19
+T4   gholdengo 100% vs ironmoth 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.38 | alt: switch4 0.25, switch5 0.16
+T5   ironvaliant 100% vs dragapult 100% | legal=9 | -> switch4 '/choose switch Ting-Lu' p=0.30 | alt: switch1 0.27, switch5 0.18
+T6   tinglu 95% vs dragapult 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.40 | alt: switch1 0.28, switch5 0.13
+T7   ironvaliant 2% vs dragapult 100% | legal=9 | -> switch4 '/choose switch Ting-Lu' p=0.30 | alt: switch1 0.27, switch5 0.17
+T8   tinglu 100% vs kingambit 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.37 | alt: switch1 0.30, switch5 0.13
+T9   ironvaliant 2% vs kingambit 100% | legal=9 | -> switch1 '/choose switch Gholdengo' p=0.28 | alt: switch4 0.26, switch2 0.20
+T10  gholdengo 75% vs kingambit 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.41 | alt: switch4 0.25, switch5 0.15
+T11  ironvaliant 2% vs greattusk 100% | legal=9 | -> switch1 '/choose switch Gholdengo' p=0.30 | alt: switch4 0.23, switch5 0.21
+T12  gholdengo 75% vs ironmoth 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.42 | alt: switch4 0.24, switch5 0.15
+T13  ironvaliant 2% vs dragapult 100% | legal=9 | -> switch4 '/choose switch Ting-Lu' p=0.31 | alt: switch1 0.25, switch5 0.18
+T14  tinglu 70% vs dragapult 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.46 | alt: switch1 0.23, switch2 0.12
+T15  ironvaliant 2% vs ironmoth 100% | legal=9 | -> switch1 '/choose switch Gholdengo' p=0.28 | alt: switch4 0.25, switch2 0.19
+T16  gholdengo 56% vs ironmoth 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.44 | alt: switch4 0.23, switch5 0.15
+T17  ironvaliant 2% vs gholdengo 100% | legal=9 | -> switch4 '/choose switch Ting-Lu' p=0.28 | alt: switch1 0.24, switch5 0.20
+T18  tinglu 76% vs greattusk 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.48 | alt: switch1 0.22, switch5 0.12
+T19  ironvaliant 2% vs greattusk 100% | legal=9 | -> switch4 '/choose switch Ting-Lu' p=0.26 | alt: switch1 0.26, switch5 0.25
+T20  tinglu 76% vs ironmoth 100% | legal=9 | -> switch3 '/choose switch Iron Valiant' p=0.38 | alt: switch1 0.27, switch5 0.16
+T20  ironvaliant 0% vs gholdengo 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.34 | alt: switch1 0.22, switch5 0.22 | FORCED
+T21  tinglu 70% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.42 | alt: switch5 0.28, switch2 0.17
+T22  gholdengo 50% vs kingambit 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.46 | alt: switch5 0.27, switch2 0.17
+T23  tinglu 70% vs ironmoth 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.43 | alt: switch5 0.25, switch2 0.18
+T24  gholdengo 44% vs ironmoth 76% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.46 | alt: switch5 0.28, switch2 0.17
+T25  tinglu 70% vs greattusk 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.42 | alt: switch5 0.27, switch2 0.18
+T26  gholdengo 38% vs dragapult 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.44 | alt: switch5 0.31, switch2 0.17
+T27  tinglu 54% vs dragapult 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.27, switch2 0.18
+T28  gholdengo 32% vs greattusk 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.35 | alt: switch5 0.35, switch2 0.22
+T29  tinglu 54% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.27, switch2 0.18
+T30  gholdengo 26% vs corviknight 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.39 | alt: switch5 0.28, switch2 0.24
+T31  tinglu 38% vs dragapult 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.26, switch2 0.19
+T32  gholdengo 20% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.40 | alt: switch5 0.32, switch2 0.19
+T33  tinglu 38% vs greattusk 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.27, switch2 0.20
+T34  gholdengo 14% vs kingambit 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.44 | alt: switch5 0.26, switch2 0.21
+T35  tinglu 38% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.39 | alt: switch5 0.26, switch2 0.19
+T36  gholdengo 8% vs corviknight 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.37 | alt: switch5 0.28, switch2 0.26
+T37  tinglu 38% vs corviknight 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.38 | alt: switch5 0.27, switch2 0.21
+T38  gholdengo 2% vs corviknight 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.37 | alt: switch5 0.28, switch2 0.26
+T39  tinglu 10% vs corviknight 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.37 | alt: switch5 0.27, switch2 0.21
+T39  gholdengo 0% vs corviknight 100% | legal=4 | -> switch4 '/choose switch Ting-Lu' p=0.35 | alt: switch2 0.28, switch5 0.28 | FORCED
+T40  tinglu 4% vs corviknight 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.44 | alt: switch2 0.34, switch0 0.18
+T41  greattusk 97% vs kingambit 100% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.42 | alt: switch4 0.38, switch0 0.15
+T42  kingambit 94% vs greattusk 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.49 | alt: switch4 0.37, switch0 0.13
+T43  greattusk 94% vs greattusk 100% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.46 | alt: switch4 0.33, switch0 0.14
+T44  kingambit 88% vs corviknight 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.42 | alt: switch4 0.40, switch0 0.17
+T45  greattusk 91% vs ironmoth 76% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.42 | alt: switch4 0.37, switch0 0.13
+T46  kingambit 82% vs greattusk 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.49 | alt: switch4 0.37, switch0 0.13
+T47  greattusk 88% vs greattusk 100% | legal=7 | -> switch2 '/choose switch Kingambit' p=0.47 | alt: switch4 0.33, switch0 0.14
+T48  kingambit 75% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.40, switch0 0.15
+T48  tinglu 0% vs ironmoth 76% | legal=3 | -> switch5 '/choose switch Great Tusk' p=0.52 | alt: switch2 0.32, switch0 0.15 | FORCED
+T49  greattusk 85% vs ironmoth 76% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.68 | alt: switch0 0.20, move3 0.08
+T50  kingambit 69% vs ironmoth 76% | legal=6 | -> switch5 '/choose switch Great Tusk' p=0.75 | alt: switch0 0.24, move2 0.01
+T50  greattusk 0% vs ironmoth 76% | legal=2 | -> switch2 '/choose switch Kingambit' p=0.72 | alt: switch0 0.28 | FORCED
+T51  kingambit 63% vs ironmoth 76% | legal=5 | -> switch0 '/choose switch Landorus' p=0.96 | alt: move2 0.02, move0 0.02
+T52  landorustherian 96% vs ironmoth 51% | legal=5 | -> move3 '/choose move uturn' p=0.95 | alt: switch2 0.05, move1 0.00
+T52  landorustherian 79% vs ironmoth 51% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T53  kingambit 57% vs ironmoth 51% | legal=5 | -> switch0 '/choose switch Landorus' p=0.96 | alt: move2 0.02, move0 0.01
+T54  landorustherian 79% vs greattusk 100% | legal=5 | -> move3 '/choose move uturn' p=0.96 | alt: switch2 0.04, move1 0.00
+T54  landorustherian 75% vs greattusk 89% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T55  kingambit 51% vs greattusk 95% | legal=5 | -> switch0 '/choose switch Landorus' p=0.96 | alt: move0 0.02, move2 0.02
+T56  landorustherian 75% vs kingambit 100% | legal=5 | -> move3 '/choose move uturn' p=0.96 | alt: switch2 0.04, move1 0.00
+T56  landorustherian 75% vs kingambit 91% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T57  kingambit 45% vs kingambit 97% | legal=5 | -> switch0 '/choose switch Landorus' p=0.93 | alt: move0 0.03, move2 0.03
+T58  landorustherian 75% vs kingambit 100% | legal=5 | -> move3 '/choose move uturn' p=0.96 | alt: switch2 0.03, move0 0.00
+T58  landorustherian 45% vs kingambit 92% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T59  kingambit 38% vs kingambit 98% | legal=5 | -> switch0 '/choose switch Landorus' p=0.96 | alt: move0 0.03, move2 0.01
+T60  landorustherian 45% vs greattusk 100% | legal=5 | -> move3 '/choose move uturn' p=0.96 | alt: switch2 0.04, move0 0.00
+T60  landorustherian 45% vs corviknight 97% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T61  kingambit 32% vs corviknight 100% | legal=5 | -> switch0 '/choose switch Landorus' p=0.93 | alt: move2 0.04, move0 0.02
+T61  landorustherian 0% vs corviknight 100% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T62  kingambit 26% vs corviknight 100% | legal=4 | -> move2 '/choose move suckerpunch' p=0.62 | alt: move0 0.27, move1 0.10
+T63  kingambit 26% vs corviknight 100% | legal=4 | -> move2 '/choose move suckerpunch' p=0.99 | alt: move0 0.01, move1 0.00

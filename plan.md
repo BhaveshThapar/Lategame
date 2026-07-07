@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-01).
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-07).
 
 ---
 
@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-07-02)
+### 13.1 Build status & findings (as of 2026-07-07)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -883,6 +883,63 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     RL objective — one n=100 eval localized the failure upstream of AWR. Suite **181 pass / 5 skip**;
     `results/slot_order_gate.json` (a/b1/b2 blocks), `results/format_ceiling_gate_ou_v5.json`,
     `results/gateb_v5_vs_random.json`.
+
+- **OU pivot — Build 6: live behavioral probe — built + run; CONCLUSIVE (cause isolated: the agents play
+  legal, confident, pathological OVER-SWITCHING — absorbing two-mon switch loops; decode/mask and
+  team-order causes eliminated by direct measurement).**
+  - **Built (zero library changes).** `scripts/behavior_probe.py`: observe-only monkeypatch hooks in the
+    `slot_order_gate` pattern — a `_FallbackSpy` rebinds `action_space.Player` so the codec's *silent*
+    random fallback (the `action_to_order` except branch) becomes visible; the agent modules'
+    `action_to_order` is wrapped to record every decision (turn, action, decoded order, `force_switch`,
+    actives/HP, live `team.values()` order); `masked_logits` is wrapped *before agent construction* (the
+    agents bind it in `__init__`) for legal-count / all-False / top-3 masked probs; probed players get
+    `log_level=25` + a handler capturing poke-env's `[Invalid choice]`/`[Unavailable choice]` (logged at
+    level 25 < WARNING — dropped by default, previously invisible); `teampreview` is wrapped to log the
+    random lead order. Near-free candidate-(b) live half in the same games: `battle._teambuilder_team`
+    (packed upload order) vs live `team.values()` per battle. Pre-registered decision tree with precedence
+    a(decode/mask) > b(team order) > c(pathological-legal) > d(drift); random-mirror control arm;
+    INCONCLUSIVE-only exit. 17 new pure-logic tests. Artifacts: `results/behavior_probe.json`, per-decision
+    JSONL + 40 poke-env HTML replays (gitignored), **40 human-readable per-turn transcripts (committed —
+    the primary evidence)**. Gotcha found: `cross_evaluate` calls `reset_battles()` on exit, wiping
+    per-battle results — the probe uses `battle_against` directly.
+  - **Findings (n=20/arm, bc_v5_s0 + offrl_v5_s0 vs random; control 0.45 ∈ [0.3,0.7] PASS; 1,807 + 1,946
+    decisions):**
+    - **(a) ELIMINATED.** Fallback rate **0.000** — not one of 3,753 decisions hit the codec's random
+      fallback; **zero** server rejections; **zero** all-False masks; zero retry repeats. The live
+      decode/mask path is clean — Build 5's codec works, and the "invisible plumbing failure" hypothesis
+      is dead.
+    - **(b) live half ELIMINATED.** Packed upload order == live `team.values()` in **40/40** battles
+      (match 1.00, stable 1.00). Live order is confirmed = upload order; train `|poke|` lines are upload
+      order by protocol, so the train-side gate is deprioritized to negligible.
+    - **(c) CONFIRMED — the failure is visible and stereotyped.** Both agents open *sanely* (turn-1 tera +
+      attack; move spam while an attacker is active), then fall into **absorbing two-mon switch loops**
+      the moment a defensive mon is in (transcripts: Gholdengo↔Corviknight for 70+ consecutive turns,
+      Kingambit↔Corviknight): voluntary switch fraction **0.77 / 0.70** vs train base **0.184** (bar
+      0.50), max consecutive-switch runs **117 / 129**, ping-pong rate **0.77 / 0.84**, mean top-1 prob
+      0.62 — confident, legal, and losing. Games last 84–91 turns and end only when random happens to KO
+      through; win 0.00 / 0.05. NOT one-move spam (top-share 0.16/0.21, entropy 3.2/3.1 bits) — the
+      collapse is specifically *switch mass*.
+    - **The loop is in the policy mass, not argmax brittleness:** in loop states switches carry ~0.9 of
+      the masked probability (top-3 all switches at ~0.4/0.3/0.2), so sampling would still switch ~90% of
+      the time. Echoes the L11 depth-1 finding — the RB *value head* over-switched ("my strong mon
+      active" rated above "opp at 21% HP"); the same signature now appears in the OU *imitation policy*.
+  - **Why a loop can be absorbing at all:** the obs is memoryless (no last-action/recency channel), so
+    "wall A active vs opp X" looks identical whether we just switched in or not — a 2-cycle is a fixed
+    point for a deterministic policy whose per-state argmax is "switch".
+  - **Next levers (cheapest first, each its own gated build).** (1) **Train-side switch-mass diagnostic**
+    — on the existing v5 shard, measure the human switch rate in the states the loop lives in (own
+    defensive mon active, healthy) and the trained policy's switch mass on those *training* states:
+    discriminates "faithful imitation of a pivot-heavy human prior that composes into a loop under
+    self-play" vs "OOD generalization artifact"; offline, zero training. (2) Depending on (1):
+    anti-loop *learning* signal (history/recency feature + retrain, or switch-damping at inference as a
+    diagnostic-only counterfactual), vs distribution-drift work (d). OU ceiling re-probe + OU PPO stay
+    gated OFF.
+  - **Lessons.** (1) Win-rate-only evals hid a two-mon switch loop for five builds — a per-decision
+    transcript of TWO games would have shown it in Build 2; make the behavioral probe a standing tool for
+    any "agent inexplicably weak" state. (2) Observe-only hooks cheaply *falsify* plumbing causes before
+    touching semantics: both invisible-failure channels (fallback, rejections) measured exactly zero.
+    Suite **198 pass / 5 skip** (203 with the local server up), ruff + mypy clean;
+    `results/behavior_probe.json` + `results/behavior_probe_transcripts/` committed.
 
 ---
 

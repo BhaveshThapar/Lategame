@@ -148,6 +148,23 @@ actually *do* vs random — a 2-battle order-log probe is the cheapest next step
 bot-eval distribution drift**. Suite **181 pass / 5 skip**; `results/slot_order_gate.json` (a/b1/b2 blocks),
 `results/format_ceiling_gate_ou_v5.json`, `results/gateb_v5_vs_random.json`.
 
+**OU pivot Build 6 — live behavioral probe (CONCLUSIVE: the agents over-switch — absorbing two-mon switch
+loops; decode/mask and team-order causes eliminated).** `scripts/behavior_probe.py` instruments the live
+decision path with observe-only hooks (the codec's silent random fallback, poke-env's level-25
+`[Invalid/Unavailable choice]` rejections, per-decision action/mask/top-3-probs, packed-vs-live team order)
+and classifies against a pre-registered tree (a decode/mask > b team-order > c pathological-legal > d drift).
+n=20/arm on bc/offrl v5 s0 vs random (control mirror 0.45 sane, 3,753 decisions): fallback rate **0.000**,
+**zero** rejections, **zero** all-False masks — (a) dead; packed upload order == live `team.values()`
+**40/40** — (b) live half dead. The failure is **(c)**: sane openings (tera + attack), then absorbing
+switch loops once a wall is active (Gholdengo↔Corviknight 70+ consecutive turns; voluntary switch fraction
+**0.77/0.70** vs train base 0.184, max runs **117/129**, ping-pong 0.77/0.84, mean top-1 prob 0.62 —
+confident, legal, losing). The loop is in the policy *mass* (~0.9 on switches in loop states — sampling
+wouldn't fix it) and the memoryless obs makes a 2-cycle a fixed point; echoes L11's value-head over-switch,
+now in the imitation policy. **Next lever: train-side switch-mass diagnostic** — human switch rate + policy
+switch mass on the shard's wall-active states (imitated pivot prior composing into a loop vs OOD artifact);
+offline, zero training. 40 per-turn transcripts committed as evidence. Suite **198 pass / 5 skip** (203 with
+the server up); `results/behavior_probe.json`, `results/behavior_probe_transcripts/`.
+
 ## Setup
 
 ```bash
