@@ -12,8 +12,8 @@ simulator (``resim_driver.js``) deterministically reproduces the battle AND re-e
 side's private ``|request|`` stream. We feed that stream to a poke-env ``Battle`` exactly
 as the live ``Player`` does (``parse_request`` + ``parse_message``), so the reconstructed
 POV is *identical in distribution to live play* -- and we can label with the real,
-request-based codec (``order_to_action``/``action_mask``) instead of v1's positional
-``fake=True`` approximations. Switches are no longer dropped: the full team is known.
+request-based strict codec (``order_to_action``/``action_mask``) instead of v1's
+request-free approximations. Switches are no longer dropped: the full team is known.
 
 Output schema is the exact ``collect`` ``(obs, action, mask, reward, done)`` shape, reusing
 ``ingest._ShardBuilder``, so ``train-rl``/``train`` consume the shard unchanged.

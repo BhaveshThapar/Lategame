@@ -110,9 +110,11 @@ def test_full_own_team_pov_and_strict_labels() -> None:
     assert len(battle.team) == 3
     assert {m.base_species for m in battle.team.values()} == {"pikachu", "bulbasaur", "charizard"}
     actions = [a for _, a, _ in records]
-    # Thunderbolt -> move slot 6; switch to Charizard (party slot 3) -> switch index 2
-    # (v1 dropped switches); Flamethrower as Charizard -> move slot 6. `default` dropped.
-    assert actions == [6, 2, 6]
+    # Canonical slots (Build 5): Thunderbolt sorts to slot 2 of Pikachu's declared four
+    # (irontail, surf, thunderbolt, voltswitch) -> action 8; switch to Charizard (party
+    # slot 3) -> switch index 2 (v1 dropped switches); Flamethrower sorts to slot 2 of
+    # Charizard's (airslash, dragonpulse, flamethrower, roost) -> 8. `default` dropped.
+    assert actions == [8, 2, 8]
     assert dropped == 1
     assert battle.finished and battle.won
 
