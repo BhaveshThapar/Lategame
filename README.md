@@ -105,6 +105,27 @@ each own mon's *unrevealed* item/ability/moves from the species' standard compet
 live full-kit detail. Suite **152 pass / 5 skip**; `results/ou_ingest_gate.json`,
 `results/format_ceiling_gate_ou_v3.json`.
 
+**OU pivot Build 4 — usage-prior imputation (RED: obs verified at eval-full density, agent still dead —
+detail density was never the binding failure).** Built `data/usage_prior.py` + `scripts/build_usage_prior.py`:
+Smogon chaos stats (gen9ou-1500, 2026-06) distilled into a committed per-species top-K artifact
+(`features/data/usage_gen9ou.json`, 402 species, 0 out-of-vocab, `vocab_version` drift guard) and sampled
+**usage-weighted + stably seeded** per (replay-POV, mon); `ingest._impute_kits` fills each kit's still-unrevealed
+item/ability/moves once per POV between prescan and reconstruction — revealed truth always wins, the labelled
+action can never be imputed, consumed items stay `None` (default-on, `--no-impute-usage`). **Gate A PASS** after
+an honest metric fix: the arm first KILLed on an absolute item bar (0.760 < 0.85), but a per-decision
+decomposition showed the residual is **0.233 consumed-`None`** (live-faithful Knock Off / Booster Energy states)
+with only **0.0069 unfilled** — the gate now kills on the unfilled rate; ability 0.999, moves 3.990.
+Re-ingested (120,001 turns — identical to v3, imputation changes values not counts), BC val-acc 0.636, 3 AWR
+seeds healthy (value-MAE 0.51–0.61). **Gate B RED:** offrl **0.003** vs heuristic; **0.05–0.27 vs random**
+across seeds (loses to random; harness clean, mirror 0.520). The monotone pattern vs random — v1 sparse
+**0.495** → v3 two-pass **0.13–0.45** → v4 eval-full **0.05–0.27** — closes the POV-density hypothesis: more
+own-kit train detail consistently makes the live agent *worse*. Strongest remaining candidate (fits the
+monotonicity): **positional move-slot ORDER** — train slots are reveal-order + sorted backfill, live slots are
+`|request|` declaration order, and the action space indexes moves positionally, so every completion step
+scrambles more slot semantics. **Next lever: canonical move-slot ordering** at ingest *and* live encode
+(BC-gateable before any retrain). Suite **162 pass / 5 skip**; `results/format_ceiling_gate_ou_v4.json`,
+`results/gateb_v4_vs_random.json`.
+
 ## Setup
 
 ```bash

@@ -784,6 +784,55 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     distribution, not merely closer to it. Suite **152 pass / 5 skip**; `results/ou_ingest_gate.json`,
     `results/format_ceiling_gate_ou_v3.json`.
 
+- **OU pivot — Build 4: usage-prior imputation — built + run; RED (train obs verified at eval-full
+  density and the agent is still dead → the binding failure is NOT own-kit detail density; lever killed).**
+  - **Built.** `lategame/data/usage_prior.py` (mirrors `embed_prior`'s build/write/load split): distills a
+    monthly Smogon chaos-stats JSON (gen9ou-1500, 2026-06; fetched by `scripts/build_usage_prior.py`, raw
+    cached under gitignored `replays/usage/`) into a committed per-species top-K artifact
+    (`features/data/usage_gen9ou.json`, 181 KB, **402 species kept / 0 skipped / 0 out-of-vocab ids** —
+    the vocab covers the whole metagame) stamped with `vocab_version` (drift guard), plus `sample_kit` =
+    **usage-weighted sampling without replacement, stably seeded** per (replay-POV, mon) via blake2s (not
+    top-1: the item slot is ~70% imputed, so a modal pick would make species→item near-constant in training
+    — mode-collapse on exactly the channel under repair). `ingest._impute_kits` runs **once per POV between
+    prescan and reconstruction**, fills kit-level only, and revealed truth always wins (moves pad never-used
+    slots up to 4 so the labelled action can never be imputed; item only if still unknown, drawn `"nothing"`
+    stays `None` = encoder-identical to live no-item; ability only if unknown; consumed items never touched).
+    Default-on `impute_usage` toggle (`--no-impute-usage`), no-op for formats without an artifact; `sorted()`
+    backfill + transform guard harden determinism. 10 new tests (5 sampler/artifact, 5 ingest).
+  - **Gate A PASS — with an honest metric correction.** The 4th (imputation) arm first **KILLed** on the
+    planned absolute item bar (0.760 < 0.85). A per-decision decomposition (new `_ItemStateProbe`, reading
+    battle state at each labelled decision) proved the residual is **0.233 consumed-`None`** — Knock Off /
+    Booster Energy / berry states the live POV also shows as `None`, ~2.4× more frequent in human ladder
+    games than in eval-vs-heuristic — with only **0.0069 actually-unfilled sentinel**. The gate now kills on
+    the *unfilled rate* (≤ 0.02, the real failure mode: a broken species lookup would push it to Build-3's
+    ~0.70) and reports the known/consumed split + live reference. Final arm: item unfilled **0.0069**,
+    ability **0.999** (≥ 0.99), moves **3.990** (≥ 3.95), missing-species **0.0083** (≤ 0.02). Prior-vs-truth
+    advisory on the reveal-biased truth subset: item top-K 0.903, ability top-1 0.972, moves containment 0.938.
+  - **Retrained & Gate B RED.** Re-ingested **120,001 turns / 61,729 BC** (identical turn count to v3 —
+    imputation changes channel values, not counts; 32,650 mons imputed, 1.4% missing species). BC val-acc
+    **0.636** (v3 0.651, expected with richer channels); 3 AWR seeds value-MAE **0.507–0.613** (healthy).
+    **Gate B (n=300, harness clean: mirror 0.520, gradient random 0.020 < maxbp 0.080 < simpleheuristics
+    0.660):** offrl **0.003** vs heuristic — and vs random **0.160 / 0.270 / 0.050** across seeds (all
+    LOSE to random; same `bigerror` stall signature as v3).
+  - **Verdict RED — the POV-density hypothesis chain is closed.** Three builds chased one hypothesis: the
+    agent is dead because training obs under-fills the own-team identity channels vs the live request. Build 4
+    **verified the train obs reaches eval-full density** (Gate A) and the agent got *worse*, completing a
+    monotone pattern vs random: v1 sparse **0.495** → v3 two-pass **0.13–0.45** → v4 eval-full **0.05–0.27**.
+    More own-kit detail at train time consistently makes the live agent worse, so detail *density* was never
+    the binding failure. The strongest remaining candidate fits that monotonicity: **positional move-slot
+    ORDER** — training obs/labels use reveal-order + sorted-backfill slots while the live `|request|` uses
+    declaration order, the action space indexes moves *positionally* (slots 6–9), and every kit-completion
+    step scrambles more slots relative to live (v1's sparse kits were mostly the moves actually used, so
+    slot semantics were closest to self-consistent). Other candidates: imputed-vs-curated kit composition,
+    and human-vs-bot state distribution drift. **Next lever = canonical move-slot ordering** applied
+    identically at ingest and live encode (cheap, BC-gateable before any retrain) — its own gated build; OU
+    ceiling re-probe + OU PPO stay gated OFF.
+  - **Lessons.** (1) A fidelity gate must separate the *failure* residual from the *live-faithful* residual
+    (unfilled sentinel vs consumed-`None`) or it kills on truth. (2) Obs-density parity ≠ obs parity: the
+    ORDER/structure of positional channels is part of the distribution, and an action space indexed by
+    position makes slot order a *label* semantics issue, not just an obs one. Suite **162 pass / 5 skip**;
+    `results/ou_ingest_gate.json`, `results/format_ceiling_gate_ou_v4.json`, `results/gateb_v4_vs_random.json`.
+
 ---
 
 ## 14. Risks & mitigations
