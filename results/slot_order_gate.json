@@ -1,0 +1,32 @@
+{
+  "n_replays": 200,
+  "train": {
+    "n_move_decisions": 7340.0,
+    "n_kept": 7340.0,
+    "move_label_scramble_rate": 0.25899182561307904,
+    "mon_order_scramble_rate": 0.3070844686648501,
+    "out_of_insertion4_rate": 0.0,
+    "out_of_canonical4_rate": 0.0,
+    "povs": 400.0,
+    "parse_rate": 1.0
+  },
+  "live_pool": {
+    "n_teams": 12.0,
+    "n_mons": 72.0,
+    "mon_scramble_rate": 0.9166666666666666,
+    "mean_displacement": 0.9652777777777778
+  },
+  "new_drop_delta": 0.0,
+  "thresholds": {
+    "min_label_scramble": 0.1,
+    "min_live_scramble": 0.5,
+    "max_new_drop_delta": 0.005,
+    "min_decisions": 1000
+  },
+  "checks": {
+    "scramble_exists": true,
+    "canonical_drop_delta_ok": true,
+    "sample_ok": true
+  },
+  "verdict": "PASS"
+}
