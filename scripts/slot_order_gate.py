@@ -29,11 +29,21 @@ create material new drops on >4-move sets (``out_of_canonical4 - out_of_insertio
 move decisions.
 
     python scripts/slot_order_gate.py --cache-dir replays/gen9ou --sample 200
+
+Gate B2's functionality read (needs the local server + trained v5 checkpoints) reuses this
+script so the whole build's evidence lives in one place: per-seed offrl-vs-random win rates,
+the exact signature that exposed the v1-v4 stall (losing to random).
+
+    python scripts/slot_order_gate.py --stage b2-random \\
+        --checkpoints checkpoints/offrl_gen9ou_v5_s0.pt,... --n 100 \\
+        --out results/gateb_v5_vs_random.json
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
+import itertools
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -205,13 +215,57 @@ def _measure_live_pool(pool_path: str | Path) -> dict[str, float]:
     }
 
 
+async def _run_b2_random(args: argparse.Namespace) -> None:
+    """Per-seed offrl-vs-random win rates on the eval teampool (v4-record JSON shape)."""
+    from lategame.eval.arena import build_player, evaluate_built
+    from lategame.teambuilding.pool import TeamPool
+
+    teams = TeamPool.from_packed_file(args.team_pool).teams
+    seeds = itertools.count()
+
+    def _pool() -> TeamPool:  # fresh pool per player so p1/p2 draw independently
+        return TeamPool(teams, seed=next(seeds))
+
+    checkpoints = [c for c in args.checkpoints.split(",") if c]
+    rates: dict[str, float] = {}
+    for idx, ckpt in enumerate(checkpoints):
+        p1 = build_player(
+            "offrl", args.format, checkpoint_path=ckpt,
+            max_concurrent_battles=args.concurrency, team=_pool(),
+        )
+        p2 = build_player(
+            "random", args.format, max_concurrent_battles=args.concurrency, team=_pool()
+        )
+        rate = await evaluate_built(p1, p2, args.n)
+        rates[f"s{idx}"] = float(rate)
+        print(f"  B2 vs-random s{idx} ({ckpt}): {rate:.3f}  (n={args.n})")
+
+    result = {"vs_random": rates, "n": args.n, "format": args.format, "checkpoints": checkpoints}
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    print(f"-> {args.out}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--stage", choices=("a", "b2-random"), default="a")
     ap.add_argument("--cache-dir", default="replays/gen9ou", help="Cached gen9ou replay JSON dir")
     ap.add_argument("--sample", type=int, default=200, help="Max replays to score")
     ap.add_argument("--team-pool", default=str(DEFAULT_OU_POOL), help="Packed eval teampool")
+    ap.add_argument("--checkpoints", default="", help="b2-random: comma-separated offrl ckpts")
+    ap.add_argument("--n", type=int, default=100, help="b2-random: battles per checkpoint")
+    ap.add_argument("--format", default="gen9ou", help="b2-random: battle format")
+    ap.add_argument("--concurrency", type=int, default=20, help="b2-random: concurrent battles")
     ap.add_argument("--out", default=str(_RESULTS))
     args = ap.parse_args()
+
+    if args.stage == "b2-random":
+        if not args.checkpoints:
+            raise SystemExit("--stage b2-random requires --checkpoints")
+        if args.out == str(_RESULTS):
+            args.out = "results/gateb_v5_vs_random.json"
+        asyncio.run(_run_b2_random(args))
+        return
 
     paths = cached_replay_paths(args.cache_dir)[: args.sample]
     replays: list[dict[str, Any]] = []

@@ -28,5 +28,25 @@
     "canonical_drop_delta_ok": true,
     "sample_ok": true
   },
-  "verdict": "PASS"
+  "verdict": "PASS",
+  "b1": {
+    "bc_val_acc": {
+      "s0": 0.647,
+      "s1": 0.6455,
+      "s2": 0.6494
+    },
+    "mean": 0.6473,
+    "v4_baseline_single_seed": 0.636,
+    "bc_samples": 61723,
+    "rl_turns": 119996,
+    "v4_reference": {
+      "bc_samples": 61729,
+      "rl_turns": 120001
+    },
+    "thresholds": {
+      "kill_below": 0.61,
+      "pass_at": 0.63
+    },
+    "verdict": "PASS"
+  }
 }
