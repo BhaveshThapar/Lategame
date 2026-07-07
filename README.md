@@ -165,6 +165,21 @@ switch mass on the shard's wall-active states (imitated pivot prior composing in
 offline, zero training. 40 per-turn transcripts committed as evidence. Suite **198 pass / 5 skip** (203 with
 the server up); `results/behavior_probe.json`, `results/behavior_probe_transcripts/`.
 
+**OU pivot Build 7 — train-side switch-mass diagnostic (H2 UNANIMOUS: the loop is an OOD artifact — the
+live ~0.9 switch mass never appears on training states; pivot-prior and amplification causes dead).**
+`scripts/switch_mass_gate.py` (offline, zero training): decodes own/opp-active species from the shard obs
+ID channels, conditions on the Build-6 empirical loop states (8 species / 27 pairs from the decisions
+JSONL, frozen fallbacks committed), and compares the human switch rate **H** against each v5 checkpoint's
+masked-softmax switch mass **P**, top-1-is-switch **T**, and the uniform-over-legal anchor **U** under a
+pre-registered H1/H2/H3 tree with teeth (harness identity 1e-16, random-init band, attacker-specificity
+≤ 0.30). All 6 ckpts × both full shards: on loop-species states H **0.205/0.210**, P **0.161–0.229**
+(matched), T **< 6%** — vs live 0.77 fraction / ~0.9 mass; even on the exact live loop pairs P_pair
+**0.165–0.234**. H1 dead (humans not pivot-heavy: replay-log true rate 0.211 ≈ shard 0.189); H3 dead (max
+P−H +0.024; BC-vs-AWR delta −0.008). **Verdict bc=H2; offrl=H2** → the failure is distribution shift, not
+learned behavior; next lever is drift-side (usage-prior imputation of own-team detail to live-FULL, the
+measured Build-2/3 gap — NOT a history feature, nothing to damp in-distribution). Suite **221 pass /
+5 skip**; `results/switch_mass_gate.json`.
+
 ## Setup
 
 ```bash

@@ -941,6 +941,52 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     Suite **198 pass / 5 skip** (203 with the local server up), ruff + mypy clean;
     `results/behavior_probe.json` + `results/behavior_probe_transcripts/` committed.
 
+- **OU pivot — Build 7: train-side switch-mass diagnostic — built + run; H2 UNANIMOUS (the switch loop
+  is an OOD generalization artifact: the live ~0.9 switch mass never appears on training states;
+  imitated-pivot-prior and training-amplification causes eliminated by direct measurement).**
+  - **Built (offline, zero training, no server).** `scripts/switch_mass_gate.py`: decodes own/opp-active
+    species + HP straight from the v5 shard obs via `OBS_LAYOUT`-derived offsets (block idx 1 active /
+    3 hp / 44 species; `force_switch` at global −3 measured ≡ 0 on every row — all shard rows are
+    voluntary decisions); loop states extracted from the Build-6 decisions JSONL (runs ≥ 10 → 8 loop
+    species, 27 (own, opp) pairs; frozen as fallback constants since the JSONL is gitignored); a
+    dex-defensiveness secondary lens from the raw `id_priors` z-stats (needed because the empirical loop
+    set is NOT purely walls — Gholdengo/Great Tusk score ~0.2). Per (arm × shard × conditioning) it
+    reports **H** (human switch rate, `action<6`), **P** (masked-softmax switch mass on actions 0–5),
+    **T** (top-1-is-switch), and **U** (uniform-over-legal anchor, ~0.44–0.47 here — "high" must beat
+    this, not 0). Pre-registered H1(pivot prior)/H2(OOD)/H3(amplification) tree + controls with teeth:
+    zero-logits harness identity (err 1e-16), random-init ET band (0.53–0.54 ∈ [0.25, 0.65]), taken-action
+    mask invariant, sample floors, and an attacker-specificity control (mass on `dex_attacker` states must
+    stay ≤ 0.30 or the wall-conditioning story collapses to H3-GLOBAL). Secondary replay-log pass over the
+    2,760 raw logs bounds the ingest undercount. 23 pure-logic tests.
+  - **Findings (6 ckpts × both full shards, 61,723 + 119,996 rows; loop-species n = 9,728 / 19,077):**
+    - **H2 on all 6 seeds, both families.** On the exact loop-species states: H **0.205/0.210**, P
+      **0.161–0.229** (matched — max |P−H| 0.049), T **0.034–0.056** — in-distribution the argmax picks a
+      switch < 6% of the time, vs the live 0.77 voluntary-switch fraction and ~0.9 mass. Even on the
+      exact live loop (own, opp) pairs (n 1,534/3,055) P_pair is only **0.165–0.234**. `in_dist_live`
+      never fires (bar 0.60); `argmax_amp` never fires.
+    - **H1 dead:** humans are NOT pivot-heavy in wall states — H 0.205 ≈ overall 0.184 (dex_wall H
+      0.21–0.22, far below the 0.40 bar). The replay-log true voluntary rate is **0.211** vs shard 0.189:
+      the ingest undercount is only +0.02 (43% of human switches are first-reveals ingest drops, but the
+      rate barely moves), so the shard H is honest.
+    - **H3 dead:** no amplification anywhere (max P−H **+0.024**); attacker control clean (0.13–0.20,
+      wall-conditioned story intact); BC-vs-AWR delta on the same shard **−0.008** — AWR adds zero
+      switch mass over pure BC.
+  - **Implication.** The three candidate mechanisms are now all measured: imitated prior dead,
+    amplification dead, leaving **distribution shift confirmed by elimination + direct contrast** — the
+    live states (full-kit `|request|` detail, curated-teampool teams, self-play loop states) sit off the
+    human-shard manifold, and off-manifold the policy's mass collapses onto switches. Prime suspect stays
+    the *measured* Build-2/3 train≠live obs-detail gap (train item 0.30 / ability 0.47 / moves 2.78 vs
+    live 1.0/1.0/4.0 on the identity channels). Mapped next lever per the pre-registered tree =
+    **drift-side work**: usage-prior imputation to bring train own-team detail to live-FULL (the Build-3
+    "next lever"), and/or a live-state-vs-shard distance probe to localize which channels carry the
+    shift. A history/recency feature is NOT the indicated fix — there is nothing to damp in-distribution.
+  - **Lessons.** (1) The pathology lives entirely OFF-shard: no shard-side metric (BC val-acc, value-MAE,
+    this gate's P) could have seen it — pair any train-side mass gate with a live behavioral probe, and
+    treat "healthy in-distribution + insane live" as a drift signature, not a modeling bug. (2) When a
+    gate's conditioning comes from a gitignored artifact, freeze the extraction output as committed
+    fallback constants or the gate is unreproducible from a clone.
+    Suite **221 pass / 5 skip**, ruff + mypy clean; `results/switch_mass_gate.json` committed.
+
 ---
 
 ## 14. Risks & mitigations
