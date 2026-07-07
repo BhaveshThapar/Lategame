@@ -1,0 +1,63 @@
+=== offrl | battle-gen9ou-101922 | won=False turns=56 | preview=/team 261543
+team packed: clefable,greattusk,kingambit,gholdengo,corviknight,tinglu | live: clefable,greattusk,kingambit,gholdengo,corviknight,tinglu | ORDER MATCH
+T1   greattusk 100% vs slowkinggalar 100% | legal=13 | -> tera2 '/choose move rapidspin terastallize' p=0.94 | alt: tera0 0.04, tera3 0.02
+T2   greattusk 37% vs slowkinggalar 83% | legal=9 | -> move2 '/choose move rapidspin' p=0.88 | alt: switch4 0.04, switch5 0.03
+T3   greattusk 43% vs slowkinggalar 64% | legal=9 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch5 0.02
+T4   greattusk 50% vs slowkinggalar 46% | legal=9 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.03, switch5 0.02
+T5   greattusk 56% vs greattusk 93% | legal=9 | -> move2 '/choose move rapidspin' p=0.88 | alt: switch4 0.04, switch5 0.03
+T5   greattusk 0% vs greattusk 85% | legal=5 | -> switch4 '/choose switch Corviknight' p=0.37 | alt: switch5 0.28, switch3 0.19 | FORCED
+T6   corviknight 100% vs greattusk 85% | legal=8 | -> switch5 '/choose switch Ting-Lu' p=0.35 | alt: switch3 0.29, switch2 0.18
+T7   tinglu 100% vs kingambit 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.44 | alt: switch3 0.25, switch2 0.14
+T8   corviknight 100% vs ragingbolt 100% | legal=8 | -> switch5 '/choose switch Ting-Lu' p=0.39 | alt: switch3 0.28, switch2 0.17
+T9   tinglu 78% vs ragingbolt 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.46 | alt: switch3 0.24, switch2 0.14
+T10  corviknight 100% vs ragingbolt 100% | legal=8 | -> switch5 '/choose switch Ting-Lu' p=0.39 | alt: switch3 0.28, switch2 0.17
+T11  tinglu 84% vs ragingbolt 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.46 | alt: switch3 0.24, switch2 0.14
+T12  corviknight 13% vs ragingbolt 100% | legal=8 | -> switch5 '/choose switch Ting-Lu' p=0.41 | alt: switch3 0.28, switch2 0.17
+T13  tinglu 91% vs corviknight 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.45 | alt: switch3 0.26, switch2 0.14
+T14  corviknight 7% vs corviknight 100% | legal=8 | -> switch5 '/choose switch Ting-Lu' p=0.39 | alt: switch3 0.27, switch2 0.17
+T15  tinglu 70% vs corviknight 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.46 | alt: switch3 0.26, switch2 0.14
+T15  corviknight 0% vs corviknight 100% | legal=4 | -> switch5 '/choose switch Ting-Lu' p=0.40 | alt: switch3 0.29, switch2 0.17 | FORCED
+T16  tinglu 70% vs corviknight 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.47 | alt: switch2 0.26, switch0 0.19
+T17  gholdengo 100% vs gholdengo 100% | legal=7 | -> switch5 '/choose switch Ting-Lu' p=0.48 | alt: switch2 0.26, switch0 0.23
+T18  tinglu 77% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.44 | alt: switch2 0.26, switch0 0.19
+T18  gholdengo 0% vs gholdengo 100% | legal=3 | -> switch5 '/choose switch Ting-Lu' p=0.50 | alt: switch2 0.26, switch0 0.24 | FORCED
+T19  tinglu 77% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.45 | alt: switch0 0.34, move3 0.17
+T20  kingambit 100% vs kingambit 100% | legal=6 | -> switch5 '/choose switch Ting-Lu' p=0.67 | alt: switch0 0.31, move2 0.01
+T21  tinglu 83% vs kingambit 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.43 | alt: switch0 0.33, move3 0.21
+T22  kingambit 100% vs kingambit 100% | legal=6 | -> switch5 '/choose switch Ting-Lu' p=0.66 | alt: switch0 0.31, move0 0.01
+T23  tinglu 89% vs kingambit 100% | legal=6 | -> move3 '/choose move whirlwind' p=0.49 | alt: switch2 0.29, switch0 0.18
+T23  tinglu 0% vs kingambit 100% | legal=2 | -> switch2 '/choose switch Kingambit' p=0.62 | alt: switch0 0.38 | FORCED
+T24  kingambit 100% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.87 | alt: move0 0.05, move2 0.03
+T25  clefable 100% vs gholdengo 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.83 | alt: move3 0.15, move2 0.02
+T26  kingambit 100% vs corviknight 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.93 | alt: move2 0.02, move0 0.02
+T27  clefable 80% vs corviknight 98% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.77 | alt: move3 0.21, move2 0.02
+T28  kingambit 100% vs corviknight 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.93 | alt: move2 0.02, move0 0.02
+T29  clefable 77% vs corviknight 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.76 | alt: move3 0.21, move2 0.02
+T30  kingambit 100% vs gholdengo 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move0 0.03, move2 0.02
+T31  clefable 83% vs kingambit 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.83 | alt: move3 0.14, move2 0.03
+T32  kingambit 100% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.91 | alt: move0 0.04, move2 0.03
+T33  clefable 89% vs slowkinggalar 79% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.82 | alt: move3 0.14, move2 0.03
+T34  kingambit 100% vs greattusk 91% | legal=5 | -> switch0 '/choose switch Clefable' p=0.93 | alt: move2 0.03, move0 0.02
+T35  clefable 95% vs slowkinggalar 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.81 | alt: move3 0.15, move2 0.03
+T36  kingambit 100% vs slowkinggalar 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move0 0.03, move2 0.03
+T37  clefable 100% vs ragingbolt 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.75 | alt: move3 0.22, move2 0.02
+T38  kingambit 100% vs ragingbolt 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.93 | alt: move2 0.02, move0 0.02
+T39  clefable 100% vs ragingbolt 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.74 | alt: move3 0.23, move2 0.02
+T40  kingambit 100% vs ragingbolt 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move0 0.03, move2 0.02
+T41  clefable 100% vs corviknight 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.78 | alt: move3 0.19, move2 0.02
+T42  kingambit 100% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.03, move0 0.02
+T43  clefable 100% vs slowkinggalar 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.80 | alt: move3 0.16, move2 0.03
+T44  kingambit 100% vs corviknight 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.93 | alt: move2 0.02, move0 0.02
+T45  clefable 100% vs gholdengo 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.84 | alt: move3 0.13, move2 0.03
+T46  kingambit 80% vs gholdengo 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.02, move0 0.02
+T47  clefable 100% vs corviknight 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.80 | alt: move3 0.17, move2 0.02
+T48  kingambit 86% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.03, move0 0.02
+T49  clefable 100% vs kingambit 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.84 | alt: move3 0.12, move2 0.03
+T50  kingambit 92% vs ragingbolt 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.03, move0 0.02
+T51  clefable 58% vs ragingbolt 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.86 | alt: move3 0.11, move2 0.03
+T52  kingambit 99% vs ragingbolt 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.03, move0 0.02
+T53  clefable 64% vs ragingbolt 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.85 | alt: move3 0.11, move2 0.03
+T54  kingambit 18% vs ragingbolt 100% | legal=5 | -> switch0 '/choose switch Clefable' p=0.92 | alt: move2 0.03, move0 0.02
+T55  clefable 70% vs ragingbolt 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.84 | alt: move3 0.12, move2 0.03
+T55  kingambit 0% vs ragingbolt 100% | legal=1 | -> switch0 '/choose switch Clefable' p=1.00 | FORCED
+T56  clefable 70% vs ragingbolt 100% | legal=4 | -> move3 '/choose move thunderwave' p=0.68 | alt: move2 0.23, move1 0.06
