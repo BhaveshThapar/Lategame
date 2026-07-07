@@ -48,5 +48,48 @@
       "pass_at": 0.63
     },
     "verdict": "PASS"
+  },
+  "b2": {
+    "vs_random": {
+      "s0": 0.02,
+      "s1": 0.11,
+      "s2": 0.06
+    },
+    "vs_random_mean": 0.063,
+    "vs_heuristic_best_seed_n300": 0.01,
+    "awr_value_mae": {
+      "s0": 0.476,
+      "s1": 0.554,
+      "s2": 0.452
+    },
+    "harness": {
+      "mirror": 0.493,
+      "random": 0.03,
+      "maxbasepower": 0.06,
+      "simpleheuristics": 0.643
+    },
+    "posthoc_bc_vs_random": {
+      "s0": 0.06,
+      "s1": 0.03,
+      "n": 100,
+      "note": "pure BC craters identically -> failure is upstream of AWR"
+    },
+    "references": {
+      "v1_vs_random": 0.495,
+      "v3_vs_random": [
+        0.13,
+        0.45
+      ],
+      "v4_vs_random": [
+        0.05,
+        0.27
+      ],
+      "v4_vs_heuristic": 0.003
+    },
+    "thresholds": {
+      "functionality_red_below": 0.55,
+      "strength_red_below": 0.05
+    },
+    "verdict": "RED"
   }
 }

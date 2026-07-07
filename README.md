@@ -126,6 +126,28 @@ scrambles more slot semantics. **Next lever: canonical move-slot ordering** at i
 (BC-gateable before any retrain). Suite **162 pass / 5 skip**; `results/format_ceiling_gate_ou_v4.json`,
 `results/gateb_v4_vs_random.json`.
 
+**OU pivot Build 5 — canonical move-slot ordering (RED: slot order fixed and verified, agent still dead —
+and pure BC craters too, so the failure is upstream of RL).** Gate A measured the suspected scramble
+directly before any code change (`scripts/slot_order_gate.py`): **25.9%** of training move-labels change slot
+under canonicalization, **91.7%** of eval-teampool mons declare moves non-canonically (~0.97 slot mean
+displacement), zero out-of-4 truncation drops — PASS. The fix: `features/action_space.py` no longer delegates
+to poke-env's `SinglesEnv` — every converter (label/decode/mask/synthesize) and the encoder's move blocks now
+index `canonical_moves` (known moves sorted by id, first four), identical at ingest and live **by
+construction**; **`OBS_VERSION` v2→v3** hard-rejects every v2-era shard/checkpoint (incl. the retired RB
+GREEN) so orderings can never silently mix. 14 new tests incl. a request-backed round-trip on every masked
+action. **Gate B1 PASS:** re-ingest needed zero ingest changes (119,996 turns, −0.005% vs v4 = the predicted
+~zero new drops; `ou_ingest_gate` regression channel-identical), BC val-acc **0.647 ± 0.002** over 3 seeds —
+above the 0.63 bar *and* the v4 baseline 0.636 (canonical labels are consistent across replays, hence more
+learnable). **Gate B2 RED:** 3 AWR seeds healthy (value-MAE 0.45–0.55) but vs-random **0.02 / 0.11 / 0.06**
+(≤ v4's 0.05–0.27) and vs-heuristic **0.010** at n=300 (harness clean: mirror 0.493, gradient
+0.030 < 0.060 < 0.643). Post-hoc localization: the pure-BC v5 checkpoints also lose to random (**0.06 /
+0.03**) — so the stall is *not* AWR-specific, *not* the harness, *not* move-slot order, *not* obs density:
+four eliminated causes. Remaining candidates: **switch-slot/team-order semantics** (slots 0–5 + the six
+own-mon obs blocks, the one ordering never probed), **live behavioral pathology** (what do these agents
+actually *do* vs random — a 2-battle order-log probe is the cheapest next step), and **human-replay →
+bot-eval distribution drift**. Suite **181 pass / 5 skip**; `results/slot_order_gate.json` (a/b1/b2 blocks),
+`results/format_ceiling_gate_ou_v5.json`, `results/gateb_v5_vs_random.json`.
+
 ## Setup
 
 ```bash

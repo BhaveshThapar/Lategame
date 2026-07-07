@@ -833,6 +833,57 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     position makes slot order a *label* semantics issue, not just an obs one. Suite **162 pass / 5 skip**;
     `results/ou_ingest_gate.json`, `results/format_ceiling_gate_ou_v4.json`, `results/gateb_v4_vs_random.json`.
 
+- **OU pivot — Build 5: canonical move-slot ordering — built + run; RED (slot order fixed and *verified*,
+  agent still dead; pure BC craters too → the stall is upstream of RL; lever killed).**
+  - **Gate A (scramble measurement, before any code change) PASS.** New `scripts/slot_order_gate.py` probed
+    `ingest._move_sample` down the exact v4 path over 200 replays / 7,340 move decisions: **25.9%** of
+    training labels change slot under canonicalization (30.7% of decisions have a scrambled 4-list), and
+    **91.7%** of the eval teampool's 72 mons declare moves non-canonically (mean displacement 0.97 slots) —
+    the divergence was real at magnitude on both sides. Out-of-4 truncation drops: **zero** either direction
+    (no >4-move sets in practice), so canonical `[:4]` is free.
+  - **Built (unit 2).** `features/action_space.py` reimplements the codec locally (mirroring
+    `SinglesEnv`'s structure incl. both lone-available-move fallbacks — a permutation shim can't handle the
+    slot-6 fallback or >4-move subset selection): `canonical_moves(mon)` = known moves sorted by id, first
+    four; used by `label_action` / `order_to_action` / `action_to_order` / `action_mask` /
+    `synthesize_action_mask` AND `encoder.embed_battle`'s move blocks — train and live slot semantics agree
+    **by construction**. **`OBS_VERSION` v2→v3**: the existing shard/checkpoint guards hard-reject every
+    v2-era artifact (incl. the retired RB GREEN — reproducible at old commits) so orderings can never
+    silently mix. Every codec consumer (ingest, resim, collect, agents, PPO, search) flows through this one
+    module — zero changes elsewhere. 14 new tests: insertion-order invariance of labels and obs,
+    request-backed round-trip on every masked action, disabled-move mask alignment at the canonical slot,
+    lone-move fallback, obs-block↔action-slot vocab-id alignment, backfilled-move canonical slot.
+  - **Gate B1 (BC, before AWR spend) PASS — and the hypothesis's cheap prediction held.** Re-ingest needed
+    ZERO ingest changes: v5 = 119,996 turns / 61,723 BC (−0.005% vs v4, the predicted ~zero new drops);
+    `ou_ingest_gate` regression PASS with channel metrics identical to the Build-4 record (order-only change
+    verified). BC ET+prior val-acc **0.647 / 0.646 / 0.649** (mean 0.647) — above the pre-registered 0.63
+    bar AND the v4 reveal-order baseline 0.636: canonical labels are consistent across replays, hence more
+    learnable.
+  - **Gate B2 RED.** 3 AWR seeds healthy (value-MAE 0.452/0.476/0.554), but vs-random **0.02 / 0.11 / 0.06**
+    (mean 0.063 ≪ the 0.55 RED bar; at/below v4's 0.05–0.27) and vs-heuristic **0.010** at n=300 (v4 0.003).
+    Harness clean (mirror 0.493; gradient random 0.030 < maxbp 0.060 < simpleheuristics 0.643). Recorded
+    without re-tuning per the gate.
+  - **Post-hoc localization (cheap, decisive): pure BC also loses to random** — bc_v5 s0 **0.06** / s1
+    **0.03** (n=100). With 0.647 imitation accuracy, an agent that loses ≥94% to RANDOM is not "weak", it is
+    systematically broken at eval — and identically so WITHOUT value-weighted RL. Four causes now eliminated
+    by direct measurement: the harness (sanity clean), AWR (BC craters equally), own-kit obs *density*
+    (Build 4 verified eval-full), move-slot *order* (this build fixed + verified it). The v1→v5 vs-random
+    story re-reads as: v1's 0.495 was never "closest to working" — it likely played fallback-random-like;
+    v3+ agents act *confidently* on the training distribution and that confident play loses live.
+  - **Remaining candidates for the stall (next levers, cheapest first).** (1) **Behavioral probe** — log the
+    orders + request/error stream of ~2 live games vs random (what does it DO? switch loops? one-move spam?
+    server-rejected choices?); hours, zero training, and it discriminates the remaining hypotheses. (2)
+    **Switch-slot/team-order semantics** — actions 0–5 and the six own-mon obs blocks index
+    `battle.team.values()` insertion order: train = `|poke|` preview (upload) order, live = first-request
+    order; believed equal (both upload order) but never probed — same gate pattern as this build. (3)
+    **Human-replay → bot-eval distribution drift** (opponents, teams, game phases). OU ceiling re-probe +
+    OU PPO stay gated OFF.
+  - **Lessons.** (1) A verified fix that doesn't move the outcome metric is still progress — but only if the
+    gate *measures the mechanism* (Gate A) so the negative eliminates the cause rather than the
+    implementation. (2) When an agent loses to random, check the *simplest* policy (BC) before blaming the
+    RL objective — one n=100 eval localized the failure upstream of AWR. Suite **181 pass / 5 skip**;
+    `results/slot_order_gate.json` (a/b1/b2 blocks), `results/format_ceiling_gate_ou_v5.json`,
+    `results/gateb_v5_vs_random.json`.
+
 ---
 
 ## 14. Risks & mitigations
