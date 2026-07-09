@@ -1,0 +1,71 @@
+{
+  "bar": 0.63,
+  "states": "results/behavior_probe_obs_v7.npz",
+  "shard": "data/gen9ou_v7_bc.npz",
+  "reference_dP": {
+    "v7_s0": 0.3767,
+    "v10_s0": 0.3692
+  },
+  "configs": [
+    {
+      "config": "gauss005",
+      "pp_noise_std": 0.05,
+      "val_acc": 0.5749,
+      "bc_pass": false,
+      "baseline_switch_mass": 0.2959,
+      "pp_neutralized_switch_mass": 0.2398,
+      "dP": 0.0561,
+      "secs": 136.6
+    },
+    {
+      "config": "gauss010",
+      "pp_noise_std": 0.1,
+      "val_acc": 0.5008,
+      "bc_pass": false,
+      "baseline_switch_mass": 0.2111,
+      "pp_neutralized_switch_mass": 0.1935,
+      "dP": 0.0176,
+      "secs": 128.2
+    },
+    {
+      "config": "gauss020",
+      "pp_noise_std": 0.2,
+      "val_acc": 0.4415,
+      "bc_pass": false,
+      "baseline_switch_mass": 0.2348,
+      "pp_neutralized_switch_mass": 0.2306,
+      "dP": 0.0043,
+      "secs": 139.8
+    },
+    {
+      "config": "resamp010",
+      "pp_resample_frac": 0.1,
+      "val_acc": 0.6478,
+      "bc_pass": true,
+      "baseline_switch_mass": 0.4351,
+      "pp_neutralized_switch_mass": 0.232,
+      "dP": 0.2031,
+      "secs": 96.2
+    },
+    {
+      "config": "resamp025",
+      "pp_resample_frac": 0.25,
+      "val_acc": 0.6272,
+      "bc_pass": false,
+      "baseline_switch_mass": 0.3382,
+      "pp_neutralized_switch_mass": 0.225,
+      "dP": 0.1132,
+      "secs": 99.4
+    },
+    {
+      "config": "resamp050",
+      "pp_resample_frac": 0.5,
+      "val_acc": 0.5507,
+      "bc_pass": false,
+      "baseline_switch_mass": 0.2767,
+      "pp_neutralized_switch_mass": 0.2382,
+      "dP": 0.0385,
+      "secs": 100.5
+    }
+  ]
+}
