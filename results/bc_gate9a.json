@@ -1,0 +1,33 @@
+{
+  "build": 9,
+  "gate": "A",
+  "lever": "ablate the move pp_fraction channel to a constant 0.0 (dim/layout unchanged)",
+  "obs_version": "v4-09831e17c378",
+  "bc_shard": "data/gen9ou_v6_bc.npz",
+  "rl_shard": "data/gen9ou_v6_rl.npz",
+  "n_bc_samples": 61723,
+  "n_rl_turns": 119996,
+  "model": "entity_transformer + id_embed_init=prior",
+  "seeds": [0, 1, 2],
+  "checkpoints": [
+    "checkpoints/bc_gen9ou_v6_s0.pt",
+    "checkpoints/bc_gen9ou_v6_s1.pt",
+    "checkpoints/bc_gen9ou_v6_s2.pt"
+  ],
+  "bar": 0.63,
+  "baseline_v5_pp_present_val_acc": [0.647, 0.646, 0.649],
+  "baseline_v5_pp_present_val_acc_mean": 0.647,
+  "val_acc": [0.3950097213220998, 0.39679196370706415, 0.3797796500324044],
+  "val_acc_mean": 0.3905,
+  "val_acc_drop_vs_baseline": 0.2565,
+  "surgical_diff_check": {
+    "shapes_equal": true,
+    "actions_identical_v5_v6": true,
+    "nonpp_columns_identical_v5_v6": true,
+    "pp_v5_nonzero_frac": 0.9924,
+    "pp_v5_present_mean": 0.9427,
+    "pp_v6_nonzero_frac": 0.0
+  },
+  "verdict": "RED",
+  "conclusion": "Removing pp is a surgical single-channel change (every other column byte-identical to v5), yet it collapses BC val-acc 0.647 -> 0.390 (-0.257), far below the 0.63 bar. pp is load-bearing for imitation -- not a droppable low-information channel: it is the encoder's implicit trace of own move-usage / recency and feeds the dominant switch-vs-attack decision axis. Dropping pp is not a viable fix. Kill-gate stops here (no live probe on a degraded 0.39 agent). Proceed to Gate B: keep pp, add an explicit in-distribution recency feature (active.first_turn) so 'just switched, haven't attacked' is represented honestly rather than leaking through pp."
+}
