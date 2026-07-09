@@ -1055,6 +1055,52 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     ruff + `mypy lategame` clean (the gate scripts carry the same 2 pre-existing "assign to a type"
     monkeypatch notes as Build 6); `results/drift_probe.json` + `results/behavior_probe8.json` committed
     (obs/decisions/transcripts gitignored).
+- **OU Pivot — Build 9: the pp-channel fix (two gates: drop pp / add first_turn) — built + run; BOTH gates
+  triangulate that the fix must ROBUSTIFY pp, not drop it or out-vote it.** Build 8 isolated the switch-loop
+  carrier to the move `pp_fraction` channel (OOD "all moves at full pp because I never attack"). Build 9
+  runs the two pre-registered, BC-gateable levers cheapest-first. Implementation note: the pp ablation is
+  realized by zeroing the channel in place (dim/layout unchanged, so `drift_probe` + shape tests stay
+  intact) rather than deleting the slot — scientifically identical for the policy (a constant input weight
+  is dead), and each gate re-ingests under a bumped `OBS_VERSION` so train and live agree.
+  - **Gate A (drop pp) — BC RED: pp is load-bearing for imitation.** Ablate `pp_fraction` to a constant 0
+    (`OBS_VERSION` v3→**v4**), re-ingest (v6 shards: 61,723 BC / 119,996 turns — identical counts, and the
+    v6 obs is **byte-identical to v5 on every non-pp column**, actions identical, so the change is surgical),
+    3-seed BC ET+prior. Val-acc collapses **0.647 → 0.390** (−0.257), far below the 0.63 bar. Removing one
+    "low-information" channel tanks imitation → pp is *not* droppable: it is the encoder's implicit trace of
+    own move-usage/recency and feeds the dominant switch-vs-attack axis. Kill-gate stops before a (confounded)
+    live probe on a 0.39 agent. `results/bc_gate9a.json`.
+  - **Gate B (keep pp + add explicit `first_turn` recency) — BC PASS but the live loop PERSISTS.** Append one
+    global scalar `float(active.first_turn)` (poke-env "first action since switch-in"; driven by the same
+    protocol messages offline+live, so **drift-free**, unlike pp), pp retained (`OBS_VERSION` v4→**v5**, 761-d).
+    v7 shard is byte-identical to v5 on the first 760 cols (surgical add). The shard signal looks perfect —
+    `first_turn=1` → switch **9.8%** vs `first_turn=0` → 23.9% (humans just-switched-in switch 2.4× *less*),
+    and BC val-acc **0.654** clears 0.63 *and beats* the pp-only 0.647 (first_turn is genuinely informative).
+    But live (bc_v7_s0, n=20 vs random+heuristic) the loop **persists**: both arms `c_pathological`
+    (max_switch_run 110/77, ping-pong 0.73/0.65, win 0.05/0.0) — attenuated vs Build 8 (vol-switch ~0.49–0.64
+    vs ~0.75) but not broken.
+  - **Why Gate B fails — causal counterfactual on the v7 BC policy (which HAS first_turn).** `first_turn` is
+    NOT drifted (fires live, 56% of decisions), yet the policy **inverts** its shard prior under OOD: live
+    `first_turn=1` → **87%** switch (vs the shard's 9.8%), because pp stays full (`frac_full` 0.86 live / 0.51
+    shard; means near-identical 0.946/0.943 — the OOD signal is *exactly-full* pp, per Build 8). Neutralizing
+    pp to in-distribution (drawing shard pp, keeping first_turn) drops live switch mass **0.604 → 0.244
+    (ΔP −0.36)**; flipping `first_turn` moves it only **±0.03–0.04**. So with pp present, pp out-weighs the
+    honest recency feature **~10×** — a parallel in-distribution feature cannot rescue a policy from an OOD
+    carrier that is still there. `results/first_turn_gate9b.json` + `results/behavior_probe9b.json`.
+  - **Verdict + next lever.** `first_turn` is **kept** (drift-free, +val-acc) but is **insufficient** as a
+    standalone loop-fix. The two gates close the pincer: pp can't be **dropped** (Gate A, load-bearing) and
+    can't be **out-voted** (Gate B, ΔP −0.36 ≫ 0.03) → the only remaining branch is to **robustify pp** while
+    keeping it — **Build 10**: train-time augmentation of the pp channel (noise/dropout, or synthesize
+    full-pp deep-game states so "full pp deep in a game → attack" is in-distribution), then re-run the
+    behavior probe. BC-gateable; OU ceiling re-probe + OU PPO stay gated OFF.
+  - **Lessons.** (1) A channel's *information value for imitation* and its *OOD brittleness* are separate axes:
+    pp is simultaneously load-bearing (drop = −0.26 val-acc) and the loop's OOD carrier — you cannot fix the
+    second by removing the channel. (2) Adding an honest, in-distribution feature *alongside* an OOD carrier
+    does not neutralize the carrier; the policy keeps weighting the (present) OOD channel. The carrier itself
+    must be made robust. (3) The offline causal counterfactual (ΔP from a targeted channel edit) diagnosed
+    the live failure with zero extra training — reuse it before proposing the next fix. Suite **245 pass**
+    (+1: the first_turn encoder test), ruff + `mypy lategame` clean; `results/bc_gate9a.json` +
+    `results/first_turn_gate9b.json` + `results/behavior_probe9b.json` committed (obs/decisions/transcripts
+    gitignored).
 
 ---
 

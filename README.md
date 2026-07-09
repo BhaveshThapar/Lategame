@@ -199,6 +199,21 @@ BC-gateable):** ablate/robustify the pp channel, or add an explicit last-action 
 behavior probe. Phase C (corpus-teampool A/B) deferred — it tests composition (G2), which Phase B
 excluded. Suite **244 pass**; `results/drift_probe.json`.
 
+**OU pivot Build 9 — the pp-channel fix, two gates (drop pp / add first_turn): both triangulate that the
+fix must ROBUSTIFY pp, not remove or out-vote it.** *Gate A (drop pp)* — ablate `pp_fraction` to a constant
+(re-ingest, byte-identical to v5 on every non-pp column), 3-seed BC. Val-acc collapses **0.647 → 0.390**:
+pp is **load-bearing for imitation** (the encoder's implicit own-move-usage/recency trace), not droppable →
+BC RED, kill-gate stops before a live probe. *Gate B (keep pp + add an explicit `first_turn` recency
+channel)* — `active.first_turn` is drift-free (same protocol messages offline+live) and the shard signal is
+ideal (`first_turn=1` → switch 9.8% vs 23.9%); BC val-acc **0.654** passes and *beats* the pp-only 0.647.
+But live the loop **persists** (both arms `c_pathological`, max-switch-run 110/77). A causal counterfactual
+on the v7 policy shows why: neutralizing pp to in-distribution drops live switch mass **0.604 → 0.244
+(ΔP −0.36)**, while flipping `first_turn` moves it only **±0.03** — with pp present, pp out-weighs the
+honest feature **~10×**. `first_turn` is **kept** (drift-free, +val-acc) but insufficient alone. **Next
+lever (Build 10, BC-gateable):** robustify pp via train-time augmentation (noise/dropout, or synthesize
+full-pp deep-game states). Suite **245 pass**; `results/bc_gate9a.json`, `results/first_turn_gate9b.json`,
+`results/behavior_probe9b.json`.
+
 ## Setup
 
 ```bash
