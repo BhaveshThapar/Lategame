@@ -132,21 +132,42 @@ def _max_switch_run(decisions: Sequence[Decision]) -> int:
     return best
 
 
-def _ping_pong_rate(decisions: Sequence[Decision]) -> float:
-    """A->B->A patterns per voluntary switch: the target equals the target two
-    voluntary switches earlier in the same battle."""
+@dataclass
+class TwoCycleRow:
+    """A flagged A->B->A voluntary switch: its absolute index in the decision stream
+    (row-aligned with the obs sidecar) and the switch-back action completing the cycle."""
+
+    index: int
+    return_action: int  # the switch-back action index (== d.action), i.e. onto the just-left mon
+
+
+def two_cycle_rows(decisions: Sequence[Decision]) -> list[TwoCycleRow]:
+    """Stream indices of A->B->A voluntary switches: the switch target equals the target two
+    voluntary switches earlier in the same battle.
+
+    Single-sources the ping-pong definition: ``_ping_pong_rate`` counts these rows and Build 13's
+    ``pingpong_probe`` selects their obs (via the row-aligned sidecar) to localize what sustains the
+    2-cycle. ``return_action`` is the recorded ``action`` -- for a flagged row that IS the move back
+    onto the just-left mon, so it is the per-row index the localizer scores P(return) at.
+    """
     targets: dict[str, list[str]] = {}
-    total = pp = 0
-    for d in decisions:
+    rows: list[TwoCycleRow] = []
+    for i, d in enumerate(decisions):
         if d.forced or d.action >= 6:
             continue
         target = d.team_order[d.action] if d.action < len(d.team_order) else str(d.action)
         seq = targets.setdefault(d.battle_tag, [])
         seq.append(target)
-        total += 1
         if len(seq) >= 3 and seq[-1] == seq[-3]:
-            pp += 1
-    return pp / total if total else 0.0
+            rows.append(TwoCycleRow(index=i, return_action=d.action))
+    return rows
+
+
+def _ping_pong_rate(decisions: Sequence[Decision]) -> float:
+    """A->B->A patterns per voluntary switch: the target equals the target two
+    voluntary switches earlier in the same battle."""
+    total = sum(1 for d in decisions if not d.forced and d.action < 6)
+    return len(two_cycle_rows(decisions)) / total if total else 0.0
 
 
 def _decision_metrics(
