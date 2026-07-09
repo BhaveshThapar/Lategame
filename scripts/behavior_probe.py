@@ -55,6 +55,9 @@ _RESULTS = Path("results/behavior_probe.json")
 _DECISIONS_OUT = Path("results/behavior_probe_decisions.jsonl")
 _TRANSCRIPT_DIR = Path("results/behavior_probe_transcripts")
 _REPLAY_DIR = Path("results/behavior_probe_replays")
+# Build-8: the captured live obs/mask sidecar (gitignored; large, regenerable). Aligned
+# row-for-row with the decisions JSONL; scripts/drift_probe.py is the consumer.
+_OBS_OUT = Path("results/behavior_probe_obs.npz")
 
 # Classification thresholds (pre-registered; see module docstring for the tree).
 FALLBACK_MAJOR = 0.20  # (a) primary: >= 1 in 5 decisions silently randomized
@@ -314,6 +317,13 @@ class _BehaviorProbe:
         self.current_tag: str | None = None
         self.fallback_hit = False
         self.pending: dict[str, Any] | None = None
+        # Build-8 obs capture: the live obs/mask the model actually saw, one row per
+        # kept decision (aligned index-for-index with ``self.decisions``). ``pending_*``
+        # are staged by the embed_battle / masked_logits hooks and consumed on append.
+        self.pending_obs: np.ndarray | None = None
+        self.pending_mask: np.ndarray | None = None
+        self.obs: list[np.ndarray | None] = []
+        self.masks: list[np.ndarray | None] = []
 
     def record_decision(self, action: int, battle: Any, order: Any, fallback: bool) -> None:
         tag = str(battle.battle_tag)
@@ -357,9 +367,13 @@ class _BehaviorProbe:
             and last.action == d.action
             and last.order_str == d.order_str
         ):
-            last.repeat += 1
+            last.repeat += 1  # rejection retry: same obs, don't duplicate the capture
         else:
             self.decisions.append(d)
+            self.obs.append(self.pending_obs)
+            self.masks.append(self.pending_mask)
+        self.pending_obs = None
+        self.pending_mask = None
 
 
 class _FallbackSpy(Player):
@@ -425,6 +439,8 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
     orig_masked = policy.masked_logits
     orig_decode = bc_agent.action_to_order
     orig_player = action_space.Player
+    orig_embed_bc = bc_agent.embed_battle
+    orig_embed_offrl = offline_rl_agent.embed_battle
 
     def spy_masked(logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         out = orig_masked(logits, mask)
@@ -439,7 +455,17 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
                 for p, a in zip(top.values.tolist(), top.indices.tolist(), strict=True)
             ],
         }
+        # The strict live mask the model actually scored under (Build-8): Phase B
+        # re-scores these obs and needs the *same* mask to reproduce live switch mass.
+        probe.pending_mask = mask.detach().cpu().numpy().reshape(-1).astype(bool)
         return out
+
+    def spy_embed(battle: Any) -> np.ndarray:
+        # embed_battle runs first in choose_move (before masked_logits/action_to_order),
+        # so stash the obs here; record_decision consumes it once the action is decoded.
+        obs = orig_embed_bc(battle)
+        probe.pending_obs = np.asarray(obs, dtype=np.float32)
+        return obs
 
     def spy_decode(action: int, battle: Any) -> Any:
         probe.fallback_hit = False
@@ -451,6 +477,8 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
     policy.masked_logits = spy_masked
     bc_agent.action_to_order = spy_decode
     offline_rl_agent.action_to_order = spy_decode
+    bc_agent.embed_battle = spy_embed
+    offline_rl_agent.embed_battle = spy_embed
     action_space.Player = _FallbackSpy
     try:
         yield
@@ -459,6 +487,8 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
         policy.masked_logits = orig_masked
         bc_agent.action_to_order = orig_decode
         offline_rl_agent.action_to_order = orig_decode
+        bc_agent.embed_battle = orig_embed_bc
+        offline_rl_agent.embed_battle = orig_embed_offrl
         action_space.Player = orig_player
 
 
@@ -484,12 +514,14 @@ def _build_probe_player(
     # arena.build_player forwards neither log_level (needed to see the level-25
     # rejection messages) nor save_replays, so the probe builds players itself.
     from lategame.agents.bc_agent import BCAgent
+    from lategame.agents.heuristic_agent import HeuristicAgent
     from lategame.agents.offline_rl_agent import OfflineRLAgent
 
     classes: dict[str, type[Player]] = {
         "bc": BCAgent,
         "offrl": OfflineRLAgent,
         "random": RandomPlayer,
+        "heuristic": HeuristicAgent,  # Build-8: the real eval opponent, as an arm
     }
     extra: dict[str, object] = {"checkpoint_path": checkpoint} if checkpoint else {}
     return classes[kind](
@@ -497,28 +529,30 @@ def _build_probe_player(
         battle_format=battle_format,
         server_configuration=LOCAL_SERVER,
         team=pool,
-        log_level=25 if kind != "random" else None,
+        # Only the probed policies (bc/offrl) need the level-25 handler for rejections;
+        # opponents (random/heuristic) are never hooked.
+        log_level=25 if kind in ("bc", "offrl") else None,
         save_replays=str(replay_dir) if replay_dir else False,
         **extra,  # type: ignore[arg-type]
     )
 
 
 async def _run_arms(
-    arms: list[tuple[str, str, str | None]],
+    arms: list[tuple[str, str, str | None, str]],
     args: argparse.Namespace,
     probe: _BehaviorProbe,
     teams: list[str],
 ) -> list[dict[str, Any]]:
     seeds = itertools.count()
     summaries = []
-    for arm, kind, ckpt in arms:
+    for arm, kind, ckpt, opp_kind in arms:
         probe.arm = arm
         replay_dir = _REPLAY_DIR / arm if args.save_replays and kind != "random" else None
         player = _build_probe_player(
             kind, args.format, ckpt, TeamPool(teams, seed=next(seeds)), replay_dir
         )
         opponent = _build_probe_player(
-            "random", args.format, None, TeamPool(teams, seed=next(seeds)), None
+            opp_kind, args.format, None, TeamPool(teams, seed=next(seeds)), None
         )
         if kind != "random":
             _record_teampreview(player, probe)
@@ -549,8 +583,8 @@ async def _run_arms(
                 "before a request?"
             )
         summaries.append(
-            {"arm": arm, "kind": kind, "checkpoint": ckpt, "timed_out": timed_out,
-             "battles": battles}
+            {"arm": arm, "kind": kind, "opponent": opp_kind, "checkpoint": ckpt,
+             "timed_out": timed_out, "battles": battles}
         )
         n_dec = sum(1 for d in probe.decisions if d.arm == arm)
         print(f"  arm {arm}: {len(battles)} battles, {n_dec} decisions"
@@ -581,6 +615,39 @@ def _write_transcripts(
         )
 
 
+def _save_obs(path: Path, probe: _BehaviorProbe) -> None:
+    """Persist the captured obs/mask sidecar, aligned with ``probe.decisions``.
+
+    Only rows whose obs *and* mask were captured are written (every live decision
+    captures both -- the None case is the direct-unit-test path, never a live game).
+    Row order matches the decisions JSONL, and each row carries its arm/action/tag so
+    Phase B can select bc-vs-offrl loop states without re-reading the JSONL.
+    """
+    rows = [
+        (o, m, d)
+        for o, m, d in zip(probe.obs, probe.masks, probe.decisions, strict=True)
+        if o is not None and m is not None
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        np.savez_compressed(path, obs=np.zeros((0, 0), np.float16))
+        print(f"obs sidecar EMPTY -> {path}")
+        return
+    obs = np.stack([o for o, _, _ in rows]).astype(np.float16)
+    masks = np.stack([m for _, m, _ in rows]).astype(bool)
+    np.savez_compressed(
+        path,
+        obs=obs,
+        mask=masks,
+        arm=np.array([d.arm for _, _, d in rows]),
+        action=np.array([d.action for _, _, d in rows], dtype=np.int64),
+        battle_tag=np.array([d.battle_tag for _, _, d in rows]),
+        turn=np.array([d.turn for _, _, d in rows], dtype=np.int64),
+        forced=np.array([d.forced for _, _, d in rows], dtype=bool),
+    )
+    print(f"obs sidecar {obs.shape} -> {path}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--n", type=int, default=20, help="Battles per arm (serial)")
@@ -601,20 +668,43 @@ def main() -> None:
     )
     ap.add_argument("--per-battle-timeout", type=float, default=120.0)
     ap.add_argument("--save-replays", action="store_true", help="Save poke-env HTML replays")
+    ap.add_argument(
+        "--opponents",
+        default="random",
+        help="Comma-separated opponent kinds per probed policy (Build-8: 'random,heuristic'"
+        " runs the pathology vs the real eval opponent too; single value keeps Build-6"
+        " arm names)",
+    )
+    ap.add_argument(
+        "--obs-out",
+        default=str(_OBS_OUT),
+        help="Build-8: gitignored npz of the per-decision obs/mask the model scored "
+        "(Phase B drift localization consumes it)",
+    )
     ap.add_argument("--out", default=str(_RESULTS))
     ap.add_argument("--decisions-out", default=str(_DECISIONS_OUT))
     ap.add_argument("--transcript-dir", default=str(_TRANSCRIPT_DIR))
     args = ap.parse_args()
 
-    arms: list[tuple[str, str, str | None]] = []
+    opponents = [o for o in (x.strip() for x in args.opponents.split(",")) if o]
+    if not opponents:
+        raise SystemExit("--opponents needs at least one kind")
+    probed: list[tuple[str, str | None]] = []
     if args.bc_checkpoint:
-        arms.append(("bc", "bc", args.bc_checkpoint))
+        probed.append(("bc", args.bc_checkpoint))
     if args.offrl_checkpoint:
-        arms.append(("offrl", "offrl", args.offrl_checkpoint))
-    if not arms:
+        probed.append(("offrl", args.offrl_checkpoint))
+    if not probed:
         raise SystemExit("pass --bc-checkpoint and/or --offrl-checkpoint")
+    # Single opponent -> keep the Build-6 bare arm name ("bc"); multiple -> suffix the
+    # opponent so each (policy, opponent) cell is a distinct arm.
+    arms: list[tuple[str, str, str | None, str]] = [
+        (kind if len(opponents) == 1 else f"{kind}_vs_{opp}", kind, ckpt, opp)
+        for kind, ckpt in probed
+        for opp in opponents
+    ]
     if args.control:
-        arms.append(("control", "random", None))
+        arms.append(("control", "random", None, "random"))
 
     teams = TeamPool.from_packed_file(args.team_pool).teams
     probe = _BehaviorProbe()
@@ -698,6 +788,7 @@ def main() -> None:
     with open(args.decisions_out, "w", encoding="utf-8") as fh:
         for d in probe.decisions:
             fh.write(json.dumps(asdict(d)) + "\n")
+    _save_obs(Path(args.obs_out), probe)
 
     print(f"\n=== Build 6 behavioral probe (n={args.n}/arm, {args.format}) ===")
     if control:

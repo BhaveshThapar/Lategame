@@ -975,17 +975,86 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     amplification dead, leaving **distribution shift confirmed by elimination + direct contrast** — the
     live states (full-kit `|request|` detail, curated-teampool teams, self-play loop states) sit off the
     human-shard manifold, and off-manifold the policy's mass collapses onto switches. Prime suspect stays
-    the *measured* Build-2/3 train≠live obs-detail gap (train item 0.30 / ability 0.47 / moves 2.78 vs
-    live 1.0/1.0/4.0 on the identity channels). Mapped next lever per the pre-registered tree =
-    **drift-side work**: usage-prior imputation to bring train own-team detail to live-FULL (the Build-3
-    "next lever"), and/or a live-state-vs-shard distance probe to localize which channels carry the
+    the *measured* Build-2/3 train≠live obs-detail gap. Mapped next lever per the pre-registered tree =
+    **drift-side work**: a live-state-vs-shard distance/causal probe to localize which channels carry the
     shift. A history/recency feature is NOT the indicated fix — there is nothing to damp in-distribution.
+    **[Corrected by Build 8]** this bullet also named "usage-prior imputation to bring train own-team
+    detail to live-FULL" as the next lever — that was **stale**: Build 4 already did exactly that (v5
+    shard verified at eval-full item/ability/move density) and it was RED. Build 8 ran the localization
+    probe instead and found the carrier is **not** own-kit detail at all but the move **pp-fraction**
+    channel (see the Build 8 entry).
   - **Lessons.** (1) The pathology lives entirely OFF-shard: no shard-side metric (BC val-acc, value-MAE,
     this gate's P) could have seen it — pair any train-side mass gate with a live behavioral probe, and
     treat "healthy in-distribution + insane live" as a drift signature, not a modeling bug. (2) When a
     gate's conditioning comes from a gitignored artifact, freeze the extraction output as committed
     fallback constants or the gate is unreproducible from a clone.
     Suite **221 pass / 5 skip**, ruff + mypy clean; `results/switch_mass_gate.json` committed.
+
+- **OU Pivot — Build 8: live-vs-shard drift localization — built + run; CARRIER ISOLATED to a single
+  encoder channel: the move `pp-fraction` (the loop is self-sustained OOD via "all my moves are at full
+  pp because I never attack").** Build 7 proved the ~0.9 live switch mass is an OOD artifact (H2) but did
+  not say *which* channels carry the drift; its recorded "next lever = usage-prior imputation" was stale
+  (Build 4 did that → RED). This build localizes the drift offline, zero training, via a **causal swap
+  bisection**, and the answer is one channel — not own-kit detail, not team composition, not the opponent.
+  - **Phase A (obs capture) — extended `behavior_probe.py`.** Wrapped the agents' `embed_battle` (like the
+    existing `masked_logits` hook) to dump the exact per-decision obs/mask the model scored to a gitignored
+    npz aligned with the decisions JSONL, and added a **held-out-eval-opponent arm** ({bc,offrl}×{random,
+    heuristic}, n=20). The pathology reproduces vs the real eval opponent too (vol-switch 0.67–0.85, runs to
+    194). Validated the Phase-A→B path offline: the captured live loop obs, re-scored through the frozen
+    checkpoints, reproduce **P ≈ 0.74** switch mass (matching the live ~0.74 vol-switch fraction) — so the
+    offline swap operates on genuinely-live states. 5,885 loop-rich obs rows over 4 arms.
+  - **Phase B (`scripts/drift_probe.py`) — the causal swap.** Pair-match each live loop state to shard rows
+    with the same (own-active, opp-active) species, then per channel group paste that group's values across
+    the manifold both ways and re-score the frozen policy: **deletion** (live base ← shard donor: does the
+    switch mass FALL to the shard's ~0.2?) and **insertion** (shard base ← live donor: does it RISE to
+    ~0.9?). ``frac_explained`` = |ΔP| / |P_live − P_shard|; the swap holds action legality fixed (hybrid
+    keeps the base mask), isolating obs *features* from *legality*. Reuses the Build-7 gate machinery
+    (`decode_actives`, `load_policy`, `score_shard`, `masked_softmax_np`, the frozen loop constants).
+    Groups from `OBS_LAYOUT`: own-active (ids vs numeric), own-bench, opp-active, opp-bench, moves, global.
+  - **Carrier = `moves`, +0.875 of the gap (bc +0.880 / offrl +0.870), every other group ≈ 0.** Both
+    directions agree on every one of the 6 checkpoints (deletion +0.89–0.97, insertion +0.75–0.87) — the
+    gold-standard remove-cause-and-effect-vanishes / add-cause-and-effect-appears pattern, not an asymmetry
+    artifact. Controls all pass: **C-self** (donor==base identity swap) err **0.0**, **C-full** (ALL-channel
+    swap must move ≥0.5 of the gap) **0.98**, **C-harness** (torch vs numpy masked softmax) **1.7e-7**,
+    floors met (2,805 matched live ≥ 300, 3,776 shard ≥ 500).
+  - **Sub-split pins it to ONE channel — `pp_fraction`, +0.875 (the whole gap); the R-CALC expected-damage
+    `score` is inert at +0.016.** Progressive within-move-block splits: `move_ids` +0.193 (identity minor),
+    `move_numeric` +0.688, `move_context` (pp+score) +0.869, then **`move_score` +0.016 vs `move_pp`
+    +0.875**. So it is *not* the move identity, *not* the damage proxy, *not* base-power/type — it is the
+    single pp-fraction channel of the active mon's move blocks.
+  - **Mechanism (triangulated 3 ways; unifies Builds 6+7).** Direct distribution: live loop states have
+    **93.6%** of moves at full pp vs the shard's **55%** — because the looping agent *never attacks*, so its
+    active mon's pp stays maxed, and "all four moves simultaneously at full pp deep in a game" is
+    off-manifold vs human data (humans attack, depleting pp). The policy has learned a sharp full-pp→switch
+    correlate; off-manifold it collapses onto switching, which keeps pp full → the loop is **self-sustaining
+    through the pp channel**. This is the concrete carrier of Build-6's "memoryless obs → absorbing 2-cycle"
+    (pp *is* the hidden "I haven't acted" variable) and Build-7's H2 OOD. Onset stratification corroborates
+    the compounding: switch mass on the **first** loop-state decision per battle is 0.305, rising to 0.752
+    later. Lesson-in-passing: the distance screen ranked `own_bench` (0.30) highest while the *causal*
+    carrier was `moves`/pp — **raw obs distance ≠ causal importance**; the swap is what discriminates.
+  - **Phase C (corpus-teampool live A/B) — DEFERRED (would test a hypothesis Phase B decisively excluded).**
+    The planned confirmatory arm tests own-team *composition* (G2). Phase B ruled that out (own_bench ≈
+    0.02) and localized to a single encoder channel; moreover `pp_fraction` depends on move *usage during
+    the game*, not the team, so a corpus team cannot change the pp mechanism. Per the project's cheap-gate-
+    first pattern (skip the expensive confirmatory when the decisive gate answers), it is deferred; the
+    replay→packed-team exporter remains a Build-9 asset candidate only if a composition angle ever
+    resurfaces.
+  - **Verdict + next lever.** The carrier is `pp_fraction` — a low-information, OOD-brittle channel. Per the
+    pre-registered tree this maps to an **encoder/robustness** fix, not more data: candidate Build-9 levers,
+    cheapest first — (1) ablate/robustify the pp channel at train (drop it, or noise/dropout-augment it, or
+    synthesize full-pp deep-game states) and re-run the behavior probe: does the loop break? (2) add an
+    explicit last-action/recency feature so "just switched, haven't attacked" is *represented* rather than
+    leaking through pp (Build 7 deprioritized this for lacking an in-distribution target; the pp mechanism
+    revives it — the loop is absorbing precisely because pp is the only trace of "I keep switching"). Each
+    is BC-gateable before any AWR/PPO spend. OU ceiling re-probe + OU PPO stay gated OFF.
+  - **Lessons.** (1) When a behavior is OOD, localize the *channel* with a causal swap before proposing a
+    fix — three prior builds (2/3/4) chased own-kit item/ability/move *detail* and one (5) chased slot
+    order; the actual carrier was a channel none of them touched. (2) Distance is a screen, not a verdict —
+    only the causal swap (with a self-swap identity control and an ALL-swap positive control) separates
+    "different" from "responsible." Suite **244 pass** (+23: drift-probe pure logic + obs-capture),
+    ruff + `mypy lategame` clean (the gate scripts carry the same 2 pre-existing "assign to a type"
+    monkeypatch notes as Build 6); `results/drift_probe.json` + `results/behavior_probe8.json` committed
+    (obs/decisions/transcripts gitignored).
 
 ---
 
