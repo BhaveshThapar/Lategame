@@ -20,9 +20,10 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset, random_split
 
 from lategame.data.dataset import BCDataset
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION
 from lategame.model.factory import build_model, model_metadata
 from lategame.model.policy import BCPolicy, masked_logits, policy_logits
+from lategame.train.augment import augment_pp_full
 
 BC_POLICY = "bc_policy"  # model_type sentinel for the flat MLP (factory has no BCPolicy).
 
@@ -53,6 +54,11 @@ class TrainConfig:
     id_embed_dim: int = 32
     id_embed_init: str = "random"  # entity_transformer only: "random" | "prior" (dex warm-start)
     max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
+    # Build 10 (plan.md 13): train-time pp augmentation. On this fraction of attack-labeled,
+    # deep-turn rows, force the active mon's pp channels to full -- making "full pp deep in a
+    # game -> attack" in-distribution. 0.0 disables it (train-time only; validation stays clean).
+    pp_aug_frac: float = 0.0
+    pp_aug_turn_threshold: float = 0.15  # normalized turn (~turn 15) above which a row is "deep"
 
 
 # Fixed seed for the data-subset permutation -- deliberately independent of TrainConfig.seed
@@ -94,6 +100,7 @@ def _run_epoch(
     loader: DataLoader,
     device: torch.device,
     optimizer: torch.optim.Optimizer | None,
+    config: TrainConfig,
 ) -> tuple[float, float]:
     """Returns (mean loss, accuracy). Trains when ``optimizer`` is given, else evals."""
     training = optimizer is not None
@@ -104,6 +111,14 @@ def _run_epoch(
     with torch.set_grad_enabled(training):
         for obs, action, mask in loader:
             obs, action, mask = obs.to(device), action.to(device), mask.to(device)
+            if training and config.pp_aug_frac > 0.0:
+                obs = augment_pp_full(
+                    obs,
+                    action,
+                    OBS_LAYOUT,
+                    frac=config.pp_aug_frac,
+                    turn_threshold=config.pp_aug_turn_threshold,
+                )
             logits = masked_logits(policy_logits(model(obs)), mask)
             loss = F.cross_entropy(logits, action)
             if optimizer is not None:
@@ -138,8 +153,8 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     best_val = float("inf")
     best_metrics: dict = {}
     for epoch in range(1, config.epochs + 1):
-        train_loss, train_acc = _run_epoch(model, train_loader, device, optimizer)
-        val_loss, val_acc = _run_epoch(model, val_loader, device, None)
+        train_loss, train_acc = _run_epoch(model, train_loader, device, optimizer, config)
+        val_loss, val_acc = _run_epoch(model, val_loader, device, None, config)
         print(
             f"epoch {epoch:>3}/{config.epochs}  "
             f"train loss {train_loss:.4f} acc {train_acc:.3f}  "
@@ -178,6 +193,7 @@ def _save_checkpoint(
             "obs_version": OBS_VERSION,
             "battle_format": battle_format,
             "metrics": metrics,
+            "pp_aug": {"frac": config.pp_aug_frac, "turn_threshold": config.pp_aug_turn_threshold},
             **meta,
         },
         out_path,

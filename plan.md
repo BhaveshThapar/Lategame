@@ -1102,6 +1102,44 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     `results/first_turn_gate9b.json` + `results/behavior_probe9b.json` committed (obs/decisions/transcripts
     gitignored).
 
+- **OU Pivot — Build 10: robustify pp by SYNTHESIZING full-pp deep-turn states — built + run; BC PASS but
+  the loop PERSISTS, and the diagnostic proves the fix is region-local (can't reach the loop).** Build 9's
+  pincer left "robustify pp" as the only branch, with two pre-registered mechanisms (noise/dropout, or
+  synthesize full-pp deep-game states); this build runs **synthesize**. New train-time augmentation
+  `lategame/train/augment.py::augment_pp_full` (+`TrainConfig.pp_aug_frac/pp_aug_turn_threshold`, CLI
+  `--pp-aug-frac`, +8 unit tests): on a random `frac` of **attack-labeled** (`action ≥ team_size`),
+  **deep-turn** (normalized turn ≥ threshold) rows, force the active mon's pp channels to full (present-guarded,
+  offsets from `OBS_LAYOUT`), so "full pp deep in a game → attack" is in-distribution. Applied **train-time
+  only** (in `_run_epoch`, gated on `optimizer is not None`), so validation stays clean **and the encoder +
+  shards are unchanged — no re-ingest, no `OBS_VERSION` bump** (HEAD stays v5/761).
+  - **BC gate — PASS.** 3-seed ET+prior on `data/gen9ou_v7_bc.npz`, frac 0.5 / turn ≥ 0.15: val-acc
+    **[0.648, 0.654, 0.658], mean 0.653 ≥ 0.63** — imitation preserved (matches the first_turn 0.654).
+    `results/bc_gate10.json`.
+  - **Live probe — LOOP PERSISTS.** `bc_v10_s0` vs random+heuristic (n=20): both arms `c_pathological`
+    (max-switch-run **108 / 989**, ping-pong 0.62/0.88, win 0.0/0.0) — unbroken vs Build 9 (110/77).
+    `results/behavior_probe10.json`.
+  - **Why (pp-reliance diagnostic, `results/pp_reliance_diag10.json`).** Self-contained pp-neutralization
+    (draw in-distribution pp from the v7 BC shard pool, `frac_full` 0.50): on the **identical** frozen v7 loop
+    states, v10 baseline switch mass **0.597 ≈ v7 0.575** and v10 pp-**ΔP 0.390 ≈ v7 0.397** — the augmentation
+    did **not** reduce pp-reliance at all. The synthesized examples are *real mid-game attack states with pp
+    maxed* → they populate the **attack-context** region, not the **loop (repeated-switch) context** region;
+    the policy fits both "full pp + attack ctx → attack" and "full pp + loop ctx → switch" at once because pp
+    is not the sole discriminator. **Region-local label augmentation of real states cannot reach the loop
+    corner — increasing `frac` will not help.**
+  - **Verdict + next lever.** Synthesize is **empirically ruled out**. The remaining pre-registered candidate
+    is **Build 11 (BC-gateable): noise/dropout on the pp channel** — a *global* regularizer that blunts the
+    `exactly-1.0 → switch` extrapolation in **all** contexts (including the unseen loop region), which
+    region-local synthesis provably cannot. The `augment.py` hook + gate harness generalize directly (add a
+    pp-noise transform beside `augment_pp_full`). OU ceiling re-probe + OU PPO stay gated OFF.
+  - **Lessons.** (1) A train-time data augmentation of **real** states only robustifies the regions those
+    states occupy; a failure mode that lives in an *unreachable* region of feature space (the loop context)
+    can't be fixed by relabeling real examples — you need a mechanism that acts on the feature *globally*
+    (noise/dropout) or that can synthesize the failure region itself. (2) Passing the BC gate proves the
+    augmentation didn't break imitation, but says nothing about the loop — the live probe + the ΔP diagnostic
+    are what adjudicate, and here they agree the mechanism is untouched. Suite **253 pass** (+8 augment
+    tests), ruff + `mypy lategame` clean; `results/bc_gate10.json` + `results/behavior_probe10.json` +
+    `results/pp_reliance_diag10.json` committed (obs/decisions/transcripts + checkpoints gitignored).
+
 ---
 
 ## 14. Risks & mitigations

@@ -1,0 +1,31 @@
+{
+  "note": "dP = baseline - pp_neutralized. Large dP => policy still keys on exactly-full pp.",
+  "shard_pp_pool_frac_full": 0.4961,
+  "v7_s0_control_on_v7_states": {
+    "policy": "bc_v7_s0",
+    "sidecar": "/Users/bhavesh/Desktop/Projects/Lategame/results/behavior_probe_obs_v7.npz",
+    "loop_rows": 1620,
+    "frac_full_live": 0.8611,
+    "baseline_switch_mass": 0.5747,
+    "pp_neutralized_switch_mass": 0.1778,
+    "dP": 0.3969
+  },
+  "v10_s0_on_v10_states": {
+    "policy": "bc_v10_s0",
+    "sidecar": "/Users/bhavesh/Desktop/Projects/Lategame/results/behavior_probe_obs_v10.npz",
+    "loop_rows": 2554,
+    "frac_full_live": 0.9404,
+    "baseline_switch_mass": 0.8285,
+    "pp_neutralized_switch_mass": 0.3079,
+    "dP": 0.5206
+  },
+  "v10_s0_on_v7_states": {
+    "policy": "bc_v10_s0",
+    "sidecar": "/Users/bhavesh/Desktop/Projects/Lategame/results/behavior_probe_obs_v7.npz",
+    "loop_rows": 1620,
+    "frac_full_live": 0.8611,
+    "baseline_switch_mass": 0.5965,
+    "pp_neutralized_switch_mass": 0.2062,
+    "dP": 0.3903
+  }
+}

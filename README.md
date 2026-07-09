@@ -214,6 +214,22 @@ lever (Build 10, BC-gateable):** robustify pp via train-time augmentation (noise
 full-pp deep-game states). Suite **245 pass**; `results/bc_gate9a.json`, `results/first_turn_gate9b.json`,
 `results/behavior_probe9b.json`.
 
+**OU pivot Build 10 — synthesize full-pp deep-turn states: BC PASS but the loop PERSISTS; the fix is
+region-local and cannot reach the loop.** New train-time augmentation (`lategame/train/augment.py`,
+`--pp-aug-frac`): on a fraction of attack-labeled, deep-turn rows, force the active mon's pp channels to
+full, making "full pp deep in a game → attack" in-distribution — a train-time-only transform, so the
+encoder/shards are **unchanged** (no `OBS_VERSION` bump). 3-seed BC (frac 0.5, turn ≥ 0.15) val-acc
+**0.653 ≥ 0.63** (imitation preserved), but the live probe stays `c_pathological` on both arms (max-switch-run
+108/989, win 0.0). The pp-reliance diagnostic explains it: on the **identical** v7 loop states, v10's pp-ΔP is
+**0.390 — unchanged from v7's 0.397** (neutralizing pp still collapses switch mass 0.597 → 0.206). The
+synthesized examples are *real mid-game attack states with pp maxed* — a different region than the
+repeated-switch loop context, so the policy keeps both "full pp + attack ctx → attack" and "full pp + loop
+ctx → switch"; region-local label augmentation can't touch the loop corner (increasing frac won't help).
+**Next lever (Build 11, BC-gateable):** the *other* pre-registered candidate — **noise/dropout on the pp
+channel** — a global regularizer that blunts the exactly-1.0 → switch extrapolation in all contexts, including
+the unseen loop region. Suite **253 pass**; `results/bc_gate10.json`, `results/behavior_probe10.json`,
+`results/pp_reliance_diag10.json`.
+
 ## Setup
 
 ```bash
