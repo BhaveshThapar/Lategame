@@ -118,8 +118,9 @@ def test_embed_battle_is_deterministic():
     np.testing.assert_array_equal(embed_battle(battle), embed_battle(battle))
 
 
-def test_obs_version_v3_marks_canonical_move_slots():
-    assert encoder.OBS_VERSION.startswith("v3-")  # bump rejects v2-era shards/checkpoints
+def test_obs_version_v4_marks_pp_ablation():
+    # Build 9 Gate A bump: rejects v3-era shards/checkpoints.
+    assert encoder.OBS_VERSION.startswith("v4-")
 
 
 def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
@@ -143,3 +144,22 @@ def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
     v = vocab.load_vocab()
     assert reveal[ms + md - 1] == v.index("moves", "surf")  # canonical slot 0
     assert reveal[ms + md + md - 1] == v.index("moves", "voltswitch")  # canonical slot 1
+
+
+def test_move_pp_channel_is_ablated_to_zero():
+    """Build 9 Gate A: the pp_fraction channel is a constant 0 for every present move."""
+    from poke_env.battle import Move
+
+    from lategame.features.encoder import OBS_LAYOUT
+
+    battle = FakeBattle()
+    mon = FakePokemon(types=[PokemonType.ELECTRIC], species="pikachu")
+    mon.moves = {mid: Move(mid, gen=9) for mid in ("voltswitch", "surf")}
+    battle.team = {"p1: Pikachu": mon}
+    battle.active_pokemon = mon  # no opponent: score_move handles a None defender
+    obs = embed_battle(battle)
+    ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
+    pp_idx = 4  # scalar order: present, base_power, accuracy, priority, pp_fraction, score
+    assert obs[ms] == 1.0  # canonical slot 0 is a real (present) move, not padding
+    for j in range(OBS_LAYOUT.n_moves):
+        assert obs[ms + j * md + pp_idx] == 0.0  # pp ablated for present + padded slots alike
