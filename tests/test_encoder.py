@@ -24,13 +24,14 @@ from lategame.features.encoder import (
 class FakePokemon:
     def __init__(
         self, types, hp=1.0, active=True, fainted=False, status=None,
-        species=None, item=None, ability=None,
+        species=None, item=None, ability=None, first_turn=False,
     ):
         self.types = types
         self.current_hp_fraction = hp
         self.active = active
         self.fainted = fainted
         self.status = status
+        self.first_turn = first_turn
         self.species = species  # id-str or None (-> UNK)
         self.item = item
         self.ability = ability
@@ -118,9 +119,9 @@ def test_embed_battle_is_deterministic():
     np.testing.assert_array_equal(embed_battle(battle), embed_battle(battle))
 
 
-def test_obs_version_v4_marks_pp_ablation():
-    # Build 9 Gate A bump: rejects v3-era shards/checkpoints.
-    assert encoder.OBS_VERSION.startswith("v4-")
+def test_obs_version_v5_marks_first_turn_feature():
+    # Build 9 Gate B bump: rejects v4-era shards/checkpoints.
+    assert encoder.OBS_VERSION.startswith("v5-")
 
 
 def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
@@ -146,20 +147,18 @@ def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
     assert reveal[ms + md + md - 1] == v.index("moves", "voltswitch")  # canonical slot 1
 
 
-def test_move_pp_channel_is_ablated_to_zero():
-    """Build 9 Gate A: the pp_fraction channel is a constant 0 for every present move."""
-    from poke_env.battle import Move
-
-    from lategame.features.encoder import OBS_LAYOUT
+def test_global_encodes_own_active_first_turn():
+    """Build 9 Gate B: the last global scalar is own active.first_turn (recency flag)."""
+    ft_idx = OBS_DIM - 1  # global block is last; first_turn is the last of the 5 global scalars
 
     battle = FakeBattle()
-    mon = FakePokemon(types=[PokemonType.ELECTRIC], species="pikachu")
-    mon.moves = {mid: Move(mid, gen=9) for mid in ("voltswitch", "surf")}
-    battle.team = {"p1: Pikachu": mon}
-    battle.active_pokemon = mon  # no opponent: score_move handles a None defender
-    obs = embed_battle(battle)
-    ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
-    pp_idx = 4  # scalar order: present, base_power, accuracy, priority, pp_fraction, score
-    assert obs[ms] == 1.0  # canonical slot 0 is a real (present) move, not padding
-    for j in range(OBS_LAYOUT.n_moves):
-        assert obs[ms + j * md + pp_idx] == 0.0  # pp ablated for present + padded slots alike
+    just_switched = FakePokemon(types=[PokemonType.ELECTRIC], first_turn=True)
+    battle.team = {"p1: Pikachu": just_switched}
+    battle.active_pokemon = just_switched
+    assert embed_battle(battle)[ft_idx] == 1.0
+
+    battle.active_pokemon = FakePokemon(types=[PokemonType.ELECTRIC], first_turn=False)
+    assert embed_battle(battle)[ft_idx] == 0.0
+
+    # No active mon (team preview / forced switch) -> 0.0, no AttributeError.
+    assert embed_battle(FakeBattle())[ft_idx] == 0.0

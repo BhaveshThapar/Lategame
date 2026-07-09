@@ -1,0 +1,434 @@
+{
+  "n": 20,
+  "format": "gen9ou",
+  "thresholds": {
+    "fallback_major": 0.2,
+    "fallback_minor": 0.02,
+    "max_rejection_rate": 0.02,
+    "min_order_match": 0.98,
+    "max_switch_fraction": 0.5,
+    "max_switch_run": 6,
+    "max_ping_pong": 0.25,
+    "max_top_action_share": 0.6,
+    "min_entropy_bits": 1.5,
+    "broken_win_rate": 0.2,
+    "min_decisions": 200,
+    "control_band": [
+      0.3,
+      0.7
+    ]
+  },
+  "train_baseline": {
+    "n": 61723.0,
+    "switch_fraction": 0.18359444615459392,
+    "entropy_bits": 2.971887374264122,
+    "top_action_share": 0.21361567000955883
+  },
+  "control": {
+    "n_decisions": 0,
+    "n_raw_calls": 0,
+    "n_battles": 20,
+    "n_finished": 20,
+    "win_rate": 0.5,
+    "mean_turns": 80.25,
+    "fallback_rate": 0.0,
+    "rejection_rate": 0.0,
+    "n_invalid": 0,
+    "n_unavailable": 0,
+    "all_false_masks": 0,
+    "switch_fraction": 0.0,
+    "voluntary_switch_fraction": 0.0,
+    "max_switch_run": 0,
+    "ping_pong_rate": 0.0,
+    "top_action_share": 0.0,
+    "entropy_bits": 0.0,
+    "mean_top1_prob": 0.0,
+    "action_hist": {}
+  },
+  "arms": {
+    "bc_vs_random": {
+      "checkpoint": "checkpoints/bc_gen9ou_v7_s0.pt",
+      "timed_out": false,
+      "metrics": {
+        "n_decisions": 1808,
+        "n_raw_calls": 1808,
+        "n_battles": 20,
+        "n_finished": 20,
+        "win_rate": 0.05,
+        "mean_turns": 84.3,
+        "fallback_rate": 0.0,
+        "rejection_rate": 0.0,
+        "n_invalid": 0,
+        "n_unavailable": 0,
+        "all_false_masks": 0,
+        "switch_fraction": 0.519358407079646,
+        "voluntary_switch_fraction": 0.4845788849347568,
+        "max_switch_run": 110,
+        "ping_pong_rate": 0.7270501835985312,
+        "top_action_share": 0.2411504424778761,
+        "entropy_bits": 3.168640158954388,
+        "mean_top1_prob": 0.6480640887109711,
+        "action_hist": {
+          "switch0": 107,
+          "switch1": 109,
+          "switch2": 134,
+          "switch3": 240,
+          "switch4": 206,
+          "switch5": 143,
+          "move0": 43,
+          "move1": 134,
+          "move2": 436,
+          "move3": 236,
+          "tera0": 2,
+          "tera2": 7,
+          "tera3": 11
+        }
+      },
+      "order": {
+        "n_battles_checked": 20,
+        "n_packed_missing": 0,
+        "match_rate": 1.0,
+        "stable_rate": 1.0,
+        "mismatched_battles": [],
+        "mismatch_examples": [],
+        "unstable_battles": []
+      },
+      "classification": {
+        "causes": {
+          "a_decode_mask": false,
+          "b_team_order": false,
+          "c_pathological": true,
+          "d_drift": false
+        },
+        "c_flags": {
+          "switch_fraction": false,
+          "switch_run": true,
+          "ping_pong": true,
+          "top_action_share": false,
+          "entropy": false
+        },
+        "switch_fraction_bar": 0.5,
+        "fallback_minor": false,
+        "primary_cause": "c_pathological"
+      },
+      "battles": [
+        {
+          "battle": "battle-gen9ou-102147",
+          "won": false,
+          "turns": 85,
+          "preview": "/team 542631"
+        },
+        {
+          "battle": "battle-gen9ou-102148",
+          "won": false,
+          "turns": 71,
+          "preview": "/team 134526"
+        },
+        {
+          "battle": "battle-gen9ou-102149",
+          "won": false,
+          "turns": 85,
+          "preview": "/team 641253"
+        },
+        {
+          "battle": "battle-gen9ou-102150",
+          "won": false,
+          "turns": 94,
+          "preview": "/team 642153"
+        },
+        {
+          "battle": "battle-gen9ou-102151",
+          "won": false,
+          "turns": 44,
+          "preview": "/team 465213"
+        },
+        {
+          "battle": "battle-gen9ou-102152",
+          "won": false,
+          "turns": 161,
+          "preview": "/team 563412"
+        },
+        {
+          "battle": "battle-gen9ou-102153",
+          "won": false,
+          "turns": 83,
+          "preview": "/team 231654"
+        },
+        {
+          "battle": "battle-gen9ou-102154",
+          "won": false,
+          "turns": 63,
+          "preview": "/team 146352"
+        },
+        {
+          "battle": "battle-gen9ou-102155",
+          "won": false,
+          "turns": 107,
+          "preview": "/team 361542"
+        },
+        {
+          "battle": "battle-gen9ou-102156",
+          "won": false,
+          "turns": 76,
+          "preview": "/team 362451"
+        },
+        {
+          "battle": "battle-gen9ou-102157",
+          "won": false,
+          "turns": 67,
+          "preview": "/team 325614"
+        },
+        {
+          "battle": "battle-gen9ou-102158",
+          "won": false,
+          "turns": 46,
+          "preview": "/team 352146"
+        },
+        {
+          "battle": "battle-gen9ou-102159",
+          "won": false,
+          "turns": 71,
+          "preview": "/team 514263"
+        },
+        {
+          "battle": "battle-gen9ou-102160",
+          "won": false,
+          "turns": 70,
+          "preview": "/team 261453"
+        },
+        {
+          "battle": "battle-gen9ou-102161",
+          "won": true,
+          "turns": 126,
+          "preview": "/team 325461"
+        },
+        {
+          "battle": "battle-gen9ou-102162",
+          "won": false,
+          "turns": 89,
+          "preview": "/team 645132"
+        },
+        {
+          "battle": "battle-gen9ou-102163",
+          "won": false,
+          "turns": 116,
+          "preview": "/team 561243"
+        },
+        {
+          "battle": "battle-gen9ou-102164",
+          "won": false,
+          "turns": 56,
+          "preview": "/team 341625"
+        },
+        {
+          "battle": "battle-gen9ou-102165",
+          "won": false,
+          "turns": 81,
+          "preview": "/team 451632"
+        },
+        {
+          "battle": "battle-gen9ou-102166",
+          "won": false,
+          "turns": 95,
+          "preview": "/team 364251"
+        }
+      ]
+    },
+    "bc_vs_heuristic": {
+      "checkpoint": "checkpoints/bc_gen9ou_v7_s0.pt",
+      "timed_out": false,
+      "metrics": {
+        "n_decisions": 940,
+        "n_raw_calls": 940,
+        "n_battles": 20,
+        "n_finished": 20,
+        "win_rate": 0.0,
+        "mean_turns": 41.2,
+        "fallback_rate": 0.0,
+        "rejection_rate": 0.0,
+        "n_invalid": 0,
+        "n_unavailable": 0,
+        "all_false_masks": 0,
+        "switch_fraction": 0.6808510638297872,
+        "voluntary_switch_fraction": 0.6359223300970874,
+        "max_switch_run": 77,
+        "ping_pong_rate": 0.648854961832061,
+        "top_action_share": 0.16489361702127658,
+        "entropy_bits": 3.2508775799822867,
+        "mean_top1_prob": 0.593883700732221,
+        "action_hist": {
+          "switch0": 110,
+          "switch1": 50,
+          "switch2": 155,
+          "switch3": 117,
+          "switch4": 123,
+          "switch5": 85,
+          "move0": 9,
+          "move1": 56,
+          "move2": 105,
+          "move3": 110,
+          "tera0": 1,
+          "tera2": 5,
+          "tera3": 14
+        }
+      },
+      "order": {
+        "n_battles_checked": 20,
+        "n_packed_missing": 0,
+        "match_rate": 1.0,
+        "stable_rate": 1.0,
+        "mismatched_battles": [],
+        "mismatch_examples": [],
+        "unstable_battles": []
+      },
+      "classification": {
+        "causes": {
+          "a_decode_mask": false,
+          "b_team_order": false,
+          "c_pathological": true,
+          "d_drift": false
+        },
+        "c_flags": {
+          "switch_fraction": true,
+          "switch_run": true,
+          "ping_pong": true,
+          "top_action_share": false,
+          "entropy": false
+        },
+        "switch_fraction_bar": 0.5,
+        "fallback_minor": false,
+        "primary_cause": "c_pathological"
+      },
+      "battles": [
+        {
+          "battle": "battle-gen9ou-102167",
+          "won": false,
+          "turns": 41,
+          "preview": "/team 635142"
+        },
+        {
+          "battle": "battle-gen9ou-102168",
+          "won": false,
+          "turns": 43,
+          "preview": "/team 652314"
+        },
+        {
+          "battle": "battle-gen9ou-102169",
+          "won": false,
+          "turns": 23,
+          "preview": "/team 324516"
+        },
+        {
+          "battle": "battle-gen9ou-102170",
+          "won": false,
+          "turns": 42,
+          "preview": "/team 346152"
+        },
+        {
+          "battle": "battle-gen9ou-102171",
+          "won": false,
+          "turns": 25,
+          "preview": "/team 241635"
+        },
+        {
+          "battle": "battle-gen9ou-102172",
+          "won": false,
+          "turns": 67,
+          "preview": "/team 546213"
+        },
+        {
+          "battle": "battle-gen9ou-102173",
+          "won": false,
+          "turns": 34,
+          "preview": "/team 235641"
+        },
+        {
+          "battle": "battle-gen9ou-102174",
+          "won": false,
+          "turns": 32,
+          "preview": "/team 416523"
+        },
+        {
+          "battle": "battle-gen9ou-102175",
+          "won": false,
+          "turns": 48,
+          "preview": "/team 641532"
+        },
+        {
+          "battle": "battle-gen9ou-102176",
+          "won": false,
+          "turns": 34,
+          "preview": "/team 416235"
+        },
+        {
+          "battle": "battle-gen9ou-102177",
+          "won": false,
+          "turns": 78,
+          "preview": "/team 134256"
+        },
+        {
+          "battle": "battle-gen9ou-102178",
+          "won": false,
+          "turns": 36,
+          "preview": "/team 425361"
+        },
+        {
+          "battle": "battle-gen9ou-102179",
+          "won": false,
+          "turns": 27,
+          "preview": "/team 514236"
+        },
+        {
+          "battle": "battle-gen9ou-102180",
+          "won": false,
+          "turns": 42,
+          "preview": "/team 615234"
+        },
+        {
+          "battle": "battle-gen9ou-102181",
+          "won": false,
+          "turns": 54,
+          "preview": "/team 416325"
+        },
+        {
+          "battle": "battle-gen9ou-102182",
+          "won": false,
+          "turns": 102,
+          "preview": "/team 651324"
+        },
+        {
+          "battle": "battle-gen9ou-102183",
+          "won": false,
+          "turns": 12,
+          "preview": "/team 321465"
+        },
+        {
+          "battle": "battle-gen9ou-102184",
+          "won": false,
+          "turns": 37,
+          "preview": "/team 236541"
+        },
+        {
+          "battle": "battle-gen9ou-102185",
+          "won": false,
+          "turns": 17,
+          "preview": "/team 532416"
+        },
+        {
+          "battle": "battle-gen9ou-102186",
+          "won": false,
+          "turns": 30,
+          "preview": "/team 531264"
+        }
+      ]
+    }
+  },
+  "checks": {
+    "sample_ok_bc_vs_random": true,
+    "sample_ok_bc_vs_heuristic": true,
+    "control_ok": true
+  },
+  "verdict": "bc_vs_random=c_pathological; bc_vs_heuristic=c_pathological",
+  "note_a": "a high fallback rate alone predicts ~random (~0.5 vs random), not the observed ~0.05 -- worse-than-random needs a co-reported cause",
+  "note_b": "order match clears only the LIVE half of candidate (b); train-side |poke| order is a separate build"
+}

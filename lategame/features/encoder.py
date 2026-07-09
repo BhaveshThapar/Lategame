@@ -49,9 +49,11 @@ from lategame.features.action_space import canonical_moves
 # shards/checkpoints also rejects an obs encoded against a different identity vocab.
 # v3 = Build-5 canonical move-slot order: slot semantics changed, so every v2-era shard
 # and checkpoint must be rejected rather than silently mix orderings.
-# v4 = Build-9 Gate A: the move pp_fraction channel is ablated to a constant (see
-# _encode_move) -- channel *values* change, so v3-era shards/checkpoints must be rejected.
-OBS_VERSION = f"v4-{vocab.vocab_version()}"
+# v4 = Build-9 Gate A (superseded): pp_fraction ablated to a constant -> BC RED (pp is
+# load-bearing for imitation), so pp is kept.
+# v5 = Build-9 Gate B: adds an explicit own-active first_turn recency channel to the global
+# block (pp retained) -- the global block widens, so v4-era shards/checkpoints must be rejected.
+OBS_VERSION = f"v5-{vocab.vocab_version()}"
 
 # Stable index maps. Enum iteration order is fixed (aliases excluded), so these
 # define a deterministic, versioned feature layout.
@@ -83,8 +85,8 @@ _SCORE_SCALE = 300.0
 # Scalar (non-one-hot) feature counts per block, named so the dims can't drift
 # from the arrays built below.
 _POKEMON_SCALARS = 4  # present, active, fainted, hp_fraction
-_MOVE_SCALARS = 6  # present, base_power, accuracy, priority, pp_fraction (ablated->0), score
-_GLOBAL_SCALARS = 4  # turn, force_switch, can_tera, maybe_trapped
+_MOVE_SCALARS = 6  # present, base_power, accuracy, priority, pp_fraction, score
+_GLOBAL_SCALARS = 5  # turn, force_switch, can_tera, maybe_trapped, own_first_turn
 
 # Identity ID channels (R-ENCODE): trailing integer channels per entity block, each a
 # ``vocab`` index (0 = none/unknown) the model looks up in a learned embedding table.
@@ -220,6 +222,7 @@ def _encode_move(
     if move is None:
         return np.zeros(_MOVE_DIM, dtype=np.float32)
 
+    max_pp = move.max_pp or 1
     score = score_move(move, attacker, defender) if attacker is not None else 0.0
     scalars = np.array(
         [
@@ -227,13 +230,7 @@ def _encode_move(
             (move.base_power or 0) / _BP_SCALE,
             normalize_accuracy(move.accuracy),
             move.priority / _PRIORITY_SCALE,
-            # pp_fraction ABLATED to a constant (Build 9 Gate A). Build 8 isolated this channel
-            # as the sole carrier of the live switch-loop: a looping agent never attacks, so all
-            # its moves stay at full pp -- "all four at full pp deep in a game" is off-manifold,
-            # the policy read it as a switch cue, and the loop self-sustained through pp. Zeroing
-            # the slot (dim/layout unchanged) removes that information; re-ingest under
-            # OBS_VERSION v4 bakes the constant into the shards so train and live agree.
-            0.0,
+            move.current_pp / max_pp,
             score / _SCORE_SCALE,
         ],
         dtype=np.float32,
@@ -260,12 +257,20 @@ def _encode_global(battle: AbstractBattle) -> np.ndarray:
     fields = _presence(battle.fields, _FIELDS)
     own_side = _presence(battle.side_conditions, _SIDE_CONDITIONS)
     opp_side = _presence(battle.opponent_side_conditions, _SIDE_CONDITIONS)
+    active = battle.active_pokemon
     flags = np.array(
         [
             battle.turn / _TURN_SCALE,
             float(battle.force_switch),
             float(bool(battle.can_tera)),
             float(battle.maybe_trapped),
+            # Own active's first turn since switch-in (Build 9 Gate B): an explicit,
+            # in-distribution recency signal for "just switched, haven't acted". Build 8 showed
+            # the switch loop leaked this through pp (all moves at full pp == never attacked, an
+            # off-manifold cue); representing "just switched" honestly lets the policy read it
+            # without that pp artifact. Driven by the same protocol messages offline and live,
+            # so -- unlike a game-depth counter -- it reconstructs identically on both sides.
+            float(active.first_turn) if active is not None else 0.0,
         ],
         dtype=np.float32,
     )
