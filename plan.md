@@ -1183,6 +1183,41 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     **266 pass** (+13 augment tests), ruff + `mypy` clean; `results/bc_gate11_screen.json` + `bc_gate11.json` +
     `behavior_probe_v11.json` committed (obs sidecar + checkpoints gitignored).
 
+- **OU Pivot — Build 12: resample p 0.25 relaxed-bar probe + close `b_team_order` (candidate c, decided) —
+  FRONTIER-CONFIRMED, loop still not broken; the residual ping-pong is pp-INDEPENDENT → pivot off pp.**
+  - **Cheap, runs-only** (no code, no `OBS_VERSION` bump, no re-ingest): the Build-11 CLI already exposes
+    `--pp-resample-frac`, and `pp_reliance_diag.py` + `behavior_probe.py` are committed. Mirrored the Build-11
+    confirm protocol exactly (`entity_transformer`, d_model 128, `id_embed_init prior`, 20 epochs), swapping
+    resample `0.10→0.25` and `v11→v12`. Pre-registered a **relaxed bar** (judge on the live loop; BC must stay
+    ≥ 0.625 within noise, void < 0.62) because the question is whether the loop or BC is the binding constraint.
+  - **BC — MARGINAL.** 3-seed val-acc **[0.6298, 0.6218, 0.6191], mean 0.6236** — misses the 0.63 hard bar and
+    sits ~within seed noise (std ~0.005) just below the 0.625 relaxed line, above the 0.62 void line. vs p 0.10's
+    0.644, p 0.25 costs **~2pts val-acc**: the imitation frontier is real and monotone.
+  - **pp-reliance — continues to drop** (offline, identical frozen v7 states, so directly comparable): ΔP **0.122**
+    (v11 0.187 / v10 0.369 / v7 0.377) and baseline switch mass **0.343** (v11 0.404 / v7 0.575). More resample →
+    lower pp-reliance, as designed.
+  - **Live probe (n=20, both arms) — LOOP SHORTER BUT NOT BROKEN.** `bc_vs_heuristic` still **`c_pathological`**:
+    max-switch-run **21** (v11 29), voluntary-switch 0.221 (v11 0.335), but **ping-pong 0.55 ≈ v11 0.52** and
+    **win 0.0**. `bc_vs_random` flips **back to `c_pathological`** (v11 was `b_team_order`) with max-switch-run
+    **14** (v11 73) and **win 0.9** (v11 0.3). The pp-CARRIED long-run component keeps shrinking (depth down,
+    random win up), but the short **ping-pong (A→B→A) is pp-INDEPENDENT** — its rate does not move even as ΔP
+    halves again — and it still costs every game vs the competent heuristic.
+  - **`b_team_order` — RESOLVED as noise, not a decode/packing bug (candidate b closed, no separate build).**
+    v11's flag came from `stable_rate` 0.95 (**1/20** battles unstable) with `match_rate` already a perfect 1.0
+    (no packed-vs-live mismatch); v12 shows `match_rate` 1.0 **and** `stable_rate` 1.0 on **both** arms — the
+    single-battle instability did not reproduce. Team order is set pre-decision so BC weights can't cause it.
+  - **Verdict + next lever. Pre-registered Outcome 2 (resample capping on the core loop), refined:** halving
+    pp-reliance again (0.187→0.122) still loses 100% vs the heuristic with a flat ping-pong → **pushing pp-reliance
+    lower — more resample OR the Build-13 encoder pp transform — will not break the ping-pong, because it is not
+    pp-carried.** So **DEPRIORITIZE the encoder pp transform as a loop fix** (it would only shrink the
+    already-shrinking pp-carried runs at more BC cost) and **PIVOT to the pp-independent ping-pong**: (a) localize
+    its carrier the way Build 8 localized pp (drift/counterfactual on the 2-cycle states), or (b) a decision-time
+    anti-repetition intervention / RL fine-tune with a loop penalty (imitation structurally cannot fix an OOD
+    2-cycle absent from winning human play). BC 0.6236 rules out shipping p 0.25 as a milestone — **p 0.10 (v11)
+    stays the best BC-passing resample point.** OU ceiling re-probe + OU PPO stay gated OFF. Suite unchanged
+    (no code touched); `results/bc_gate12.json` + `pp_reliance_diag12.json` + `behavior_probe_v12.json` committed
+    (obs sidecar + checkpoints gitignored).
+
 ---
 
 ## 14. Risks & mitigations

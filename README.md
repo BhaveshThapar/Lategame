@@ -249,6 +249,25 @@ confirmed the causal carrier and a global regularizer does move the loop, but th
 need an `OBS_VERSION` bump) or a hybrid targeted+global resample. Suite **266 pass**; `results/bc_gate11.json`,
 `results/bc_gate11_screen.json`, `results/behavior_probe_v11.json`.
 
+**OU pivot Build 12 — resample p 0.25 relaxed-bar probe + close `b_team_order`: FRONTIER-CONFIRMED, the
+loop is still not broken and the residual ping-pong is pp-INDEPENDENT → pivot off pp.** The cheap, decisive
+follow-up to Build 11 (runs-only: no code, no `OBS_VERSION` bump, no re-ingest). Pushed resample from the
+BC-passing p 0.10 to **p 0.25** (3 seeds, same arch) with a pre-registered relaxed bar, to test whether the
+loop or BC is the binding constraint. **BC — marginal:** 3-seed val-acc **0.6236** (misses 0.63, ~within noise
+below the 0.625 relaxed line; ~2pts under p 0.10's 0.644 — the imitation frontier is real). **pp-reliance keeps
+dropping** (offline, identical v7 states): ΔP **0.122** (v11 0.187 / v7 0.377), baseline switch mass 0.343.
+**Live (n=20):** the loop is **shorter but not broken** — `bc_vs_heuristic` stays `c_pathological` (max-switch-run
+21 vs v11 29, but **ping-pong 0.55 ≈ v11 0.52**, win 0.0); `bc_vs_random` flips back to `c_pathological` with
+max-switch-run 14 (v11 73) and **win 0.9** (v11 0.3). The pp-carried long-run component keeps shrinking, but the
+short **A→B→A ping-pong is pp-INDEPENDENT** — its rate doesn't move as ΔP halves again. **`b_team_order`
+resolved as noise** (v11's flag was `stable_rate` 0.95 from 1/20 battles with `match_rate` already 1.0; v12 shows
+1.0/1.0 on both arms — didn't reproduce; candidate closed, no separate build). **Verdict: pushing pp-reliance
+lower — more resample OR an encoder pp transform — won't break the ping-pong because it isn't pp-carried.
+Deprioritize the encoder transform; pivot to the pp-independent ping-pong** (localize its carrier à la Build 8,
+or a decision-time anti-repetition / RL loop-penalty). p 0.10 (v11) stays the best BC-passing resample point.
+Suite **266 pass** (no code touched); `results/bc_gate12.json`, `results/pp_reliance_diag12.json`,
+`results/behavior_probe_v12.json`.
+
 ## Setup
 
 ```bash
