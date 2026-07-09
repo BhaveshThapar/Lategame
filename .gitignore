@@ -38,6 +38,8 @@ dist/
 /results/behavior_probe8_replays/
 # Bulk probe sidecars, any build (only the JSON summaries are committed)
 /results/behavior_probe*_decisions.jsonl
+/results/behavior_probe_decisions*.jsonl
 /results/behavior_probe*_transcripts/
+/results/behavior_probe_transcripts*/
 /results/behavior_probe*_replays/
 /results/behavior_probe_obs*.npz

@@ -1,0 +1,177 @@
+{
+  "thresholds": {
+    "residual_min": 0.4,
+    "retained_max": 0.5,
+    "baseline_min": 0.15,
+    "min_2cycle": 80,
+    "min_matched_live": 80,
+    "min_shard_matched": 200,
+    "min_hp": 0.5,
+    "min_pair": 10,
+    "cap_donor": 60,
+    "carrier_frac": 0.5,
+    "secondary_frac": 0.25,
+    "self_tol": 0.0001,
+    "harness_tol": 0.0001,
+    "match": "own"
+  },
+  "provenance": {
+    "obs": "results/behavior_probe_obs_v13.npz",
+    "decisions": "results/behavior_probe_decisions_v13.jsonl",
+    "shard": "data/gen9ou_v7_bc.npz",
+    "arm": "bc_vs_heuristic",
+    "arm_2cycle_counts": {
+      "bc_vs_heuristic": 337,
+      "bc_vs_random": 280
+    },
+    "obs_version": "v5-09831e17c378",
+    "primary": "checkpoints/bc_gen9ou_v11_s0.pt",
+    "robustness": [
+      "checkpoints/bc_gen9ou_v11_s1.pt",
+      "checkpoints/bc_gen9ou_v11_s2.pt"
+    ],
+    "device": "cpu",
+    "n_2cycle": 337,
+    "n_matched_live": 322,
+    "n_matched_shard": 10041,
+    "n_groups_matched": 9,
+    "pp_frac_full_before": 0.9899068322981367,
+    "pp_frac_full_after": 0.5100931677018633
+  },
+  "metric": "P(return action) = softmax prob on the recorded switch-back index",
+  "primary": {
+    "baseline_return": 0.30634122258572843,
+    "ppneut_return": 0.07271093100393249,
+    "neutralized_all": 0.07562347994925692,
+    "pp_share": 1.012623862005765,
+    "residual": 0.23735274799193767,
+    "retained_res": 1.0400565486524564,
+    "drop_res": {
+      "own_active_ids": 0.00027139913088276846,
+      "own_active_numeric": 0.003474679519566967,
+      "own_bench": 0.006781573367401983,
+      "opp_active": 0.008403138202609295,
+      "opp_bench": 0.0008509419518609729,
+      "moves": 0.028523249884992143,
+      "global": -0.04394427398783704,
+      "move_ids": 0.010720700476758223,
+      "move_numeric": 0.01826518455661995,
+      "move_context": 0.01845593811142958,
+      "move_score": 0.002668717254953948,
+      "move_pp": 0.015069163427543567
+    },
+    "frac_res": {
+      "own_active_ids": 0.0,
+      "own_active_numeric": 0.0,
+      "own_bench": 0.0,
+      "opp_active": 0.0,
+      "opp_bench": 0.0,
+      "moves": 0.0,
+      "global": 0.0,
+      "move_ids": 0.0,
+      "move_numeric": 0.0,
+      "move_context": 0.0,
+      "move_score": 0.0,
+      "move_pp": 0.0
+    }
+  },
+  "carrier_of_residual": "NO_CARRIER",
+  "robustness": {
+    "checkpoints/bc_gen9ou_v11_s1.pt": {
+      "baseline_return": 0.31427834384282183,
+      "ppneut_return": 0.06374973883947808,
+      "neutralized_all": 0.06837607527616099,
+      "pp_share": 1.0188137200345866,
+      "residual": 0.20284483512284532,
+      "retained_res": 1.072570280614514,
+      "drop_res": {
+        "own_active_ids": -2.691494149115181e-05,
+        "own_active_numeric": 0.0025484943619613967,
+        "own_bench": 0.003162903446372975,
+        "opp_active": 0.00847200899759469,
+        "opp_bench": 0.001224563919840757,
+        "moves": 0.02785317446878874,
+        "global": -0.04705875895097447,
+        "move_ids": 0.012376793507654332,
+        "move_numeric": 0.022809739075658947,
+        "move_context": 0.0179498339413885,
+        "move_score": 0.0016837507223866552,
+        "move_pp": 0.015970925786040764
+      },
+      "frac_res": {
+        "own_active_ids": 0.0,
+        "own_active_numeric": 0.0,
+        "own_bench": 0.0,
+        "opp_active": 0.0,
+        "opp_bench": 0.0,
+        "moves": 0.0,
+        "global": 0.0,
+        "move_ids": 0.0,
+        "move_numeric": 0.0,
+        "move_context": 0.0,
+        "move_score": 0.0,
+        "move_pp": 0.0
+      }
+    },
+    "checkpoints/bc_gen9ou_v11_s2.pt": {
+      "baseline_return": 0.26802114163589036,
+      "ppneut_return": 0.07410691460299519,
+      "neutralized_all": 0.078538466945326,
+      "pp_share": 1.023387638735667,
+      "residual": 0.2764965261720668,
+      "retained_res": 1.0597994447086547,
+      "drop_res": {
+        "own_active_ids": 0.0008292970267812783,
+        "own_active_numeric": 0.004095685752528069,
+        "own_bench": 0.006704731393346611,
+        "opp_active": 0.008576557895614068,
+        "opp_bench": 0.002090434519203821,
+        "moves": 0.02648657420433201,
+        "global": -0.06010119217774769,
+        "move_ids": 0.005753811701166192,
+        "move_numeric": 0.01713861296421946,
+        "move_context": 0.021548674868489173,
+        "move_score": 0.005123532051075921,
+        "move_pp": 0.015868136756156816
+      },
+      "frac_res": {
+        "own_active_ids": 0.0,
+        "own_active_numeric": 0.0,
+        "own_bench": 0.0,
+        "opp_active": 0.0,
+        "opp_bench": 0.0,
+        "moves": 0.0,
+        "global": 0.0,
+        "move_ids": 0.0,
+        "move_numeric": 0.0,
+        "move_context": 0.0,
+        "move_score": 0.0,
+        "move_pp": 0.0
+      }
+    }
+  },
+  "robustness_forks": {
+    "checkpoints/bc_gen9ou_v11_s1.pt": "PP_CARRIED",
+    "checkpoints/bc_gen9ou_v11_s2.pt": "PP_CARRIED"
+  },
+  "move_pp_residual_frac_sanity": 0.0,
+  "switch_mass_crosscheck": {
+    "baseline": 0.6113835316822396,
+    "ppneut": 0.15171453273299826,
+    "return_given_switch_baseline": 0.5010622738607656,
+    "return_given_switch_ppneut": 0.47926147676238856
+  },
+  "controls": {
+    "self_swap_max_err": 0.0,
+    "gather_harness_err": 6.49989698175979e-08
+  },
+  "checks": {
+    "self_swap_identity": true,
+    "gather_harness": true,
+    "pp_neut_lowered_frac_full": true,
+    "floor_2cycle": true,
+    "floor_matched_live": true,
+    "floor_shard": true
+  },
+  "verdict": "PP_CARRIED"
+}

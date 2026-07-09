@@ -268,6 +268,26 @@ or a decision-time anti-repetition / RL loop-penalty). p 0.10 (v11) stays the be
 Suite **266 pass** (no code touched); `results/bc_gate12.json`, `results/pp_reliance_diag12.json`,
 `results/behavior_probe_v12.json`.
 
+**OU pivot Build 13 — localize the ping-pong carrier (`scripts/pingpong_probe.py`, clone of Build 8's causal
+swap on the 2-cycle states): VERDICT `PP_CARRIED` (3-seed) — the pp-independent *rate* is a sticky-argmax
+artifact; the 2-cycle *decision* is ~100% pp-carried → reverses Build 12's deprioritization of the encoder pp
+transform.** Runs-only (no `OBS_VERSION` bump / re-ingest / retrain): new probe + `behavior_probe.two_cycle_rows`
+(single-sources the ping-pong definition) + tests, reusing `drift_probe`'s swap/verdict/controls and
+`pp_reliance_diag.neutralize_pp`; fresh aligned capture from the shipped v11 winner (`bc_gen9ou_v11_s0`, n=50).
+The naive metric just re-finds pp (a 2-cycle active mon just switched in → full pp, Build 8's OOD cue), so the
+gate is **two-stage** — neutralize pp (frac_full 0.99→0.51), then localize the *residual* — with metric
+**P(return action)** conditioned on own active species. On **337** A→B→A rows (322 matched, 9 species; controls
+pass): baseline P(return) **0.306 → pp-neutralized 0.073 → full-neut 0.076** (pp explains ~100% of the drop,
+residual **0.237 < 0.40**), all 3 seeds `PP_CARRIED`; switch mass **0.611 → 0.152** (dP 0.46). The decisive
+disambiguation: **`P(return|switch)` is pp-INVARIANT (0.501 → 0.479)** — pp drives *switch-vs-stay*, while the
+bounce-back to A is a structural ~50% coin-flip (uniform floor ~0.157). Reconciles Build 12: resample shrank the
+pp margin but couldn't flip the discrete argmax, so the rate stayed flat while the mechanism stayed pp.
+**Verdict: the resample lever is exhausted (plateaued, and pp is load-bearing so can't be dropped). Build 14 =
+(a) encoder pp-transform (change pp's representation to break the argmax lock; imitation, but re-ingest + BC
+risk) or (b) decision-time anti-repetition / RL loop-penalty (attacks the pp-invariant structural bounce-back;
+cheap, no retrain) — recommend (b) first.** Suite **271 pass**, ruff + mypy(lategame) clean;
+`results/pingpong_probe.json` + `results/behavior_probe_v13.json`.
+
 ## Setup
 
 ```bash

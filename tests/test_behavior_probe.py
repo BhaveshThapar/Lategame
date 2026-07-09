@@ -130,6 +130,22 @@ def test_ping_pong_rate():
     assert probe_mod._ping_pong_rate([_dec(action=0, forced=True)] * 3) == 0.0
 
 
+def test_two_cycle_rows_flags_the_bounce_back():
+    # glimmora -> greattusk -> glimmora: only the third decision (index 2) completes a 2-cycle,
+    # and its return-action is the switch back onto glimmora (action 0). A move (action=6) between
+    # switches is skipped without breaking the per-battle target sequence.
+    decs = [_dec(action=0), _dec(action=1), _dec(action=6), _dec(action=0)]
+    rows = probe_mod.two_cycle_rows(decs)
+    assert [(r.index, r.return_action) for r in rows] == [(3, 0)]
+    # The count matches _ping_pong_rate's numerator over voluntary switches (0,1,0 -> 3).
+    assert probe_mod._ping_pong_rate(decs) == 1 / 3
+    # Forced and cross-battle switches never flag a 2-cycle.
+    assert probe_mod.two_cycle_rows([_dec(action=0, forced=True)] * 3) == []
+    split = [_dec(action=0, battle_tag="b1"), _dec(action=1, battle_tag="b1"),
+             _dec(action=0, battle_tag="b2")]
+    assert probe_mod.two_cycle_rows(split) == []
+
+
 def test_decision_metrics_rates():
     decs = [
         _dec(action=6, repeat=3),  # collapsed rejection retries

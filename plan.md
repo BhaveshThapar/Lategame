@@ -1218,6 +1218,49 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     (no code touched); `results/bc_gate12.json` + `pp_reliance_diag12.json` + `behavior_probe_v12.json` committed
     (obs sidecar + checkpoints gitignored).
 
+- **OU Pivot — Build 13: localize the ping-pong carrier (clone Build 8's causal-swap on the 2-cycle states) —
+  VERDICT `PP_CARRIED` (3-seed): the pp-independent *rate* is a sticky-argmax phenomenon; the 2-cycle decision
+  is ~100% pp-carried → reverses the Build-12 deprioritization of the encoder pp transform.**
+  - **Runs-only** (no `OBS_VERSION` bump, no re-ingest, no retrain): new `scripts/pingpong_probe.py` +
+    `behavior_probe.two_cycle_rows` (single-sources the ping-pong definition; `_ping_pong_rate` refactored to
+    reuse it) + tests, reusing `drift_probe.swap_group`/`carrier_verdict`/controls and
+    `pp_reliance_diag.neutralize_pp`. Fresh aligned capture from the shipped v11 winner
+    (`bc_gen9ou_v11_s0`, n=50; `results/behavior_probe_obs_v13.npz` + `_decisions_v13.jsonl`, gitignored).
+  - **The naive metric just re-finds pp** (the smoke on v12 showed `move_pp` +0.89): a 2-cycle active mon just
+    switched in → full pp, Build 8's exact OOD cue. So the gate is **two-stage** — Stage 1 neutralizes pp
+    (`neutralize_pp`, frac_full 0.99→0.51) and measures its grip; Stage 2 localizes the *residual* on the
+    pp-neutralized base. Metric = **P(return action)** (softmax prob on the recorded switch-back index),
+    conditioned on **own active species** (own-only matching keeps all rows; (own,opp) discards ~70%). Verdict
+    read on the **generating** seed (s0); s1/s2 are robustness only (they need not reproduce the loop).
+  - **Data + controls (all pass):** 337 A→B→A rows on `bc_vs_heuristic`, **322 matched-live** across 9 species,
+    10 041 shard donors; C-self 0.0, C-gather-harness 6.5e-8, floors clear.
+  - **Result — `PP_CARRIED`, all 3 seeds agree.** Primary s0: baseline P(return) **0.306** → **pp-neutralized
+    0.073** → full-neutralized 0.076, so **pp_share 1.01** (pp explains ~100% of the drop) and **residual
+    0.237 < 0.40**. s1/s2 residual 0.203 / 0.276 → both `PP_CARRIED`. Switch-mass cross-check: **0.611 → 0.152**
+    on pp-neut (dP **0.46**, >> `pp_reliance`'s full-capture 0.187 — the 2-cycle is a pp-saturated fresh-switch
+    region). There is **no residual to localize** (Stage-2 fracs 0.000, `move_pp` sanity 0.000).
+  - **The decisive disambiguation — `P(return|switch)` is pp-INVARIANT: 0.501 → 0.479.** So pp carries the
+    **switch-vs-stay** decision; conditional on switching, bouncing back to A is ~50% *regardless of pp* — a
+    structural "few viable targets" effect (uniform floor ~0.157 over 6.37 legal actions; pp-neut return 0.073
+    sits *below* uniform). The ping-pong = "pp says switch, and a switch has a coin-flip chance of going back."
+  - **Reconciliation with Build 12:** the pp-independent **rate** is real but is a *sticky-argmax* artifact —
+    resample shrank the pp probability margin (switch mass, ΔP 0.187→0.122) yet could not flip the discrete
+    argmax, so the rate stayed flat while the mechanism remained pp. "pp-independent rate" ≠ "pp-independent
+    mechanism."
+  - **Verdict + next lever. `PP_CARRIED` reverses the Build-12 deprioritization of the encoder pp transform.**
+    The 2-cycle is pp-driven at the decision level; the **resample lever is exhausted** (continuous margin
+    reduction plateaued at the BC frontier) and pp is **load-bearing** (Build 8 v4 ablation collapsed BC, so it
+    can't be dropped). **Build 14 levers:** (a) **encoder pp-transform** — change pp's *representation*
+    (bucketize / drop the exactly-full spike / replace with an honest "turns since this mon attacked" recency)
+    to break the argmax lock; stays in imitation but costs an `OBS_VERSION` bump + re-ingest and risks BC. Or
+    (b) **decision-time anti-repetition** — penalize the return action directly; this attacks the pp-INVARIANT
+    structural bounce-back, is cheap, and needs no retrain (RL loop-penalty is the heavier sibling).
+    **Recommendation: (b) first** (the pp-invariant `return|switch` says the bounce-back is structural, not a
+    feature the encoder can robustify away), with (a) the principled-but-costly imitation alternative. OU
+    ceiling re-probe + OU PPO stay gated OFF. Suite 271 pass, ruff + mypy(lategame) clean;
+    `results/pingpong_probe.json` + `behavior_probe_v13.json` committed (obs/decisions/transcripts + checkpoints
+    gitignored).
+
 ---
 
 ## 14. Risks & mitigations
