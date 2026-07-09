@@ -1,0 +1,68 @@
+{
+  "build": 10,
+  "lever": "robustify pp via train-time augmentation (synthesize full-pp deep-turn states)",
+  "obs_version": "v5-09831e17c378",
+  "obs_dim": 761,
+  "bc_shard": "/Users/bhavesh/Desktop/Projects/Lategame/data/gen9ou_v7_bc.npz",
+  "pp_aug": {
+    "frac": 0.5,
+    "turn_threshold": 0.15
+  },
+  "checkpoints": [
+    "/Users/bhavesh/Desktop/Projects/Lategame/checkpoints/bc_gen9ou_v10_s0.pt",
+    "/Users/bhavesh/Desktop/Projects/Lategame/checkpoints/bc_gen9ou_v10_s1.pt",
+    "/Users/bhavesh/Desktop/Projects/Lategame/checkpoints/bc_gen9ou_v10_s2.pt"
+  ],
+  "bc_gate": {
+    "bar": 0.63,
+    "val_acc": [
+      0.6480881399870383,
+      0.6539209332469216,
+      0.6578094620868438
+    ],
+    "val_acc_mean": 0.6532728451069345,
+    "baseline_v7_pp_first_turn_mean": 0.6537,
+    "verdict": "PASS"
+  },
+  "offline_loop_state_counterfactual": {
+    "sidecar": "results/behavior_probe_obs_v7.npz",
+    "loop_rows": 1620,
+    "captured_rows": 2748,
+    "v7_switch_mass": 0.5747,
+    "v7_switch_mass_recorded_gate9b": 0.6036,
+    "v10_switch_mass": 0.5965,
+    "delta": -0.0219,
+    "target": "v10 << 0.604 (target < 0.30)",
+    "verdict": "PERSISTS"
+  },
+  "live_behavior_probe": {
+    "checkpoint": "checkpoints/bc_gen9ou_v10_s0.pt",
+    "n_per_arm": 20,
+    "control_win_rate": 0.6,
+    "bc_vs_random": {
+      "win_rate": 0.0,
+      "voluntary_switch_fraction": 0.66,
+      "max_switch_run": 108,
+      "ping_pong_rate": 0.62,
+      "classification": "c_pathological"
+    },
+    "bc_vs_heuristic": {
+      "win_rate": 0.0,
+      "voluntary_switch_fraction": 0.9,
+      "max_switch_run": 989,
+      "ping_pong_rate": 0.88,
+      "classification": "c_pathological"
+    },
+    "verdict": "LOOP PERSISTS -- both arms c_pathological, unbroken vs Build 9 (run 110/77)"
+  },
+  "pp_reliance_diagnostic": {
+    "method": "dP = baseline switch mass - switch mass after drawing in-distribution pp from the v7 BC shard pool (frac_full 0.50)",
+    "results_file": "results/pp_reliance_diag10.json",
+    "v7_s0_on_v7_states": {"baseline": 0.5747, "pp_neutralized": 0.1778, "dP": 0.3969, "frac_full_live": 0.8611},
+    "v10_s0_on_v7_states": {"baseline": 0.5965, "pp_neutralized": 0.2062, "dP": 0.3903, "frac_full_live": 0.8611},
+    "v10_s0_on_v10_states": {"baseline": 0.8285, "pp_neutralized": 0.3079, "dP": 0.5206, "frac_full_live": 0.9404},
+    "conclusion": "On identical v7 states v10 dP (0.390) == v7 dP (0.397): the augmentation did NOT reduce pp-reliance. Synthesized full-pp examples live in the real-attack-context region, not the loop-context region, so the policy keeps both 'full pp + attack ctx -> attack' and 'full pp + loop ctx -> switch'."
+  },
+  "verdict": "BC PASS (0.653) but LOOP PERSISTS live (both c_pathological) and pp-reliance UNCHANGED (dP 0.390 == v7 0.397). Region-local label augmentation of real attack states cannot reach the loop region -- increasing frac will not help.",
+  "next_lever": "Build 11: noise/dropout on the pp channel (the other pre-registered Build 9 candidate). Global regularization blunts the exactly-1.0 -> switch extrapolation in ALL contexts including the unseen loop region, where region-local synthesis cannot."
+}
