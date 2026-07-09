@@ -176,9 +176,28 @@ pre-registered H1/H2/H3 tree with teeth (harness identity 1e-16, random-init ban
 (matched), T **< 6%** — vs live 0.77 fraction / ~0.9 mass; even on the exact live loop pairs P_pair
 **0.165–0.234**. H1 dead (humans not pivot-heavy: replay-log true rate 0.211 ≈ shard 0.189); H3 dead (max
 P−H +0.024; BC-vs-AWR delta −0.008). **Verdict bc=H2; offrl=H2** → the failure is distribution shift, not
-learned behavior; next lever is drift-side (usage-prior imputation of own-team detail to live-FULL, the
-measured Build-2/3 gap — NOT a history feature, nothing to damp in-distribution). Suite **221 pass /
-5 skip**; `results/switch_mass_gate.json`.
+learned behavior; next lever is drift-side — a live-vs-shard localization probe (NOT a history feature,
+nothing to damp in-distribution). Suite **221 pass / 5 skip**; `results/switch_mass_gate.json`.
+*(Build-7 also named "usage-prior imputation" as the next lever; **Build 8 found that stale** — Build 4
+already did it → RED — and localized the real carrier, below.)*
+
+**OU pivot Build 8 — live-vs-shard drift localization (CARRIER = a single encoder channel: the move
+`pp-fraction`).** Phase A extends `scripts/behavior_probe.py` to dump the exact per-decision obs/mask the
+model scored (gitignored npz) and adds a held-out-heuristic-opponent arm (the loop reproduces vs the real
+eval opponent too). Phase B (`scripts/drift_probe.py`, offline, zero training) runs a **causal swap
+bisection**: pair-match each live loop state to shard rows of the same (own,opp) species, then paste each
+channel group across the manifold both ways and re-score the frozen policy (`deletion` live←shard: does
+switch mass fall to ~0.2? `insertion` shard←live: does it rise to ~0.9?), holding action legality fixed.
+**Carrier = `moves`, +0.875 of the gap** (bc +0.880 / offrl +0.870, both swap directions, all 6 ckpts);
+every other group ≈ 0; controls pass (self-swap identity 0.0, ALL-swap positive control 0.98, harness
+1.7e-7). A within-block sub-split pins it to **one channel — `pp_fraction` +0.875** (the R-CALC
+expected-damage `score` is inert at +0.016). Mechanism (triangulated): live loop states keep **93.6%** of
+moves at full pp (the agent never attacks) vs the shard's **55%**, so "all moves at full pp deep in a
+game" is off-manifold and the policy reads it as a switch cue → the loop self-sustains through pp. This is
+the concrete carrier of Build-6's memoryless absorbing loop and Build-7's H2. **Next lever (Build 9,
+BC-gateable):** ablate/robustify the pp channel, or add an explicit last-action feature; then re-run the
+behavior probe. Phase C (corpus-teampool A/B) deferred — it tests composition (G2), which Phase B
+excluded. Suite **244 pass**; `results/drift_probe.json`.
 
 ## Setup
 

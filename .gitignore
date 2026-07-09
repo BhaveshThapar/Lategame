@@ -31,3 +31,8 @@ dist/
 # Build-6 behavioral probe bulk artifacts (JSON summary + transcripts are committed)
 /results/behavior_probe_decisions.jsonl
 /results/behavior_probe_replays/
+# Build-8 obs/mask capture sidecar (large, regenerable from the probe run)
+/results/behavior_probe_obs.npz
+/results/behavior_probe8_decisions.jsonl
+/results/behavior_probe8_transcripts/
+/results/behavior_probe8_replays/
