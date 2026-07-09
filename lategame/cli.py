@@ -73,6 +73,8 @@ def _run_train(args: argparse.Namespace) -> None:
         max_samples=args.max_samples,
         pp_aug_frac=args.pp_aug_frac,
         pp_aug_turn_threshold=args.pp_aug_turn_threshold,
+        pp_noise_std=args.pp_noise_std,
+        pp_resample_frac=args.pp_resample_frac,
     )
     train_bc(args.data, args.out, config)
 
@@ -318,6 +320,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.15,
         help="Normalized turn above which a row counts as 'deep' for --pp-aug-frac",
+    )
+    train.add_argument(
+        "--pp-noise-std",
+        type=float,
+        default=0.0,
+        help="Build 11: Gaussian jitter std added to every present-move pp channel (train time)",
+    )
+    train.add_argument(
+        "--pp-resample-frac",
+        type=float,
+        default=0.0,
+        help="Build 11: fraction of present pp cells resampled from the batch pp pool (train time)",
     )
 
     collect_rl = sub.add_parser(

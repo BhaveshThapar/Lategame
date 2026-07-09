@@ -13,6 +13,11 @@ corner in-distribution: synthesize "all moves full pp at a deep turn -> attack".
 on a random fraction of attack-labeled, deep-turn rows it forces the active mon's pp
 channels to full. Column offsets are read from ``ObsLayout`` so they can never drift
 from ``encoder.embed_battle``.
+
+Build 11 adds two *global* pp regularizers (``augment_pp_noise``, ``augment_pp_resample``):
+where synthesize was region-local (attack + deep only) and so never reached the loop corner,
+these perturb every present-move pp channel in *every* context, blunting the sharp
+``exactly-1.0 -> switch`` extrapolation everywhere. All three are train-time only.
 """
 
 from __future__ import annotations
@@ -66,4 +71,76 @@ def augment_pp_full(
         base = layout.moves_start + j * layout.move_dim
         rows = sel & (out[:, base + _MOVE_PRESENT_IDX] > 0.0)
         out[rows, base + _MOVE_PP_IDX] = 1.0
+    return out
+
+
+def augment_pp_noise(
+    obs: Tensor,
+    action: Tensor,  # unused; kept for call-site parity with augment_pp_full
+    layout: ObsLayout,
+    *,
+    std: float,
+    generator: torch.Generator | None = None,
+) -> Tensor:
+    """Return a clone of ``obs`` with Gaussian jitter added to the active mon's pp channels.
+
+    Build 11 (plan.md 13): a *global* regularizer -- applied to every present-move pp channel in
+    *every* row (no attack/deep gate, unlike ``augment_pp_full``) so it blunts the sharp
+    ``exactly-1.0 -> switch`` extrapolation in all contexts, including the unseen loop corner.
+    The ``[0, 1]`` clamp biases full-pp rows downward (up-noise clamps away), directly softening
+    the "exactly full pp" cue. Fresh noise per call; absent moves (present flag 0) stay all-zero.
+
+    ``std <= 0`` is a no-op (returns ``obs`` untouched). Never mutates ``obs`` in place.
+    """
+    if std <= 0.0:
+        return obs
+    out = obs.clone()
+    for j in range(layout.n_moves):
+        base = layout.moves_start + j * layout.move_dim
+        col = base + _MOVE_PP_IDX
+        present = out[:, base + _MOVE_PRESENT_IDX] > 0.0
+        noise = (torch.randn(out.shape[0], generator=generator) * std).to(out.device)
+        out[present, col] = (out[present, col] + noise[present]).clamp(0.0, 1.0)
+    return out
+
+
+def augment_pp_resample(
+    obs: Tensor,
+    action: Tensor,  # unused; kept for call-site parity with augment_pp_full
+    layout: ObsLayout,
+    *,
+    frac: float,
+    generator: torch.Generator | None = None,
+) -> Tensor:
+    """Return a clone of ``obs`` with a random ``frac`` of present pp channels resampled from the
+    batch's own present-move pp distribution.
+
+    Build 11 (plan.md 13): the second *global* regularizer, mirroring the proven neutralization
+    counterfactual (which resampled pp from the shard pool ~50% full). The batch is itself an
+    empirical draw from the shard, so its present-move pp values are an unbiased pool. Applied to
+    every present-move pp channel in every row (no attack/deep gate). Replaced values are always
+    real in-distribution pp values, so pp stays in ``[0, 1]``.
+
+    ``frac <= 0`` is a no-op (returns ``obs`` untouched). Never mutates ``obs`` in place.
+    """
+    if frac <= 0.0:
+        return obs
+    out = obs.clone()
+    ms, md = layout.moves_start, layout.move_dim
+    present_cols = [ms + j * md + _MOVE_PRESENT_IDX for j in range(layout.n_moves)]
+    present_flags = torch.stack([out[:, c] > 0.0 for c in present_cols], dim=1)
+    pp_vals = torch.stack([out[:, c] for c in pp_columns(layout)], dim=1)
+    pool = pp_vals[present_flags]
+    if pool.numel() == 0:
+        return out
+    for j in range(layout.n_moves):
+        base = ms + j * md
+        present = out[:, base + _MOVE_PRESENT_IDX] > 0.0
+        roll = torch.rand(out.shape[0], generator=generator).to(out.device)
+        sel = present & (roll < frac)
+        n = int(sel.sum())
+        if n == 0:
+            continue
+        idx = torch.randint(pool.numel(), (n,), generator=generator).to(out.device)
+        out[sel, base + _MOVE_PP_IDX] = pool[idx]
     return out

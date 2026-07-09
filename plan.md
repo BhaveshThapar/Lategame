@@ -1140,6 +1140,49 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     tests), ruff + `mypy lategame` clean; `results/bc_gate10.json` + `results/behavior_probe10.json` +
     `results/pp_reliance_diag10.json` committed (obs/decisions/transcripts + checkpoints gitignored).
 
+- **OU Pivot — Build 11: robustify pp by GLOBAL regularization (noise + resample), decide by gates —
+  built + run; PARTIAL WIN: the first mechanism to actually MOVE the live loop, but BC-passing strength
+  attenuates (loop depth 108 → 29, ~4×) without fully breaking it.** Build 10 ruled out synthesize; this
+  build runs the *other* pre-registered candidate — a **global** pp regularizer applied in **every** context
+  (no attack/deep gate), so it can reach the loop corner region-local synthesis could not. Two flavors added
+  beside `augment_pp_full` in `lategame/train/augment.py`: **`augment_pp_noise`** (Gaussian jitter on pp,
+  `[0,1]`-clamped; `--pp-noise-std`) and **`augment_pp_resample`** (a random `frac` of present pp cells
+  resampled from the batch's own pp pool — an empirical draw from the shard's ~50%-full pp distribution,
+  mirroring the proven neutralization counterfactual; `--pp-resample-frac`). +`TrainConfig.pp_noise_std/
+  pp_resample_frac`, +13 unit tests (pin the *global* reach: switch rows AND shallow turns are perturbed).
+  The pp-reliance diagnostic was **promoted from the Build-10 inline snippet to a committed script**
+  `scripts/pp_reliance_diag.py` (reuses `switch_mass_gate.load_policy/score_shard`; re-baselines confirm
+  v7_s0 ΔP **0.377** ≈ v10_s0 **0.369**, reproducing the Build-10 finding). All **train-time only — no
+  `OBS_VERSION` bump** (HEAD stays v5/761).
+  - **Stage 1+2 screen (seed 0, 6 configs; `results/bc_gate11_screen.json`).** **Gaussian noise RULED OUT** —
+    it collapses BC at *every* strength (σ 0.05 → val-acc **0.575**, 0.10 → 0.501, 0.20 → 0.442; all < 0.63):
+    pp is far too load-bearing for additive jitter (the model can't fit clean val pp after training on
+    always-noised pp). **Resample** shows a clean monotone frontier — p 0.10 → val **0.648 PASS**, ΔP 0.203;
+    p 0.25 → val 0.627 (just misses), ΔP 0.113; p 0.50 → val 0.551, ΔP 0.039 (more resampling → lower
+    pp-reliance but lower BC). **Winner = resample p 0.10** (the only BC-pass; ~halves ΔP vs v10).
+  - **Stage 3 confirm (3-seed + live probe; `results/bc_gate11.json`).** **BC PASS** — val-acc
+    **[0.6444, 0.6434, 0.6442], mean 0.644 ≥ 0.63** (on par with the v7 baseline 0.647). **pp-reliance HALVED**
+    — on the identical frozen v7 states, `bc_v11_s0` baseline switch mass **0.404** (vs v10 0.597 / v7 0.575)
+    and **ΔP 0.187** (vs v10 0.369 / v7 0.377), the first mechanism in the investigation to reduce it at all.
+  - **Live probe — LOOP ATTENUATED ~4× BUT NOT BROKEN** (`bc_v11_s0`, n=20, random+heuristic). `bc_vs_heuristic`
+    `c_pathological` but **max-switch-run 29 (vs Build 10's 108)**, voluntary-switch **0.33 now < the 0.5 bar**
+    (the switch-fraction flag no longer trips; only switch-run ≥ 6 and ping-pong 0.52 > 0.25 do), win 0.0.
+    `bc_vs_random` flips to `b_team_order` — a separate team-order/decode issue that takes precedence and
+    surfaces once the loop is attenuated (its c-flags still show switch-run/ping-pong, so the loop is present
+    but no longer the *primary* cause on that arm).
+  - **Verdict + next lever. PARTIAL SUCCESS — mechanism validated, strength-capped.** pp is confirmed the
+    causal loop carrier, and a global regularizer that reaches all contexts *does* move the live loop (unlike
+    region-local synthesize) — cutting pp-reliance ~50% and loop depth ~4× while preserving imitation. But the
+    **BC-passing frontier caps ΔP reduction at ~0.19**: going lower (p ≥ 0.25 → ΔP 0.11) fails the 0.63 gate,
+    so at survivable strength the residual pp signal still sustains shorter ping-pong loops (win 0). **Build 12
+    candidates (BC-gateable):** (a) push past the frontier with an **encoder-level pp intervention** (bins /
+    monotone transform — *would* need an `OBS_VERSION` bump + re-ingest) or a **hybrid** global-resample +
+    deep-turn-targeted resample; (b) **isolate the `b_team_order` signal** on the random arm as a possible
+    independent decode confound; (c) resample p 0.25 (ΔP 0.11) is a near-miss (val 0.627) worth a relaxed-bar
+    probe if the loop, not BC, is the binding constraint. OU ceiling re-probe + OU PPO stay gated OFF. Suite
+    **266 pass** (+13 augment tests), ruff + `mypy` clean; `results/bc_gate11_screen.json` + `bc_gate11.json` +
+    `behavior_probe_v11.json` committed (obs sidecar + checkpoints gitignored).
+
 ---
 
 ## 14. Risks & mitigations

@@ -23,7 +23,7 @@ from lategame.data.dataset import BCDataset
 from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION
 from lategame.model.factory import build_model, model_metadata
 from lategame.model.policy import BCPolicy, masked_logits, policy_logits
-from lategame.train.augment import augment_pp_full
+from lategame.train.augment import augment_pp_full, augment_pp_noise, augment_pp_resample
 
 BC_POLICY = "bc_policy"  # model_type sentinel for the flat MLP (factory has no BCPolicy).
 
@@ -59,6 +59,11 @@ class TrainConfig:
     # game -> attack" in-distribution. 0.0 disables it (train-time only; validation stays clean).
     pp_aug_frac: float = 0.0
     pp_aug_turn_threshold: float = 0.15  # normalized turn (~turn 15) above which a row is "deep"
+    # Build 11 (plan.md 13): global pp regularizers -- perturb every present-move pp channel in
+    # every context to blunt the "exactly-1.0 -> switch" extrapolation (incl. the loop corner).
+    # Mutually exclusive with each other and with pp_aug_frac in practice; 0.0 disables.
+    pp_noise_std: float = 0.0  # Gaussian jitter std added to pp, clamped to [0, 1]
+    pp_resample_frac: float = 0.0  # fraction of present pp cells resampled from the batch pp pool
 
 
 # Fixed seed for the data-subset permutation -- deliberately independent of TrainConfig.seed
@@ -119,6 +124,10 @@ def _run_epoch(
                     frac=config.pp_aug_frac,
                     turn_threshold=config.pp_aug_turn_threshold,
                 )
+            if training and config.pp_noise_std > 0.0:
+                obs = augment_pp_noise(obs, action, OBS_LAYOUT, std=config.pp_noise_std)
+            if training and config.pp_resample_frac > 0.0:
+                obs = augment_pp_resample(obs, action, OBS_LAYOUT, frac=config.pp_resample_frac)
             logits = masked_logits(policy_logits(model(obs)), mask)
             loss = F.cross_entropy(logits, action)
             if optimizer is not None:
@@ -194,6 +203,8 @@ def _save_checkpoint(
             "battle_format": battle_format,
             "metrics": metrics,
             "pp_aug": {"frac": config.pp_aug_frac, "turn_threshold": config.pp_aug_turn_threshold},
+            "pp_noise_std": config.pp_noise_std,
+            "pp_resample_frac": config.pp_resample_frac,
             **meta,
         },
         out_path,

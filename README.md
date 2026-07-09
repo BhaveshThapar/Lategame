@@ -230,6 +230,25 @@ channel** — a global regularizer that blunts the exactly-1.0 → switch extrap
 the unseen loop region. Suite **253 pass**; `results/bc_gate10.json`, `results/behavior_probe10.json`,
 `results/pp_reliance_diag10.json`.
 
+**OU pivot Build 11 — global pp regularization (noise + resample), decide by gates: PARTIAL WIN — the first
+mechanism to move the live loop, attenuating it ~4× without fully breaking it.** The *other* pre-registered
+candidate: a **global** pp regularizer applied in every context (unlike Build 10's region-local synthesize), so
+it can reach the loop corner. Two flavors beside `augment_pp_full` — `augment_pp_noise` (Gaussian jitter,
+`--pp-noise-std`) and `augment_pp_resample` (resample a fraction of pp cells from the shard's ~50%-full pool,
+`--pp-resample-frac`) — plus the pp-reliance diagnostic promoted to a committed `scripts/pp_reliance_diag.py`.
+Train-time only, no `OBS_VERSION` bump. **Screen (seed 0):** Gaussian **ruled out** (collapses BC at every
+strength — σ 0.05 → 0.575 ≪ 0.63, pp is too load-bearing for additive noise); resample shows a clean frontier
+(p 0.10 → val **0.648**, ΔP 0.203; p 0.25 → 0.627, ΔP 0.113; p 0.50 → 0.551, ΔP 0.039). **Winner = resample
+p 0.10** (only BC-pass). **Confirm (3-seed + live):** BC val-acc **0.644 ≥ 0.63**; on the identical v7 loop
+states pp-reliance is **halved** (ΔP **0.187** vs v10 0.369 / v7 0.377, baseline switch mass 0.404 vs 0.597).
+Live, the loop **attenuates ~4×** (max-switch-run **29 vs Build 10's 108**, voluntary-switch 0.33 now *below*
+the 0.5 pathology bar) but stays `c_pathological` on the heuristic arm (short ping-pong loops, win 0.0); the
+random arm flips to `b_team_order` (a separate decode issue surfacing once the loop shrinks). **Verdict: pp is
+confirmed the causal carrier and a global regularizer does move the loop, but the BC-passing frontier caps
+ΔP-reduction at ~0.19 — insufficient to fully break it.** Next (Build 12): encoder-level pp transform (would
+need an `OBS_VERSION` bump) or a hybrid targeted+global resample. Suite **266 pass**; `results/bc_gate11.json`,
+`results/bc_gate11_screen.json`, `results/behavior_probe_v11.json`.
+
 ## Setup
 
 ```bash
