@@ -20,6 +20,7 @@ from typing import cast
 import numpy as np
 import torch
 from poke_env.player import cross_evaluate
+from poke_env.teambuilder.teambuilder import Teambuilder
 
 from lategame.agents.ppo_agent import PPORecordingAgent
 from lategame.config import DEFAULT_FORMAT
@@ -68,8 +69,16 @@ async def collect_rollout(
     battle_format: str = DEFAULT_FORMAT,
     weights: RewardWeights | None = None,
     max_concurrent: int = 20,
+    team: str | Teambuilder | None = None,
+    loop_penalty: float = 0.0,
 ) -> RolloutBuffer:
-    """Roll out ``learner_checkpoint`` vs each opponent; return the learner's turns."""
+    """Roll out ``learner_checkpoint`` vs each opponent; return the learner's turns.
+
+    ``team`` (a shared ``TeamPool``) is required for teambuilt formats (gen9ou) and left
+    ``None`` for Random Battles. ``loop_penalty`` arms the Build-14 LoopGuard on the learner
+    and any learned (offrl/ppo) opponents so an absorbing switch loop can't stall a battle;
+    ``build_player`` ignores it for fixed baselines. Both default to the RB no-op.
+    """
     if not opponents:
         raise ValueError("Need at least one opponent to generate rollouts.")
     weights = weights or RewardWeights()
@@ -92,6 +101,8 @@ async def collect_rollout(
                 checkpoint_path=learner_checkpoint,
                 sample=True,
                 max_concurrent_battles=max_concurrent,
+                team=team,
+                loop_penalty=loop_penalty,
             ),
         )
         learner._reward_weights = weights
@@ -101,6 +112,8 @@ async def collect_rollout(
             checkpoint_path=opp.checkpoint_path,
             sample=opp.sample,
             max_concurrent_battles=max_concurrent,
+            team=team,
+            loop_penalty=loop_penalty,
         )
         await cross_evaluate([learner, opponent], n_challenges=games_per_opp)
         for recs, rewards, log_probs, values in _learner_episodes(learner, weights):

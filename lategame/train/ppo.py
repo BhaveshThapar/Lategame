@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import torch
+from poke_env.teambuilder.teambuilder import Teambuilder
 from torch import nn
 
 from lategame.config import DEFAULT_FORMAT
@@ -42,6 +43,7 @@ from lategame.model.actor_critic import (
 )
 from lategame.model.factory import build_model, model_metadata
 from lategame.model.policy import masked_logits
+from lategame.teambuilding.pool import TeamPool
 from lategame.train.bc import select_device
 from lategame.train.offline_rl import _value_ce
 from lategame.train.selfplay import (
@@ -57,6 +59,8 @@ class PPOConfig:
     init: str = "checkpoints/offrl_gen9randombattle.pt"
     out_dir: str = "checkpoints/ppo"
     battle_format: str = DEFAULT_FORMAT
+    team_pool: str | None = None  # packed-team pool for teambuilt formats (gen9ou); None for RB
+    loop_penalty: float = 0.0  # Build-14 LoopGuard on the learner/learned opponents (0 = off)
     iters: int = 8
     games_per_opp: int = 8
     pop_size: int = 2  # league checkpoints sampled per iteration (fictitious play)
@@ -234,11 +238,18 @@ def _print_stats(iteration: int, n_turns: int, stats: dict[str, float]) -> None:
     )
 
 
-async def _eval_point(iteration: int, ckpt_path: str, config: PPOConfig) -> CurvePoint:
+async def _eval_point(
+    iteration: int,
+    ckpt_path: str,
+    config: PPOConfig,
+    team: str | Teambuilder | None = None,
+) -> CurvePoint:
     """Win-rate of the iteration's checkpoint (greedy) vs each baseline + vs iter 0.
 
     The PPO checkpoint is a standard actor-critic checkpoint, so the M3 ``offrl`` agent
-    loads it directly -- no separate eval agent needed.
+    loads it directly -- no separate eval agent needed. ``team`` (a shared pool) is passed
+    to every player for teambuilt formats; the learner arms carry ``config.loop_penalty`` so
+    eval matches the acting policy (baselines ignore it via ``build_player``).
     """
     point: CurvePoint = {"iter": iteration}
     for base in config.eval_baselines:
@@ -248,9 +259,11 @@ async def _eval_point(iteration: int, ckpt_path: str, config: PPOConfig) -> Curv
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            loop_penalty=config.loop_penalty,
         )
         opponent = build_player(
-            base, config.battle_format, max_concurrent_battles=config.max_concurrent
+            base, config.battle_format, max_concurrent_battles=config.max_concurrent, team=team
         )
         point[f"vs_{base}"] = round(await evaluate_built(learner, opponent, config.eval_n), 4)
     if iteration > 0:
@@ -260,6 +273,8 @@ async def _eval_point(iteration: int, ckpt_path: str, config: PPOConfig) -> Curv
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            loop_penalty=config.loop_penalty,
         )
         iter0 = build_player(
             "offrl",
@@ -267,6 +282,8 @@ async def _eval_point(iteration: int, ckpt_path: str, config: PPOConfig) -> Curv
             checkpoint_path=config.init,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            loop_penalty=config.loop_penalty,
         )
         point["vs_iter0"] = round(await evaluate_built(learner, iter0, config.eval_n), 4)
     return point
@@ -287,10 +304,18 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
     ckpt = torch.load(init_path, map_location="cpu", weights_only=False)
     if ckpt.get("obs_version") != OBS_VERSION or ckpt.get("input_dim") != OBS_DIM:
         raise ValueError("init checkpoint encoder mismatch; cannot warm-start PPO. Retrain.")
+    # Rollout runs in the checkpoint's format; eval (_eval_point) runs config.battle_format.
+    # If they disagree the loop would roll out one format and score another -- fail loudly.
+    battle_format = str(ckpt.get("battle_format", config.battle_format))
+    if battle_format != config.battle_format:
+        raise ValueError(
+            f"format mismatch: init checkpoint is '{battle_format}' but config is "
+            f"'{config.battle_format}'; rollout/eval would differ -- pass --format {battle_format}"
+        )
     v_min, v_max, n_bins = float(ckpt["v_min"]), float(ckpt["v_max"]), int(ckpt["n_bins"])
     centers = value_support(v_min, v_max, n_bins).to(device)
     sigma = config.hl_gauss_sigma_bins * (v_max - v_min) / (n_bins - 1)
-    battle_format = str(ckpt.get("battle_format", config.battle_format))
+    team = TeamPool.from_packed_file(config.team_pool) if config.team_pool else None
     print(f"value support [{v_min:.3f}, {v_max:.3f}] over {n_bins} bins (sigma={sigma:.3f})")
 
     model = build_model(ckpt).to(device)
@@ -304,7 +329,7 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
     latest = str(init_path)  # checkpoint the acting agent reads (iter 0 = init)
     league = [str(init_path)]
 
-    curve: list[CurvePoint] = [await _eval_point(0, latest, config)]
+    curve: list[CurvePoint] = [await _eval_point(0, latest, config, team)]
     _print_curve_row(curve[0])
     _write_curve(out_dir / "curve.json", curve)
 
@@ -326,6 +351,8 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
             battle_format,
             config.weights,
             config.max_concurrent,
+            team=team,
+            loop_penalty=config.loop_penalty,
         )
         advantages, returns = compute_gae(
             buffer.reward, buffer.value, buffer.done, config.gamma, config.gae_lambda
@@ -340,7 +367,7 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
         league.append(ckpt_path)
 
         _print_stats(k, len(buffer), stats)
-        point = await _eval_point(k, latest, config)
+        point = await _eval_point(k, latest, config, team)
         curve.append(point)
         _print_curve_row(point)
         _write_curve(out_dir / "curve.json", curve)

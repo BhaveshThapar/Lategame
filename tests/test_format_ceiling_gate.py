@@ -168,3 +168,30 @@ def test_build_matchups_can_drop_stale_offrl_green_arm():
     )]
     assert "offrl_green" not in labels
     assert labels[-1] == "bc_v11"
+
+
+def test_build_matchups_appends_offrl_ou_arm():
+    # Build 16: an offrl checkpoint adds a dedicated offrl_ou (PPO-self-play) learned arm.
+    ms = gate._build_matchups(None, include_offrl_green=False, offrl_ckpt="checkpoints/ppo.pt")
+    assert ms[-1] == ("offrl_ou", "offrl", "heuristic", "checkpoints/ppo.pt")
+
+
+def test_build_matchups_appends_both_learned_arms():
+    ms = gate._build_matchups(
+        "checkpoints/bc.pt", include_offrl_green=False, offrl_ckpt="checkpoints/ppo.pt"
+    )
+    labels = [m[0] for m in ms]
+    assert "offrl_ou" in labels and "bc_v11" in labels
+    assert labels[-1] == "bc_v11"  # bc appended after offrl_ou
+
+
+def test_assess_ou_model_gap_prefers_offrl_arm():
+    # With both learned arms present, model_gap is measured against the stronger PPO offrl_ou arm.
+    m1 = _ou_m1(simple=0.64)
+    m1["bc_v11"] = {"rate": 0.03, "ci95": [0.01, 0.06]}
+    m1["offrl_ou"] = {"rate": 0.20, "ci95": [0.16, 0.25]}
+    v = gate.assess_ou(m1)["ou_verdict"]
+    assert v["verdict"] == "MODEL_BOUND"
+    assert v["learned_offrl"]["rate"] == 0.20
+    assert v["learned_bc"]["rate"] == 0.03
+    assert abs(v["model_gap"] - (0.64 - 0.20)) < 1e-9

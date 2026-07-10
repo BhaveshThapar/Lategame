@@ -34,8 +34,11 @@ import json
 import statistics
 from pathlib import Path
 
+from poke_env.teambuilder.teambuilder import Teambuilder
+
 from lategame.config import DEFAULT_FORMAT
 from lategame.eval.arena import build_player, evaluate_built
+from lategame.teambuilding.pool import TeamPool
 from lategame.train.ppo import PPOConfig, run_ppo
 
 _LADDER = ("random", "maxbasepower", "simpleheuristics", "heuristic")
@@ -50,11 +53,16 @@ def _ppo_config(
     eval_n: int,
     device: str,
     fmt: str,
+    team_pool: str | None,
+    loop_penalty: float,
+    ckpt_prefix: str,
 ) -> PPOConfig:
     return PPOConfig(
         init=init,
-        out_dir=f"checkpoints/ppo_scale_et_prior_s{seed}",  # do not clobber the M5 ppo/ run
+        out_dir=f"checkpoints/{ckpt_prefix}_s{seed}",  # do not clobber the M5 ppo/ run
         battle_format=fmt,
+        team_pool=team_pool,
+        loop_penalty=loop_penalty,
         anchors=("simpleheuristics",),  # heuristic held OUT of training
         eval_baselines=("random", "simpleheuristics", "heuristic"),
         iters=iters,
@@ -73,8 +81,8 @@ def _best_checkpoint(out_dir: str, init: str, best_iter: int) -> str:
     return str(Path(out_dir) / f"iter_{best_iter:02d}.pt")
 
 
-def _seed_record(init: str, seed: int, curve: list[dict]) -> dict:
-    out_dir = f"checkpoints/ppo_scale_et_prior_s{seed}"
+def _seed_record(init: str, seed: int, curve: list[dict], ckpt_prefix: str) -> dict:
+    out_dir = f"checkpoints/{ckpt_prefix}_s{seed}"
     start = next(p for p in curve if p["iter"] == 0)
     ppo_points = [p for p in curve if p["iter"] >= 1]
     best = max(ppo_points, key=lambda p: p.get("vs_heuristic", 0.0)) if ppo_points else start
@@ -94,14 +102,27 @@ def _seed_record(init: str, seed: int, curve: list[dict]) -> dict:
     }
 
 
-async def _ladder(ckpt: str, fmt: str, n: int) -> dict[str, float]:
+async def _ladder(
+    ckpt: str,
+    fmt: str,
+    n: int,
+    team: str | Teambuilder | None = None,
+    loop_penalty: float = 0.0,
+) -> dict[str, float]:
     """Greedy win-rate of one checkpoint across all baselines (the confirmatory ladder)."""
     out: dict[str, float] = {}
     for base in _LADDER:
         learner = build_player(
-            "offrl", fmt, checkpoint_path=ckpt, max_concurrent_battles=_EVAL_CONCURRENCY
+            "offrl",
+            fmt,
+            checkpoint_path=ckpt,
+            max_concurrent_battles=_EVAL_CONCURRENCY,
+            team=team,
+            loop_penalty=loop_penalty,
         )
-        opponent = build_player(base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY)
+        opponent = build_player(
+            base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY, team=team
+        )
         out[base] = round(await evaluate_built(learner, opponent, n), 4)
     return out
 
@@ -145,19 +166,28 @@ async def run_gate(
     ladder_n: int,
     device: str,
     fmt: str,
+    team_pool: str | None,
+    loop_penalty: float,
+    ckpt_prefix: str,
 ) -> dict:
     if not Path(init).exists():
         raise SystemExit(f"GREEN warm-start checkpoint '{init}' not found.")
     print(
         f"init {init} | seeds {seeds} | iters {iters} | "
-        f"games_per_opp {games_per_opp} | eval_n {eval_n}"
+        f"games_per_opp {games_per_opp} | eval_n {eval_n} | "
+        f"team_pool {team_pool} | loop_penalty {loop_penalty} | prefix {ckpt_prefix}"
     )
+    # One shared pool: both sides of every eval/ladder battle draw from it (fair mirror).
+    team = TeamPool.from_packed_file(team_pool) if team_pool else None
 
     records: list[dict] = []
     for seed in seeds:
-        cfg = _ppo_config(init, seed, iters, games_per_opp, eval_n, device, fmt)
+        cfg = _ppo_config(
+            init, seed, iters, games_per_opp, eval_n, device, fmt,
+            team_pool, loop_penalty, ckpt_prefix,
+        )
         curve = await run_ppo(cfg)
-        rec = _seed_record(init, seed, curve)
+        rec = _seed_record(init, seed, curve, ckpt_prefix)
         records.append(rec)
         print(
             f"seed={seed} start={rec['start_vs_heuristic']:.3f} "
@@ -167,13 +197,17 @@ async def run_gate(
 
     overall_best = max(records, key=lambda r: r["best_vs_heuristic"])
     print(f"\nconfirmatory ladder (n={ladder_n}) on {overall_best['best_checkpoint']}")
-    ladder = await _ladder(overall_best["best_checkpoint"], fmt, ladder_n)
+    ladder = await _ladder(overall_best["best_checkpoint"], fmt, ladder_n, team, loop_penalty)
     print("  " + "  ".join(f"{k} {v:.3f}" for k, v in ladder.items()))
 
     summary = _summarize(records)
     result = {
         "init": init,
         "arm": "ppo_et_prior",
+        "format": fmt,
+        "team_pool": team_pool,
+        "loop_penalty": loop_penalty,
+        "ckpt_prefix": ckpt_prefix,
         "seeds": seeds,
         "iters": iters,
         "games_per_opp": games_per_opp,
@@ -204,6 +238,25 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--ladder-n", type=int, default=300, help="Confirmatory ladder battles")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--format", dest="battle_format", default=DEFAULT_FORMAT)
+    parser.add_argument(
+        "--team-pool",
+        dest="team_pool",
+        default=None,
+        help="Packed-team pool for teambuilt formats (gen9ou); omit for Random Battles",
+    )
+    parser.add_argument(
+        "--loop-penalty",
+        dest="loop_penalty",
+        type=float,
+        default=0.0,
+        help="Build-14 LoopGuard penalty on the learner/learned opponents (0 = off)",
+    )
+    parser.add_argument(
+        "--ckpt-prefix",
+        dest="ckpt_prefix",
+        default="ppo_scale_et_prior",
+        help="checkpoints/<prefix>_s{seed}/ output dir (use ppo_ou_et_prior for OU)",
+    )
     args = parser.parse_args(argv)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -218,6 +271,9 @@ def main(argv: list[str] | None = None) -> None:
             args.ladder_n,
             args.device,
             args.battle_format,
+            args.team_pool,
+            args.loop_penalty,
+            args.ckpt_prefix,
         )
     )
 

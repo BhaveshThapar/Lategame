@@ -324,6 +324,26 @@ a format cap. **This flips the project posture: OU has real headroom → OU stre
 the justified next build; the interleaved ping-pong residual deprioritizes (won't lift heuristic win).** Suite
 **281 pass** (276 + 5), ruff + mypy(lategame) clean; `results/format_ceiling_gate_ou_v15.json`.
 
+**OU pivot Build 16 — PPO self-play on OU: the first method to move OU vs-heuristic with CI-clean significance;
+`AMBER` (mechanism validated, gap dented not closed).** Build 15 named PPO self-play as the strength build; the RB
+PPO was `AMBER` but RB was *format-capped*, so Build 16 tests whether on-policy PPO compounds where OU headroom
+provably exists. Preflight caught that no OU offrl checkpoint was on the current encoder (build-number "v5" ≠
+encoder v5; all were v2/v3/760) and the v11 BC winner has no *fitted* critic, so a v5/761 fitted-critic warm-start
+was retrained via `train-rl` on the v7 RL shard (BC-init v11) → `offrl_gen9ou_v7_s0.pt` (value-MAE 0.53). Wiring
+(runs + team/format plumbing; no `OBS_VERSION` bump / re-ingest / BC-retrain): `team` + `loop_penalty` thread
+through `collect_rollout`; `PPOConfig`/`run_ppo` (+ a format-consistency guard)/`_eval_point`; `ppo_continue_gate`
+gains `--team-pool`/`--loop-penalty`/`--ckpt-prefix`; `format_ceiling_gate` gains a dedicated `offrl_ou` learned
+arm + `model_gap`. A smoke settled the loop-guard fork (`lp=0` → the offrl agent loops to a 1000-turn auto-tie,
+0.000 vs random; `lp=4` functional), and `PPORecordingAgent` records `old_log_prob` from *un-penalized* logits
+(learner stays on-policy; the guard only stops opponents/eval-arms stalling). **Full gate (3 seeds × 10 iters, lp=4):
+PPO works** — `vs_iter0` **0.849 ± 0.017** (decisive, no collapse), `vs_random` **0.40 → 0.78**. Authoritative M1
+(n=300, best ckpt + `LoopGuard(4)`, harness clean): **`offrl_ou` 0.133 [0.099, 0.176]** vs **`bc_v11` 0.057 [0.036,
+0.089]** — disjoint CIs, a significant **~2.3×** gain; **`model_gap` 0.567 → 0.510**. **Verdict `AMBER` (positive):
+the RB AMBER did NOT transfer — PPO self-play genuinely improves the OU policy — but 0.133 « the competent bot 0.643,
+so the gap is dented ~10%, not closed.** Suite **289 pass** (281 + 8), ruff + mypy(lategame) clean;
+`results/ppo_ou_gate_v16.json`, `results/format_ceiling_gate_ou_v16.json`. Open next (AMBER follow-ups): expand the
+12-team self-play pool (prime ceiling suspect), more PPO iters (curve still climbing), stronger warm-start / more BC data.
+
 ## Setup
 
 ```bash
