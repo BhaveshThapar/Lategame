@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-07).
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-09).
 
 ---
 
@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-07-07)
+### 13.1 Build status & findings (as of 2026-07-09)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -1260,6 +1260,38 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     ceiling re-probe + OU PPO stay gated OFF. Suite 271 pass, ruff + mypy(lategame) clean;
     `results/pingpong_probe.json` + `behavior_probe_v13.json` committed (obs/decisions/transcripts + checkpoints
     gitignored).
+
+- **OU Pivot — Build 14: decision-time anti-repetition (loop guard) — the absorbing switch loop is BROKEN
+  (`max_switch_run` 58/26 → 2/2), with a milder interleaved ping-pong residual persisting (rate 0.30-0.37 > 0.25).**
+  - **Runs + small code, no `OBS_VERSION` bump / re-ingest / retrain.** New `lategame/agents/loop_guard.py`
+    (`LoopGuard`, torch-free) wired into `BCAgent`/`OfflineRLAgent.choose_move` between `masked_logits` and the
+    argmax; a `--loop-penalty` flag on `behavior_probe` threads it through `_build_probe_player` for a clean A/B on
+    identical machinery. `LoopGuard(0)` is exact identity. Chosen mechanism (per user): a **soft escalating logit
+    penalty**, not a hard mask (a finite penalty can never make the only legal action unreachable → no
+    forced-switch hang, and it leaves attacks untouched so the argmax is pushed toward attacking).
+  - **Two mechanism iterations (CLAUDE.md re-plan discipline).** (1) *return-only* — penalize just the switch-back
+    action (mirror `two_cycle_rows`). Live it merely converted the tight A→B→A into a longer roster-cycle via
+    **fresh-mon escape** (ping_pong 0.44→0.13 but `max_run` 17→26, switch mass flat, win 0) → **ruled out**
+    (fresh-mon escape is structural to a return-only penalty; no window/magnitude fixes it). (2) *streak* —
+    penalize **every** voluntary switch by `penalty·max(0, run − free_switches)` once a consecutive-switch run
+    forms (`free_switches=1`: a lone scout and a double-switch pivot stay free, the penalty first bites on the 3rd
+    consecutive switch where the 2-cycle forms), directly pressuring the pp-driven switch mass toward attacking.
+    Dropped the species/window tracking — a run counter is all the streak penalty needs.
+  - **Result (n=50, `bc_gen9ou_v11_s0`, p=4).** vs random: `max_run` **58→2**, vol_switch 0.171→0.107, win
+    **0.54→0.58**; vs heuristic: `max_run` **26→2**, vol_switch 0.337→0.169, win 0.00→0.02. Fallback/rejection
+    clean both arms. **The absorbing consecutive switch loop — the acute pathology since Build 8 — is broken and
+    the agent is functional vs random.** Smoke: p8 is no better than p4 (over-penalizes, win 0) → **p4 is the
+    pick**.
+  - **Residual (honest caveat).** `ping_pong_rate` fell ~0.55→0.30-0.37 but stays **> 0.25** (the `ping_pong`
+    c-flag still trips): the run resets on every attack, so the guard kills *consecutive* loops but not a **slower
+    interleaved oscillation** (switch→attack→switch→attack, 2-periodic across turns). It is much milder (win vs
+    random 0.58), and the still-~0 heuristic win reflects the OU policy's **general weakness (FORMAT_BOUND, gated
+    off)**, not the loop.
+  - **Verdict: loop BROKEN, committed as-is.** Suite **276 pass** (271 + 5 loop-guard), ruff + mypy(lategame)
+    clean; `results/behavior_probe_v14_{off,on}.json` committed (obs/decisions/transcripts + checkpoints
+    gitignored). **Open next:** the interleaved residual would need a persists-across-attacks penalty (risks
+    over-penalizing legit pivots and won't lift heuristic win); the heuristic-win frontier is the separate
+    FORMAT_BOUND strength problem. OU ceiling re-probe + OU PPO stay gated OFF.
 
 ---
 

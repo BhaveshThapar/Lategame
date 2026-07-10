@@ -28,12 +28,14 @@ class OfflineRLAgent(Player):
         *args: object,
         checkpoint_path: str | Path | None = None,
         sample: bool = False,
+        loop_penalty: float = 0.0,
         **kwargs: object,
     ) -> None:
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
         import torch
 
+        from lategame.agents.loop_guard import LoopGuard
         from lategame.model.factory import build_model
         from lategame.model.policy import masked_logits
 
@@ -58,6 +60,7 @@ class OfflineRLAgent(Player):
         self._model = model
         self._masked_logits = masked_logits
         self._sample = sample
+        self._loop_guard = LoopGuard(loop_penalty)
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
         if not battle.available_moves and not battle.available_switches:
@@ -69,8 +72,12 @@ class OfflineRLAgent(Player):
         with torch.no_grad():
             logits, _ = self._model(obs)
             logits = self._masked_logits(logits, mask)
+            pen = self._loop_guard.penalty_vector(battle)
+            if pen.any():
+                logits = logits - torch.from_numpy(pen).to(logits.dtype).unsqueeze(0)
             if self._sample:
                 action = int(torch.multinomial(torch.softmax(logits, dim=1), 1).item())
             else:
                 action = int(logits.argmax(dim=1).item())
+        self._loop_guard.record(battle, action)
         return action_to_order(action, battle)
