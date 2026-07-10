@@ -531,6 +531,7 @@ def _build_probe_player(
     checkpoint: str | None,
     pool: TeamPool,
     replay_dir: Path | None,
+    loop_penalty: float = 0.0,
 ) -> Player:
     # arena.build_player forwards neither log_level (needed to see the level-25
     # rejection messages) nor save_replays, so the probe builds players itself.
@@ -545,6 +546,8 @@ def _build_probe_player(
         "heuristic": HeuristicAgent,  # Build-8: the real eval opponent, as an arm
     }
     extra: dict[str, object] = {"checkpoint_path": checkpoint} if checkpoint else {}
+    if kind in ("bc", "offrl"):
+        extra["loop_penalty"] = loop_penalty  # Build 14 decision-time anti-repetition
     return classes[kind](
         account_configuration=local_account(f"{kind[:10]}-{secrets.token_hex(3)}"),
         battle_format=battle_format,
@@ -570,7 +573,8 @@ async def _run_arms(
         probe.arm = arm
         replay_dir = _REPLAY_DIR / arm if args.save_replays and kind != "random" else None
         player = _build_probe_player(
-            kind, args.format, ckpt, TeamPool(teams, seed=next(seeds)), replay_dir
+            kind, args.format, ckpt, TeamPool(teams, seed=next(seeds)), replay_dir,
+            args.loop_penalty,
         )
         opponent = _build_probe_player(
             opp_kind, args.format, None, TeamPool(teams, seed=next(seeds)), None
@@ -686,6 +690,13 @@ def main() -> None:
         "--train-shard",
         default="data/gen9ou_v5_bc.npz",
         help="BC shard for the train action-distribution baseline (optional)",
+    )
+    ap.add_argument(
+        "--loop-penalty",
+        type=float,
+        default=0.0,
+        help="Build 14 decision-time anti-repetition penalty for probed bc/offrl policies "
+        "(0 = off, reproduces the Build 13 baseline)",
     )
     ap.add_argument("--per-battle-timeout", type=float, default=120.0)
     ap.add_argument("--save-replays", action="store_true", help="Save poke-env HTML replays")

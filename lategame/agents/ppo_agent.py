@@ -48,9 +48,16 @@ class PPORecordingAgent(OfflineRLAgent):
         *args: object,
         checkpoint_path: str | Path | None = None,
         sample: bool = True,
+        loop_penalty: float = 0.0,
         **kwargs: object,
     ) -> None:
-        super().__init__(*args, checkpoint_path=checkpoint_path, sample=sample, **kwargs)
+        super().__init__(
+            *args,
+            checkpoint_path=checkpoint_path,
+            sample=sample,
+            loop_penalty=loop_penalty,
+            **kwargs,
+        )
 
         from lategame.model.actor_critic import value_from_logits, value_support
 
