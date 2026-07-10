@@ -43,6 +43,11 @@ AGENTS: dict[str, type[Player]] = {
 # the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
 _CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search"}
 
+# Learned-policy agents whose constructors accept a Build-14 ``loop_penalty`` (LoopGuard);
+# ``search`` is checkpoint-backed but has no LoopGuard. ``LoopGuard(0.0)`` is exact identity,
+# so forwarding the default 0.0 is a no-op for every existing caller.
+_LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
+
 
 @dataclass
 class EvalResult:
@@ -66,6 +71,7 @@ def build_player(
     sample: bool = False,
     max_concurrent_battles: int | None = None,
     team: str | Teambuilder | None = None,
+    loop_penalty: float = 0.0,
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
@@ -75,6 +81,10 @@ def build_player(
         extra["sample"] = sample
         if checkpoint_path is not None:
             extra["checkpoint_path"] = checkpoint_path
+    # Build-14 decision-time anti-repetition. Only the learned policies carry a LoopGuard;
+    # 0.0 is exact identity so this changes nothing unless a caller opts in.
+    if name in _LOOP_GUARD_AGENTS:
+        extra["loop_penalty"] = loop_penalty
     # poke-env defaults to one battle at a time; PPO rollouts/eval pass a higher value
     # so cross_evaluate keeps many battles in flight (the local server is the bottleneck).
     if max_concurrent_battles is not None:

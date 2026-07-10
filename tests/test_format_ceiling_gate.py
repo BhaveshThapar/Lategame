@@ -116,8 +116,29 @@ def test_assess_ou_clean_harness_wider_band():
     assert a["gradient_ok"] is True
     # width 0.60 - 0.03 = 0.57 vs RB 0.523 - 0.007 = 0.516 -> wider
     assert a["band_width"]["wider_than_rb"] is True
-    # OU smoke never applies the RB FORMAT/MODEL verdict.
+    # The RB-style top-level FORMAT/MODEL verdict is still never applied to the OU smoke.
     assert "verdict" not in a
+    # ...but the OU-specific FORMAT-vs-MODEL verdict is: simpleheuristics 0.60 >= HEADROOM 0.58.
+    assert a["ou_verdict"]["verdict"] == "MODEL_BOUND"
+    assert a["ou_verdict"]["format_bound_rejected"] is True
+
+
+def test_assess_ou_model_bound_reports_model_gap():
+    m1 = _ou_m1(simple=0.64)
+    m1["bc_v11"] = {"rate": 0.03, "ci95": [0.01, 0.06]}
+    a = gate.assess_ou(m1)
+    v = a["ou_verdict"]
+    assert v["verdict"] == "MODEL_BOUND"
+    assert v["learned_bc"]["rate"] == 0.03
+    assert abs(v["model_gap"] - (0.64 - 0.03)) < 1e-9
+
+
+def test_assess_ou_insufficient_when_competent_below_headroom():
+    # A clean harness but no wide-band evidence (simpleheuristics < HEADROOM) -> no MODEL_BOUND.
+    a = gate.assess_ou(_ou_m1(simple=0.52, maxbp=0.20))
+    assert a["harness_ok"] is True
+    assert a["ou_verdict"]["verdict"] == "INSUFFICIENT"
+    assert a["ou_verdict"]["format_bound_rejected"] is False
 
 
 def test_assess_ou_flags_broken_mirror_and_gradient():
@@ -125,3 +146,25 @@ def test_assess_ou_flags_broken_mirror_and_gradient():
     assert a["mirror_sanity_ok"] is False
     assert a["gradient_ok"] is False
     assert a["harness_ok"] is False
+    # A dirty harness must not emit a trustworthy verdict.
+    assert a["ou_verdict"]["verdict"] == "INSUFFICIENT"
+    assert a["ou_verdict"]["format_bound_rejected"] is False
+
+
+def test_build_matchups_appends_loop_fixed_bc_arm():
+    base = gate._build_matchups(None)
+    assert base == gate._MATCHUPS
+    assert base is not gate._MATCHUPS  # a copy, not the module constant
+    with_bc = gate._build_matchups("checkpoints/bc_gen9ou_v11_s0.pt")
+    assert with_bc[-1] == ("bc_v11", "bc", "heuristic", "checkpoints/bc_gen9ou_v11_s0.pt")
+    assert len(with_bc) == len(base) + 1
+
+
+def test_build_matchups_can_drop_stale_offrl_green_arm():
+    # On OU the RB offrl_green checkpoint can't load (older encoder); the arm is droppable while
+    # the loop-fixed bc arm is kept.
+    labels = [m[0] for m in gate._build_matchups(
+        "checkpoints/bc_gen9ou_v11_s0.pt", include_offrl_green=False
+    )]
+    assert "offrl_green" not in labels
+    assert labels[-1] == "bc_v11"

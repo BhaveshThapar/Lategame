@@ -66,6 +66,25 @@ _MATCHUPS: list[tuple[str, str, str, str | None]] = [
     ("offrl_green", "offrl", "heuristic", _GREEN_CKPT),
 ]
 
+# Learned p1 arms take the Build-14 ``loop_penalty`` (LoopGuard); baselines do not.
+_LEARNED_ARMS = {"bc", "offrl", "ppo"}
+
+
+def _build_matchups(
+    bc_ckpt: str | None, include_offrl_green: bool = True
+) -> list[tuple[str, str, str, str | None]]:
+    """The fixed skill gradient, plus a loop-fixed ``bc`` arm when a checkpoint is given.
+
+    Pure (no server) so the matchup wiring is unit-testable. The ``bc_v11`` arm scores an
+    OU-trained BC policy vs ``heuristic`` -- the shipped winner the RB-oriented ``offrl_green``
+    arm can't load. ``include_offrl_green=False`` drops that arm: its default checkpoint is an
+    RB agent frozen at an older encoder version, so on OU (no loadable offrl override) it can't
+    build -- the ``bc_v11`` arm is the meaningful learned arm there."""
+    matchups = [m for m in _MATCHUPS if include_offrl_green or m[0] != "offrl_green"]
+    if bc_ckpt:
+        matchups.append(("bc_v11", "bc", "heuristic", bc_ckpt))
+    return matchups
+
 # On-record gen9-RB M1 band (results/format_ceiling_gate.json, Lever 15) for a side-by-side
 # read on the teambuilt (OU) smoke. GREEN there is the RB-trained offrl checkpoint.
 _RB_BAND = {
@@ -310,6 +329,8 @@ async def run_m1(
     battle_format: str,
     team_pool: str,
     offrl_ckpt: str | None = None,
+    bc_ckpt: str | None = None,
+    loop_penalty: float = 0.0,
 ) -> dict[str, Any]:
     """Head-to-heads vs ``heuristic`` for the fixed skill gradient + GREEN, at n each.
 
@@ -318,7 +339,10 @@ async def run_m1(
     independent (non-locked) team draws -- varied matchups, mirror-fair in expectation.
 
     ``offrl_ckpt`` overrides the ``offrl`` arm's checkpoint (default: the RB GREEN ckpt), so the
-    OU probe can score an OU-trained agent while the RB band stays the on-record RB GREEN."""
+    OU probe can score an OU-trained agent while the RB band stays the on-record RB GREEN.
+    ``bc_ckpt`` appends a loop-fixed ``bc_v11`` arm (the shipped OU winner); ``loop_penalty``
+    (Build 14) is applied to every learned arm so the agents are scored *with* the LoopGuard the
+    live probe uses."""
     from lategame.eval.arena import build_player, evaluate_built
 
     teams: list[str] | None = None
@@ -336,13 +360,17 @@ async def run_m1(
 
         return TeamPool(teams, seed=next(seeds))
 
+    # The offrl_green arm's default checkpoint is an RB agent pinned to an older encoder version;
+    # on OU it only builds if the caller supplies a loadable OU offrl override.
+    include_green = "randombattle" in battle_format or offrl_ckpt is not None
     block: dict[str, Any] = {"n": n, "format": battle_format}
-    for label, p1, p2, ckpt in _MATCHUPS:
+    for label, p1, p2, ckpt in _build_matchups(bc_ckpt, include_offrl_green=include_green):
         if offrl_ckpt and p1 == "offrl":
             ckpt = offrl_ckpt
         player1 = build_player(
             p1, battle_format, checkpoint_path=ckpt,
             max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
+            loop_penalty=loop_penalty if p1 in _LEARNED_ARMS else 0.0,
         )
         player2 = build_player(
             p2, battle_format, max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
@@ -363,21 +391,59 @@ def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
 
     Deliberately does not apply the RB BAND_TOP/HEADROOM thresholds -- poke-env's bots sit far
     below OU's skill ceiling and there's no OU near-optimal reference yet (M2/M3 deferred)."""
-    rate = {k: m1[k]["rate"] for k in _RB_BAND if k in m1}
+    rate = {k: m1[k]["rate"] for k in _RB_BAND if k in m1 and "rate" in m1[k]}
     mirror_ok = abs(rate.get("mirror", 0.5) - 0.5) <= MIRROR_TOL
     gradient_ok = (
         rate.get("random", 1.0) < rate.get("maxbasepower", 0.0) < rate.get("simpleheuristics", 0.0)
     )
+    harness_ok = mirror_ok and gradient_ok
     ou_width = rate.get("simpleheuristics", 0.0) - rate.get("random", 0.0)
     rb_width = _RB_BAND["simpleheuristics"] - _RB_BAND["random"]
+
+    # FORMAT vs MODEL: apply the Lever-15 HEADROOM threshold to the competent-bot reference
+    # (simpleheuristics), consistent with the RB verdict. On OU a *simple* bot already clears
+    # the heuristic by a wide margin, so if it lands >= HEADROOM the format is not the ceiling
+    # and our learned agent's low win is a MODEL gap. Only trust the verdict on a clean harness.
+    competent = rate.get("simpleheuristics")
+    learned_bc = m1.get("bc_v11")  # loop-fixed OU winner, if the bc arm ran
+    format_bound_rejected = competent is not None and competent >= HEADROOM
+    if not harness_ok:
+        verdict = "INSUFFICIENT"
+        reason = "harness not clean (mirror/gradient) -- fix before trusting the OU band"
+    elif format_bound_rejected:
+        verdict = "MODEL_BOUND"
+        reason = (
+            f"competent bot (simpleheuristics {competent:.3f}) >= HEADROOM {HEADROOM} over the "
+            "heuristic => OU rewards skill, format is not the ceiling; the learned agent's low "
+            "win is a model gap, not a format cap. FORMAT_BOUND rejected for OU."
+        )
+    else:
+        verdict = "INSUFFICIENT"
+        reason = (
+            f"competent bot (simpleheuristics {competent}) < HEADROOM {HEADROOM} -- no wide-band "
+            "evidence of skill headroom; investigate harness or reconsider a genuine OU ceiling."
+        )
+    ou_verdict: dict[str, Any] = {
+        "verdict": verdict,
+        "reason": reason,
+        "competent_rate": competent,
+        "headroom": HEADROOM,
+        "format_bound_rejected": bool(format_bound_rejected and harness_ok),
+    }
+    if learned_bc is not None:
+        ou_verdict["learned_bc"] = {"rate": learned_bc["rate"], "ci95": learned_bc.get("ci95")}
+        if competent is not None:
+            ou_verdict["model_gap"] = competent - learned_bc["rate"]
+
     return {
         "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
         "mirror_sanity_ok": mirror_ok,
         "gradient_ok": gradient_ok,
-        "harness_ok": mirror_ok and gradient_ok,
+        "harness_ok": harness_ok,
         "ou_band": rate,
         "rb_band_reference": _RB_BAND,
         "band_width": {"ou": ou_width, "rb": rb_width, "wider_than_rb": ou_width >= rb_width},
+        "ou_verdict": ou_verdict,
     }
 
 
@@ -397,6 +463,14 @@ def _print_ou_summary(a: dict[str, Any]) -> None:
     print(f"  {a['note']}")
     if not a["harness_ok"]:
         print("  !! harness NOT clean -- investigate before trusting the OU band")
+    v = a.get("ou_verdict")
+    if v:
+        bc = v.get("learned_bc")
+        if bc is not None:
+            gap = v.get("model_gap")
+            gap_s = f"   model_gap {gap:.3f}" if gap is not None else ""
+            print(f"  loop-fixed bc_v11 (vs heuristic): {bc['rate']:.3f}{gap_s}")
+        print(f"  OU VERDICT: {v['verdict']} -- {v['reason']}")
 
 
 # --------------------------------------------------------------------------- #
@@ -450,6 +524,10 @@ def main() -> None:
     ap.add_argument("--concurrency", type=int, default=20, help="M1 max concurrent battles")
     ap.add_argument("--offrl-checkpoint", default=None,
                     help="checkpoint for the offrl M1 arm (default: RB GREEN); set to an OU ckpt")
+    ap.add_argument("--bc-checkpoint", default=None,
+                    help="OU BC checkpoint; adds a loop-fixed bc_v11 arm to the teambuilt M1 sweep")
+    ap.add_argument("--loop-penalty", type=float, default=0.0,
+                    help="Build-14 LoopGuard penalty applied to learned M1 arms (0 = off)")
     ap.add_argument("--limit", type=int, default=300, help="M3 replays to re-sim")
     args = ap.parse_args()
 
@@ -469,7 +547,10 @@ def main() -> None:
         # RB FORMAT/MODEL verdict is forced -- see assess_ou.
         print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt; M1-only smoke)...")
         data["m1"] = asyncio.run(
-            run_m1(args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint)
+            run_m1(
+                args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint,
+                bc_ckpt=args.bc_checkpoint, loop_penalty=args.loop_penalty,
+            )
         )
         data["ou_assessment"] = assess_ou(data["m1"])
         _print_ou_summary(data["ou_assessment"])
