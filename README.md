@@ -306,6 +306,24 @@ run resets on each attack, so the guard kills *consecutive* loops but not a slow
 policy's general weakness (FORMAT_BOUND, gated off), not the loop. Suite **276 pass**, ruff + mypy(lategame)
 clean; `results/behavior_probe_v14_{off,on}.json`.
 
+**OU pivot Build 15 — OU ceiling re-probe (loop-fixed): the OU FORMAT_BOUND label was inherited from RB and is
+now measured WRONG — OU is `MODEL_BOUND`.** Build 14 gave the first loop-free OU agent; no win-rate harness had
+ever scored it (`arena`/`format_ceiling_gate` didn't thread `loop_penalty` and targeted the `offrl` arm, while
+the shipped winner is `bc`), and `assess_ou` had always *withheld* the FORMAT/MODEL verdict for teambuilt formats.
+This build closes both gaps (runs + small eval wiring; no `OBS_VERSION` bump / re-ingest / retrain): `loop_penalty`
+now threads through `arena.build_player` (`_LOOP_GUARD_AGENTS`), and `format_ceiling_gate` gains `--bc-checkpoint`
+/`--loop-penalty`, a loop-fixed `bc_v11` M1 arm, and an OU FORMAT-vs-MODEL verdict in `assess_ou` (applies the
+Lever-15 `HEADROOM=0.58` threshold to the competent-bot reference). The stale RB `offrl_green` arm (checkpoint
+pinned to encoder v2/760, un-loadable since the v5/761 bump) is dropped on OU. **M1 (n=300, `bc_gen9ou_v11_s0` +
+`LoopGuard(4)`):** harness clean (mirror **0.510**, gradient monotone random **0.027** < maxbasepower **0.060** <
+simpleheuristics **0.620** [0.564, 0.673]), band width **0.593 > RB 0.516**. A *simple competent bot* clears the
+heuristic by **0.62 ≥ HEADROOM** ⇒ OU rewards skill, the format is **not** the ceiling → **`MODEL_BOUND`,
+FORMAT_BOUND rejected for OU**. Our loop-fixed winner sits at **bc_v11 0.053** [0.033, 0.085] — near the
+random/maxbasepower floor, **model_gap 0.567** below the competent bot: the ~0 heuristic win is a *model* gap, not
+a format cap. **This flips the project posture: OU has real headroom → OU strength (PPO self-play / better BC) is
+the justified next build; the interleaved ping-pong residual deprioritizes (won't lift heuristic win).** Suite
+**281 pass** (276 + 5), ruff + mypy(lategame) clean; `results/format_ceiling_gate_ou_v15.json`.
+
 ## Setup
 
 ```bash

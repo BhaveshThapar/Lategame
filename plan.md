@@ -4,7 +4,7 @@
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
-**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-09).
+**Status:** In progress — see §13.1 for build status & findings (updated 2026-07-10).
 
 ---
 
@@ -283,7 +283,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 | **M6 — Multi-format** | OU (team pools) + VGC (doubles head) instantiated | ≥3 formats playable end-to-end (G4) |
 | **M7 — Search (optional)** | Test-time depth-limited search toggle | Measurable win-rate lift on Extended-Timer formats |
 
-### 13.1 Build status & findings (as of 2026-07-09)
+### 13.1 Build status & findings (as of 2026-07-10)
 
 > The build milestones below track the *actual* implementation sequence and differ from the
 > roadmap table above (which numbers M5+ as deploy/multi-format). All work so far targets
@@ -1292,6 +1292,38 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     gitignored). **Open next:** the interleaved residual would need a persists-across-attacks penalty (risks
     over-penalizing legit pivots and won't lift heuristic win); the heuristic-win frontier is the separate
     FORMAT_BOUND strength problem. OU ceiling re-probe + OU PPO stay gated OFF.
+
+- **OU Pivot — Build 15: OU ceiling re-probe (loop-fixed) — the OU FORMAT_BOUND label was inherited from RB and
+  is now measured WRONG: OU is `MODEL_BOUND`, FORMAT_BOUND rejected.**
+  - **Motivation.** Build 14 produced the first loop-free OU agent, but the "OU heuristic-loss is FORMAT_BOUND"
+    posture was never *computed on OU* — `scripts/format_ceiling_gate.py::assess_ou` deliberately withholds the
+    FORMAT/MODEL verdict for teambuilt formats (no OU near-optimal reference), so the label was inherited from the
+    RB run. And no win-rate harness scored the loop-fixed agent: `arena.build_player` / CLI `evaluate` /
+    `format_ceiling_gate` never threaded `loop_penalty` and targeted the `offrl` arm, while the shipped winner is
+    the `bc` checkpoint. The 0.58/0.02 figures came only from the serial n=50 `behavior_probe`.
+  - **Runs + small eval wiring, no `OBS_VERSION` bump / re-ingest / retrain.** (1) `loop_penalty` now threads
+    through `arena.build_player` via a new `_LOOP_GUARD_AGENTS = {bc, offrl, ppo}` set (`LoopGuard(0)` is exact
+    identity → every existing caller unchanged). (2) `format_ceiling_gate` gains `--bc-checkpoint` /
+    `--loop-penalty`, a pure `_build_matchups(bc_ckpt, include_offrl_green)` helper appending a loop-fixed
+    `bc_v11` M1 arm, and an OU FORMAT-vs-MODEL verdict in `assess_ou` that applies the Lever-15 `HEADROOM=0.58`
+    threshold to the competent-bot reference (`simpleheuristics`). The stale RB `offrl_green` arm (checkpoint
+    pinned to encoder **v2/760**, un-loadable since the **v5/761** bump) is dropped on OU — the `bc_v11` arm is the
+    meaningful learned arm there.
+  - **Result (M1, n=300, `bc_gen9ou_v11_s0` + `LoopGuard(4)`).** Harness clean: mirror **0.510** (sanity within
+    `MIRROR_TOL`), gradient monotone **random 0.027 < maxbasepower 0.060 < simpleheuristics 0.620** [0.564, 0.673];
+    band width **0.593 > RB 0.516**. A *simple competent bot* (simpleheuristics) clears the heuristic by
+    **0.62 ≥ HEADROOM 0.58** — the very quantity that forced FORMAT_BOUND on RB (where even the strongest bot only
+    tied the heuristic) shows **wide headroom** on OU ⇒ OU rewards skill, the format is **not** the ceiling →
+    **`MODEL_BOUND`**. Our loop-fixed winner sits at **bc_v11 0.053** [0.033, 0.085] (consistent with the n=50
+    behavior_probe 0.02), near the random/maxbasepower floor, **model_gap 0.567** below the competent bot: the ~0
+    heuristic win is a *model* gap, not a format cap. (bc_v11 0.053 ≈ maxbasepower 0.060 — the loop-fixed policy
+    plays roughly at "always max-base-power" level vs the heuristic.)
+  - **Verdict: OU is MODEL_BOUND — the project posture flips.** OU has real, uncaptured headroom → **OU strength
+    (PPO self-play / better BC data) is now the justified next build.** The interleaved ping-pong residual
+    deprioritizes (won't lift the heuristic win). Suite **281 pass** (276 + 5), ruff + mypy(lategame) clean;
+    `results/format_ceiling_gate_ou_v15.json` committed. **Open next:** OU strength push (Option C) — turn the
+    heavier machinery on to close the 0.567 model gap; M2 (OU near-optimal search) / M3 (OU replays) remain
+    deferred (the wide-band simpleheuristics evidence already rejects FORMAT_BOUND without them).
 
 ---
 
