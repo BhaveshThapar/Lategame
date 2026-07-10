@@ -1325,6 +1325,50 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     heavier machinery on to close the 0.567 model gap; M2 (OU near-optimal search) / M3 (OU replays) remain
     deferred (the wide-band simpleheuristics evidence already rejects FORMAT_BOUND without them).
 
+- **OU Pivot — Build 16: PPO self-play on OU — the first method to move OU vs-heuristic with CI-clean significance;
+  `AMBER` (mechanism validated, gap dented not closed).**
+  - **Motivation.** Build 15 → `MODEL_BOUND` named PPO self-play as the justified strength build. The RB PPO
+    (Lever 10) was `AMBER` ("stable, no collapse, but doesn't beat the AWR ceiling"), but RB was *format-capped*
+    (no headroom), so that flatness plausibly wouldn't transfer to OU. Build 16 is the honest test of whether
+    on-policy PPO compounds past the demonstrator ceiling where headroom provably exists.
+  - **Preflight re-plan (blocker caught before coding).** No existing OU offrl checkpoint was on the current
+    encoder — the filename "v5" is a *build* number, not the encoder version (`offrl_gen9ou_v5_s0` = encoder
+    **v3/760**, `_et_prior` = **v2/760**; live is **v5/761**). The offrl lineage never re-ran after the v6→v7
+    (encoder v4→v5) bumps, and the v11 BC winner carries no *fitted* critic (warm-starting PPO from it = the M5
+    random-critic collapse mode). Resolution (reuses built M3 machinery, a run not new code): retrained OU
+    offline-RL on the v5/761 RL shard, BC-init from v11 → **`checkpoints/offrl_gen9ou_v7_s0.pt`** (val actor-acc
+    0.648, value-MAE **0.53**, `v_min/v_max/n_bins` stamped → passes `run_ppo`'s guard).
+  - **Wiring (runs + team/format plumbing, no `OBS_VERSION` bump / re-ingest / BC-retrain).** (1) `team` +
+    `loop_penalty` thread through `data/rollout.py::collect_rollout` (learner + opponents). (2) `PPOConfig` gains
+    `team_pool` / `loop_penalty`; `run_ppo` builds one shared `TeamPool` and adds a **format-consistency guard**
+    (rollout uses the checkpoint's format, eval uses `config.battle_format` — mismatch now fails loudly);
+    `_eval_point` threads both. (3) `ppo_continue_gate.py` gains `--team-pool` / `--loop-penalty` / `--ckpt-prefix`
+    (non-clobbering `checkpoints/ppo_ou_et_prior_s{seed}/`). (4) `format_ceiling_gate.py` gains a dedicated
+    **`offrl_ou`** learned arm (`_build_matchups(offrl_ckpt=…)`) and `assess_ou` computes `model_gap` against the
+    strongest learned arm present (PPO `offrl_ou` over `bc_v11`).
+  - **Loop-guard decided by smoke, not assumed.** At `loop_penalty=0` the `offrl` agent loops to the 1000-turn
+    auto-tie and scores **0.000 vs random** (the pre-Build-14 pathology); at `loop_penalty=4` it's functional →
+    **lp=4** (matches how `bc_v11` was scored). On-policy correctness: `PPORecordingAgent.choose_move` records
+    `old_log_prob` from the *un-penalized* masked logits (the learner acts on its true policy), and the guard only
+    keeps `offrl`/`ppo` **opponents/eval-arms** from stalling — so lp=4 is correct with no code change. The looping
+    learner simply loses to a progressing opponent → PPO's reward teaches it to stop.
+  - **Result — full gate (3 seeds × 10 iters, warm-start `offrl_gen9ou_v7_s0`, lp=4).** PPO **works**: `vs_iter0`
+    **0.849 ± 0.017** (decisive self-improvement, no collapse) and `vs_random` climbs monotonically **0.40 → 0.78**;
+    `best_vs_heuristic` **0.124 ± 0.046**. Authoritative M1 (n=300, best ckpt `ppo_ou_et_prior_s1/iter_10` +
+    `LoopGuard(4)`) is harness-clean (mirror **0.480**, gradient monotone **random 0.010 < maxbasepower 0.080 <
+    simpleheuristics 0.643**, band 0.633 > RB 0.516): **`offrl_ou` 0.133 [0.099, 0.176]** vs **`bc_v11`
+    0.057 [0.036, 0.089]** — the CIs are **disjoint** (0.099 > 0.089), a statistically significant **~2.3×** gain
+    over the BC winner. **`model_gap` 0.567 → 0.510.**
+  - **Verdict: `AMBER` (positive) — the mechanism is validated, the magnitude is modest.** On-policy PPO self-play
+    is the **first method to move OU vs-heuristic with CI-clean significance** (0.057 → 0.133), with decisive
+    self-improvement and no collapse ⇒ **the RB AMBER did NOT transfer** (it was a format artifact). But 0.133 is
+    still far below the competent bot 0.643 — the gap is **dented (~10%), not closed**. `MODEL_BOUND` reconfirmed.
+    Suite **289 pass** (281 + 8), ruff + mypy(lategame) clean; `results/ppo_ou_gate_v16.json` +
+    `results/format_ceiling_gate_ou_v16.json` + `checkpoints/offrl_gen9ou_v7_s0.pt` +
+    `checkpoints/ppo_ou_et_prior_s{0,1,2}/`. **Open next (AMBER follow-ups):** the vs_random curve was still
+    climbing at iter 10 and self-play ran on only a **12-team pool** — the prime ceiling suspect. Candidates:
+    expand the team pool (`build_ou_teampool.py`), more PPO iters, a stronger/larger warm-start or more BC data.
+
 ---
 
 ## 14. Risks & mitigations

@@ -261,3 +261,75 @@ def test_build_player_omits_max_concurrent_when_unset(monkeypatch):
     monkeypatch.setitem(arena.AGENTS, "random", Dummy)
     arena.build_player("random", "gen9randombattle")
     assert "max_concurrent_battles" not in captured
+
+
+def test_ppo_config_has_ou_team_and_loop_fields():
+    # Build 16: OU self-play needs a team pool + LoopGuard; both default to the RB no-op.
+    pytest.importorskip("torch")
+    from lategame.train.ppo import PPOConfig
+
+    cfg = PPOConfig()
+    assert cfg.team_pool is None
+    assert cfg.loop_penalty == 0.0
+
+
+def test_run_ppo_rejects_format_mismatch(tmp_path):
+    # If the warm-start checkpoint's format != config.battle_format, rollout (checkpoint format)
+    # and eval (config format) would diverge -- run_ppo must fail loudly before any server call.
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import PPOConfig, _save_checkpoint, run_ppo
+
+    path = tmp_path / "rb_init.pt"
+    _save_checkpoint(ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path),
+                     "gen9randombattle", -3.0, 3.0, 11)
+    cfg = PPOConfig(init=str(path), battle_format="gen9ou")
+    with pytest.raises(ValueError, match="format mismatch"):
+        asyncio.run(run_ppo(cfg))
+
+
+def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
+    # Teams + LoopGuard must reach BOTH the ppo learner and the opponent build (build_player
+    # filters loop_penalty to learned agents). Stub the server so this stays a unit test.
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.data import rollout as rollout_mod
+    from lategame.data.collect import PlayerSpec
+    from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
+
+    calls: list[tuple[str, dict]] = []
+
+    class Dummy:
+        def __init__(self) -> None:
+            self.dropped = 0
+
+    def fake_build_player(name, battle_format, **kwargs):
+        calls.append((name, kwargs))
+        return Dummy()
+
+    async def fake_cross_evaluate(players, n_challenges):
+        return None
+
+    def fake_episodes(player, weights):
+        obs = np.zeros(OBS_DIM, dtype=np.float32)
+        mask = np.ones(GEN9_ACTION_SPACE_SIZE, dtype=bool)
+        return [([(obs, 0, mask)], [0.0], [0.0], [0.0])]
+
+    monkeypatch.setattr(rollout_mod, "build_player", fake_build_player)
+    monkeypatch.setattr(rollout_mod, "cross_evaluate", fake_cross_evaluate)
+    monkeypatch.setattr(rollout_mod, "_learner_episodes", fake_episodes)
+
+    buf = asyncio.run(
+        rollout_mod.collect_rollout(
+            "ck.pt", [PlayerSpec("simpleheuristics")], games_per_opp=1,
+            battle_format="gen9ou", team="POOL", loop_penalty=4.0,
+        )
+    )
+    ppo_call = next(k for (n, k) in calls if n == "ppo")
+    opp_call = next(k for (n, k) in calls if n == "simpleheuristics")
+    assert ppo_call["team"] == "POOL" and ppo_call["loop_penalty"] == 4.0
+    assert opp_call["team"] == "POOL" and opp_call["loop_penalty"] == 4.0
+    assert len(buf) == 1

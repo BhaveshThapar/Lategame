@@ -71,16 +71,22 @@ _LEARNED_ARMS = {"bc", "offrl", "ppo"}
 
 
 def _build_matchups(
-    bc_ckpt: str | None, include_offrl_green: bool = True
+    bc_ckpt: str | None,
+    include_offrl_green: bool = True,
+    offrl_ckpt: str | None = None,
 ) -> list[tuple[str, str, str, str | None]]:
-    """The fixed skill gradient, plus a loop-fixed ``bc`` arm when a checkpoint is given.
+    """The fixed skill gradient, plus loop-fixed learned arms when checkpoints are given.
 
-    Pure (no server) so the matchup wiring is unit-testable. The ``bc_v11`` arm scores an
-    OU-trained BC policy vs ``heuristic`` -- the shipped winner the RB-oriented ``offrl_green``
-    arm can't load. ``include_offrl_green=False`` drops that arm: its default checkpoint is an
-    RB agent frozen at an older encoder version, so on OU (no loadable offrl override) it can't
-    build -- the ``bc_v11`` arm is the meaningful learned arm there."""
+    Pure (no server) so the matchup wiring is unit-testable. ``offrl_ckpt`` appends an
+    ``offrl_ou`` arm (Build 16: the PPO-self-play OU actor-critic vs ``heuristic``) and
+    ``bc_ckpt`` appends the ``bc_v11`` arm (the shipped BC winner vs ``heuristic``) -- both
+    the OU-current-encoder learned arms the RB-oriented ``offrl_green`` arm can't load.
+    ``include_offrl_green=False`` drops the RB green arm: its default checkpoint is an RB agent
+    frozen at an older encoder version, so on OU it can't build -- the ``offrl_ou``/``bc_v11``
+    arms are the meaningful learned arms there."""
     matchups = [m for m in _MATCHUPS if include_offrl_green or m[0] != "offrl_green"]
+    if offrl_ckpt:
+        matchups.append(("offrl_ou", "offrl", "heuristic", offrl_ckpt))
     if bc_ckpt:
         matchups.append(("bc_v11", "bc", "heuristic", bc_ckpt))
     return matchups
@@ -360,13 +366,13 @@ async def run_m1(
 
         return TeamPool(teams, seed=next(seeds))
 
-    # The offrl_green arm's default checkpoint is an RB agent pinned to an older encoder version;
-    # on OU it only builds if the caller supplies a loadable OU offrl override.
-    include_green = "randombattle" in battle_format or offrl_ckpt is not None
+    # The offrl_green arm's default checkpoint is an RB agent pinned to an older encoder version,
+    # so it's RB-only; on OU an ``offrl_ckpt`` is scored as the explicit ``offrl_ou`` arm instead.
+    include_green = "randombattle" in battle_format
     block: dict[str, Any] = {"n": n, "format": battle_format}
-    for label, p1, p2, ckpt in _build_matchups(bc_ckpt, include_offrl_green=include_green):
-        if offrl_ckpt and p1 == "offrl":
-            ckpt = offrl_ckpt
+    for label, p1, p2, ckpt in _build_matchups(
+        bc_ckpt, include_offrl_green=include_green, offrl_ckpt=offrl_ckpt
+    ):
         player1 = build_player(
             p1, battle_format, checkpoint_path=ckpt,
             max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
@@ -405,7 +411,8 @@ def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
     # the heuristic by a wide margin, so if it lands >= HEADROOM the format is not the ceiling
     # and our learned agent's low win is a MODEL gap. Only trust the verdict on a clean harness.
     competent = rate.get("simpleheuristics")
-    learned_bc = m1.get("bc_v11")  # loop-fixed OU winner, if the bc arm ran
+    learned_bc = m1.get("bc_v11")  # loop-fixed OU BC winner, if the bc arm ran
+    learned_offrl = m1.get("offrl_ou")  # Build-16 PPO-self-play OU actor-critic, if it ran
     format_bound_rejected = competent is not None and competent >= HEADROOM
     if not harness_ok:
         verdict = "INSUFFICIENT"
@@ -432,8 +439,15 @@ def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
     }
     if learned_bc is not None:
         ou_verdict["learned_bc"] = {"rate": learned_bc["rate"], "ci95": learned_bc.get("ci95")}
-        if competent is not None:
-            ou_verdict["model_gap"] = competent - learned_bc["rate"]
+    if learned_offrl is not None:
+        ou_verdict["learned_offrl"] = {
+            "rate": learned_offrl["rate"], "ci95": learned_offrl.get("ci95")
+        }
+    # model_gap uses the strongest learned arm present -- the PPO (offrl_ou) arm takes precedence
+    # over bc_v11 once Build 16 has run, else it falls back to the bc winner.
+    primary = learned_offrl or learned_bc
+    if primary is not None and competent is not None:
+        ou_verdict["model_gap"] = competent - primary["rate"]
 
     return {
         "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
@@ -465,11 +479,16 @@ def _print_ou_summary(a: dict[str, Any]) -> None:
         print("  !! harness NOT clean -- investigate before trusting the OU band")
     v = a.get("ou_verdict")
     if v:
+        gap = v.get("model_gap")
+        gap_s = f"   model_gap {gap:.3f}" if gap is not None else ""
         bc = v.get("learned_bc")
         if bc is not None:
-            gap = v.get("model_gap")
-            gap_s = f"   model_gap {gap:.3f}" if gap is not None else ""
-            print(f"  loop-fixed bc_v11 (vs heuristic): {bc['rate']:.3f}{gap_s}")
+            print(f"  loop-fixed bc_v11 (vs heuristic): {bc['rate']:.3f}")
+        offrl = v.get("learned_offrl")
+        if offrl is not None:
+            print(f"  PPO offrl_ou (vs heuristic): {offrl['rate']:.3f}{gap_s}")
+        elif bc is not None:
+            print(f"  model_gap (bc_v11):{gap_s}")
         print(f"  OU VERDICT: {v['verdict']} -- {v['reason']}")
 
 
@@ -523,7 +542,7 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=300, help="battles per M1 matchup")
     ap.add_argument("--concurrency", type=int, default=20, help="M1 max concurrent battles")
     ap.add_argument("--offrl-checkpoint", default=None,
-                    help="checkpoint for the offrl M1 arm (default: RB GREEN); set to an OU ckpt")
+                    help="OU offrl/PPO checkpoint; adds an offrl_ou learned arm to the M1 sweep")
     ap.add_argument("--bc-checkpoint", default=None,
                     help="OU BC checkpoint; adds a loop-fixed bc_v11 arm to the teambuilt M1 sweep")
     ap.add_argument("--loop-penalty", type=float, default=0.0,
