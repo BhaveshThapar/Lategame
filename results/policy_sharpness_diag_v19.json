@@ -1,0 +1,63 @@
+{
+  "policy": "checkpoints/ppo_ou_x50_s0/iter_41.pt",
+  "states": "results/behavior_probe_obs_v19.npz",
+  "n_rows": 1266,
+  "sharpness": {
+    "checkpoints/offrl_gen9ou_v7_s0.pt": {
+      "mean_entropy": 1.0036,
+      "mean_max_prob": 0.5955,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.5705,
+      "frac_near_deterministic": 0.1501
+    },
+    "checkpoints/ppo_ou_x50_s0/iter_01.pt": {
+      "mean_entropy": 0.9735,
+      "mean_max_prob": 0.6022,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.5534,
+      "frac_near_deterministic": 0.1659
+    },
+    "checkpoints/ppo_ou_x50_s0/iter_10.pt": {
+      "mean_entropy": 0.8671,
+      "mean_max_prob": 0.6785,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.4929,
+      "frac_near_deterministic": 0.2615
+    },
+    "checkpoints/ppo_ou_x50_s0/iter_25.pt": {
+      "mean_entropy": 0.8311,
+      "mean_max_prob": 0.6825,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.4724,
+      "frac_near_deterministic": 0.2749
+    },
+    "checkpoints/ppo_ou_x50_s0/iter_41.pt": {
+      "mean_entropy": 0.8175,
+      "mean_max_prob": 0.682,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.4647,
+      "frac_near_deterministic": 0.2701
+    }
+  },
+  "win_rates": {
+    "greedy": 0.4867,
+    "sampled": 0.3467,
+    "greedy_minus_sampled": 0.14
+  },
+  "opponent": "heuristic",
+  "n_battles": 300,
+  "loop_penalty": 4.0,
+  "thresholds": {
+    "soft_h_ratio": 0.4,
+    "sharp_h_ratio": 0.15,
+    "sampled_gap": 0.05
+  },
+  "verdict": "LIVE",
+  "why": "h_ratio 0.465 >= 0.4 (policy still soft)",
+  "note": "h_ratio = mean policy entropy / mean uniform-over-legal entropy. Eval is greedy (argmax) while rollout samples, so entropy can only hurt INDIRECTLY -- by keeping the distribution soft so the argmax lags. LIVE => run the ent/lr schedule."
+}

@@ -380,6 +380,47 @@ with the competent heuristic. `MODEL_BOUND` reconfirmed. **Verdict: plateau foun
 expansion** (`build_ou_teampool.py`, 12 → ~24) and a **stronger warm-start** are the evidenced Build-19 candidates (each
 isolated); lr-decay / PFSP hardening is *not* indicated (no instability observed); more iterations retired.
 
+**OU pivot Build 19 — the PPO train/eval objective mismatch: MEASURED, FIXED, and ruled OUT as the plateau's cause.
+`NULL` on strength; the schedule lever is RETIRED.** Re-reading the v18 curves overrode v18's own decision tree: the
+agent **trains directly against `simpleheuristics`** (it is the PPO anchor, injected every iteration) and after 50 iters
+still wins only **26–45%** against it — a *fixed, scripted, non-adapting* opponent already in the training mix is not
+beaten by more opponent *variety*, so the plateau is in the **learner**, not the opponents. That **refutes team-pool
+expansion as the binding lever** (and it is unmeasurable as specified: one pool feeds rollouts *and* eval, so expanding
+it moves the metric out from under v18's CI). Capacity is weaker than assumed too — the net is already
+over-parameterized for imitation (0.72M params on 61,723 BC rows). So Build 19 ran the cheapest learner-side lever: the
+**`ent_coef`/`lr` schedule**, fixed for all 50 iters until now.
+
+*Stage A — a probe qualified the spend before paying it (`scripts/policy_sharpness_diag.py`, new).* Reading the code
+**falsified the naive story for free**: **eval is already greedy** (`_eval_point` → `sample=False` → argmax) while
+**rollout samples**, so entropy cannot *directly* cost eval win-rate — only *indirectly*, by holding the distribution
+soft so the argmax lags. The probe (v18 best ckpt, 1266 frozen live states + a greedy/sampled A/B at n=300) found the
+mismatch is real and large: policy entropy **stalls exactly when the win-rate stalls** (`h_ratio` 0.571 → 0.493 → 0.472
+→ **0.465**, `max_prob` flat at 0.682 from iter 10), and **greedy 0.487 vs sampled 0.347 → a +0.140 gap** — PPO was
+maximizing the return of a distribution playing 14 points worse than the one we deploy. → **LIVE.**
+
+*Stage B — schedule (`PPOConfig.ent_coef_final`/`lr_final`, a pure `anneal()`, four `ppo_continue_gate` flags;
+`*_final=None` ⇒ constant ⇒ bit-identical to Builds 16–18, proven by smoke).* Run identical to v18 except `ent_coef
+0.01 → 0.0`, `lr 2.5e-4 → 5e-5`. **The mechanism engaged and the metric did not move.** Sharpening worked (`h_ratio`
+**0.465 → 0.336**, `max_prob` → **0.788**, near-deterministic decisions 27% → **44%**) and the objective mismatch
+**closed to zero** (**greedy 0.433 vs sampled 0.437, gap −0.003**, was +0.140). But strength is flat: 3-seed
+`best_vs_heuristic` **0.493 ± 0.063** vs v18's 0.503 ± 0.048, and authoritative M1 (n=300, harness clean — mirror 0.487,
+gradient 0.030 < 0.067 < 0.643) gives **`offrl_ou` 0.490 [0.434, 0.546]** vs v18's **0.453 [0.398, 0.510]** — **CIs
+overlap** where pre-registration demanded *disjoint above 0.510* ⇒ **NULL**. `model_gap` 0.18 → 0.153 (n.s.); sanity
+guards clean (`vs_iter0` ≥ 0.96 — the lr decay did not destabilize).
+
+**What the null teaches:** the +0.140 gap was **the cost of *sampling*, not headroom in the *argmax***. Annealing pulled
+the **sampled** policy *up to* the argmax (0.347 → 0.437) without pushing the **argmax** higher — and the argmax is what
+we score. The mismatch was real, is now fixed, and is **not** the plateau's cause. Keep the schedule as the OU default
+(free, and it removes a confound) but claim no win from it. Suite **296 pass** (289 + 7), ruff + mypy clean;
+`results/ppo_ou_gate_v19.json`, `results/format_ceiling_gate_ou_v19.json`, `results/policy_sharpness_diag_v19*.json`.
+**Open next (Build 20)** — with entropy/lr *and* opponent-variety both eliminated, the suspects in cost order:
+**(1) per-iteration sample budget** — `games_per_opp=16` × 3 opponents = **48 battles ≈ ~2K transitions ≈ ~32 gradient
+steps per iteration** (~2,400 battles for the whole run): a very small RL budget and a plausible **noise-floor** plateau;
+`--games-per-opp 48` is already a flag ⇒ **zero code change**. **(2) capacity** — a bigger warm-start (`factory.py`
+already reads `d_model/n_layers/…` from `arch`; only `bc.py::_build_model` fails to populate them). *Methodology:
+`best_vs_heuristic` is a max over 50 noisy n=100 evals — an optimistically biased statistic (winner's curse). Compare
+builds on the authoritative n=300 CI.*
+
 ## Setup
 
 ```bash

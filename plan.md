@@ -1435,6 +1435,70 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     **stronger/larger warm-start** are now the evidenced Build-19 candidates (each isolated). The *destabilized* branch
     did not trigger, so lr-decay / PFSP-league hardening is **not** indicated. More iterations is retired (curve flat).
 
+- **OU Pivot — Build 19: the PPO train/eval objective mismatch — MEASURED, FIXED, and *ruled out* as the plateau's
+  cause. `NULL` on strength; the schedule lever is RETIRED.**
+  - **Re-reading v18 overrode its own decision tree.** Build 18 pre-registered *team-pool* or *warm-start*. But the
+    v18 curves show the agent **trains directly against `simpleheuristics`** (it is the PPO anchor, `ppo.py`
+    `anchors=("simpleheuristics",)`, injected every iteration) **and after 50 iters still wins only 26–45% against
+    it** (final per-seed 0.45 / 0.34 / 0.26). A *fixed, scripted, non-adapting* opponent already in the training mix
+    is not beaten by more opponent variety ⇒ the plateau is in the **learner**, not the opponents. That **refutes
+    team-pool expansion as the binding lever** (and it is unmeasurable as specified anyway: the same pool feeds
+    rollouts *and* `_eval_point`, so expanding it moves the metric out from under v18's CI — it is a *generalization*
+    question needing a held-out `--eval-team-pool` first). **Capacity** is also weaker than assumed: the net is
+    already over-parameterized for imitation (**0.72M params on 61,723 BC rows** = 0.086 rows/param; d256/4L would be
+    4.56M = 0.014), so the 0.63 BC gate would likely reject a bigger teacher for *overfitting* — a false negative that
+    says nothing about what PPO (unbounded self-play data) wants. Lever chosen: the **PPO optimization schedule**
+    (`ent_coef`/`lr` were **fixed for all 50 iters** and not exposed by the gate) — cheapest, reuses the v7 warm-start,
+    no BC/offrl retrain, no `OBS_VERSION` bump, no re-ingest.
+  - **Stage A — the probe that qualified the spend (`scripts/policy_sharpness_diag.py`, new, committed).** Reading the
+    code **falsified the naive story before it cost a run**: **eval is already greedy** (`_eval_point` builds the
+    learner `sample=False` → argmax) while **rollout samples** (`sample=True`; `PPORecordingAgent`), so residual
+    entropy **cannot directly cost eval win-rate**. It can only hurt *indirectly* — by holding the distribution soft so
+    the **argmax lags** the distribution PPO optimizes. Probe (v18 best ckpt, 1266 frozen live states from a fresh
+    `behavior_probe --obs-out` capture + a greedy/sampled win-rate A/B at n=300): **(A1)** entropy sharpens early then
+    **stalls exactly when the win-rate stalls** — `h_ratio` (mean H / mean uniform-over-legal H) 0.571 (warm-start) →
+    0.493 (it10) → 0.472 (it25) → **0.465 (it41)**, `max_prob` flat at 0.682 from iter 10, only 27% of decisions
+    near-deterministic. **(A2)** the mismatch is real and large: **greedy 0.487 vs sampled 0.347 → gap +0.140**. PPO
+    was maximizing the return of a distribution that plays **14 points worse** than the one we deploy. → **LIVE.**
+  - **Stage B — the schedule (code, back-compatible).** `PPOConfig.ent_coef_final` / `lr_final` (`None` ⇒ constant ⇒
+    **bit-identical to Build 16–18**), a pure `anneal(start, final, k, iters)`, per-iteration `optimizer.param_groups`
+    lr + `replace(config, ent_coef=…)` into `ppo_update`, and both values echoed into the per-iter stats so a run is
+    auditable. `--ent-coef/--ent-coef-final/--lr/--lr-final` on `ppo_continue_gate`. Smoke proved both directions:
+    scheduled → ent 0.0100/0.0050/0.0000 + lr 2.50e-4/1.50e-4/5.00e-5 (exact endpoints); flags omitted → constant.
+    Run identical to v18 in every other respect (init `offrl_gen9ou_v7_s0`, 12-team pool, lp=4, 50 iters, 3 seeds,
+    `games_per_opp` 16, `eval_n` 100), schedule `ent_coef 0.01 → 0.0`, `lr 2.5e-4 → 5e-5`.
+  - **Result — the mechanism ENGAGED and the metric DID NOT MOVE.** Sharpening worked: `h_ratio` **0.465 → 0.336**
+    (0.512 @10 → 0.370 @30 → 0.336 @50 — it keeps falling instead of stalling), `max_prob` 0.682 → **0.788**,
+    near-deterministic decisions 27% → **44%**. And the objective mismatch **closed to zero**: on the scheduled policy
+    **greedy 0.433 vs sampled 0.437 → gap −0.003** (was **+0.140**). But strength is flat: 3-seed `best_vs_heuristic`
+    **0.493 ± 0.063** vs v18's 0.503 ± 0.048, and **authoritative M1 (n=300, best ckpt `ppo_ou_sched_s2/iter_49` +
+    `LoopGuard(4)`, harness clean — mirror 0.487, gradient 0.030 < 0.067 < 0.643, band 0.613 > RB 0.516):**
+    **`offrl_ou` 0.490 [0.434, 0.546]** vs v18's **0.453 [0.398, 0.510]** — **CIs overlap heavily** (pre-registration
+    demanded *disjoint above 0.510*) ⇒ **NULL**. `model_gap` 0.18 → 0.153 (not significant). `bc_v11` 0.040.
+    `MODEL_BOUND` reconfirmed. Sanity guards clean (`vs_iter0` ≥ 0.96, `vs_random` ≥ 0.97 — the lr decay did **not**
+    destabilize).
+  - **What the null actually teaches (the load-bearing correction).** The +0.140 gap was **the cost of *sampling*, not
+    headroom in the *argmax***. Annealing entropy pulled the **sampled** policy **up to** the argmax (0.347 → 0.437,
+    +0.09) — it did **not** push the **argmax** higher (0.487 → ~0.45–0.49, flat), and **the argmax is what we score**.
+    PPO was already extracting the argmax's value; the entropy bonus was taxing only the *rollout* policy, a train-time
+    cost eval never paid. **So the objective mismatch was real, is now fixed, and is NOT the plateau's cause.**
+  - **Verdict: `NULL` — the schedule lever is RETIRED.** Keep the schedule as the OU default anyway (it costs nothing —
+    0.490 vs 0.453, if anything nominally higher — and it removes a real confound, making future levers cleaner to
+    read), but claim **no strength win** from it. The flags stay **opt-in** (`*_final=None`), so RB and every prior
+    build are untouched. Suite **296 pass** (289 + 7 new), ruff + mypy clean; `scripts/policy_sharpness_diag.py`,
+    `results/ppo_ou_gate_v19.json`, `results/format_ceiling_gate_ou_v19.json`,
+    `results/policy_sharpness_diag_v19{,_sched}.json`; `checkpoints/ppo_ou_sched_s{0,1,2}/` gitignored.
+  - **Open next (Build 20), now that entropy/lr AND opponent-variety are both eliminated.** The learner-side suspects,
+    in cost order: **(1) per-iteration sample budget** — `games_per_opp=16` × (pop_size 2 + 1 anchor) = **48 battles ≈
+    ~2K transitions ≈ ~32 gradient steps per iteration**, on a *normalized* advantage estimate; ~2,400 battles for the
+    whole run. That is a very small RL budget and a plausible **noise-floor** plateau. `--games-per-opp 48` is already a
+    flag ⇒ **zero code change**, ~3× wall-clock. **(2) capacity** — a bigger warm-start; `factory.py` already reads
+    `d_model/n_layers/n_heads/ff_dim` from `arch` and `train-rl --bc-init` auto-inherits it, so the only gap is that
+    `bc.py::_build_model` never populates them (4 `TrainConfig` fields + 4 CLI flags). Team-pool stays **deprioritized**
+    (refuted as binding). **Methodology note for every future build: `best_vs_heuristic` is a max over 50 noisy n=100
+    evals — an optimistically biased statistic (winner's curse; v18 shrank 0.503 → 0.453 at n=300). Compare builds on
+    the authoritative n=300 CI, never on `best_vs_heuristic`.**
+
 ---
 
 ## 14. Risks & mitigations

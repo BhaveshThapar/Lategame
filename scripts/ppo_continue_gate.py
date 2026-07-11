@@ -56,6 +56,11 @@ def _ppo_config(
     team_pool: str | None,
     loop_penalty: float,
     ckpt_prefix: str,
+    *,
+    ent_coef: float = PPOConfig.ent_coef,
+    ent_coef_final: float | None = None,
+    lr: float = PPOConfig.lr,
+    lr_final: float | None = None,
 ) -> PPOConfig:
     return PPOConfig(
         init=init,
@@ -71,6 +76,11 @@ def _ppo_config(
         max_concurrent=_EVAL_CONCURRENCY,
         device=device,
         seed=seed,
+        # Build 19: `*_final=None` holds the value constant == the Build 16-18 schedule.
+        ent_coef=ent_coef,
+        ent_coef_final=ent_coef_final,
+        lr=lr,
+        lr_final=lr_final,
     )
 
 
@@ -169,6 +179,11 @@ async def run_gate(
     team_pool: str | None,
     loop_penalty: float,
     ckpt_prefix: str,
+    *,
+    ent_coef: float = PPOConfig.ent_coef,
+    ent_coef_final: float | None = None,
+    lr: float = PPOConfig.lr,
+    lr_final: float | None = None,
 ) -> dict:
     if not Path(init).exists():
         raise SystemExit(f"GREEN warm-start checkpoint '{init}' not found.")
@@ -176,6 +191,12 @@ async def run_gate(
         f"init {init} | seeds {seeds} | iters {iters} | "
         f"games_per_opp {games_per_opp} | eval_n {eval_n} | "
         f"team_pool {team_pool} | loop_penalty {loop_penalty} | prefix {ckpt_prefix}"
+    )
+    ent_end = ent_coef if ent_coef_final is None else ent_coef_final
+    lr_end = lr if lr_final is None else lr_final
+    print(
+        f"schedule: ent_coef {ent_coef} -> {ent_end} | lr {lr:.2e} -> {lr_end:.2e}"
+        f"{'  (constant == Build 18)' if ent_coef_final is None and lr_final is None else ''}"
     )
     # One shared pool: both sides of every eval/ladder battle draw from it (fair mirror).
     team = TeamPool.from_packed_file(team_pool) if team_pool else None
@@ -185,6 +206,7 @@ async def run_gate(
         cfg = _ppo_config(
             init, seed, iters, games_per_opp, eval_n, device, fmt,
             team_pool, loop_penalty, ckpt_prefix,
+            ent_coef=ent_coef, ent_coef_final=ent_coef_final, lr=lr, lr_final=lr_final,
         )
         curve = await run_ppo(cfg)
         rec = _seed_record(init, seed, curve, ckpt_prefix)
@@ -208,6 +230,10 @@ async def run_gate(
         "team_pool": team_pool,
         "loop_penalty": loop_penalty,
         "ckpt_prefix": ckpt_prefix,
+        "ent_coef": ent_coef,
+        "ent_coef_final": ent_coef_final,
+        "lr": lr,
+        "lr_final": lr_final,
         "seeds": seeds,
         "iters": iters,
         "games_per_opp": games_per_opp,
@@ -257,6 +283,22 @@ def main(argv: list[str] | None = None) -> None:
         default="ppo_scale_et_prior",
         help="checkpoints/<prefix>_s{seed}/ output dir (use ppo_ou_et_prior for OU)",
     )
+    # Build 19: linear schedules over the run. Omitting the *-final flags holds the value
+    # constant, reproducing Build 16-18 exactly.
+    parser.add_argument("--ent-coef", type=float, default=PPOConfig.ent_coef)
+    parser.add_argument(
+        "--ent-coef-final",
+        type=float,
+        default=None,
+        help="Build-19: anneal ent_coef linearly to this by the final iter (omit = constant)",
+    )
+    parser.add_argument("--lr", type=float, default=PPOConfig.lr)
+    parser.add_argument(
+        "--lr-final",
+        type=float,
+        default=None,
+        help="Build-19: anneal lr linearly to this by the final iter (omit = constant)",
+    )
     args = parser.parse_args(argv)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -274,6 +316,10 @@ def main(argv: list[str] | None = None) -> None:
             args.team_pool,
             args.loop_penalty,
             args.ckpt_prefix,
+            ent_coef=args.ent_coef,
+            ent_coef_final=args.ent_coef_final,
+            lr=args.lr,
+            lr_final=args.lr_final,
         )
     )
 

@@ -333,3 +333,66 @@ def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
     assert ppo_call["team"] == "POOL" and ppo_call["loop_penalty"] == 4.0
     assert opp_call["team"] == "POOL" and opp_call["loop_penalty"] == 4.0
     assert len(buf) == 1
+
+
+# --------------------------------------------------------------------------- #
+# Build 19 (plan.md 19): linear ent_coef / lr schedules.
+#
+# Motivation is measured, not assumed: on the Build-18 plateau the SAMPLED policy PPO
+# optimizes scored 0.347 vs the ARGMAX we deploy at 0.487 (scripts/policy_sharpness_diag.py),
+# and policy entropy stalled at 0.465 of uniform. Annealing ent_coef -> 0 lets the
+# distribution sharpen onto its own argmax and closes that train/eval gap.
+# --------------------------------------------------------------------------- #
+def test_anneal_none_final_holds_the_value_constant():
+    from lategame.train.ppo import anneal
+
+    # The Build 16-18 path: no schedule => every iteration runs at the start value.
+    for k in (1, 7, 50):
+        assert anneal(0.01, None, k, 50) == 0.01
+
+
+def test_anneal_hits_both_endpoints_and_the_midpoint():
+    from lategame.train.ppo import anneal
+
+    assert anneal(0.01, 0.0, 1, 51) == pytest.approx(0.01)  # first iter = start
+    assert anneal(0.01, 0.0, 51, 51) == pytest.approx(0.0)  # final iter = final
+    assert anneal(0.01, 0.0, 26, 51) == pytest.approx(0.005)  # halfway
+    assert anneal(2.5e-4, 5e-5, 51, 51) == pytest.approx(5e-5)
+
+
+def test_anneal_is_monotone_and_clamps_out_of_range_iters():
+    from lategame.train.ppo import anneal
+
+    values = [anneal(0.01, 0.0, k, 50) for k in range(1, 51)]
+    assert all(a >= b for a, b in zip(values, values[1:], strict=False))
+    assert anneal(0.01, 0.0, 0, 50) == pytest.approx(0.01)  # k < 1 clamps to the start
+    assert anneal(0.01, 0.0, 99, 50) == pytest.approx(0.0)  # k > iters clamps to the final
+    assert anneal(0.01, 0.0, 1, 1) == 0.01  # single-iter run: no interpolation to do
+
+
+def test_ppo_update_reports_the_values_it_actually_ran_at():
+    torch = pytest.importorskip("torch")
+    from lategame.train.ppo import PPOConfig, compute_gae, ppo_update
+
+    model, buffer, centers = _synthetic_buffer(torch)
+    config = PPOConfig(epochs=1, minibatch=8, target_kl=10.0, ent_coef=0.004)
+    optimizer = torch.optim.Adam(model.parameters(), lr=7e-5)
+    adv, returns = compute_gae(
+        buffer.reward, buffer.value, buffer.done, config.gamma, config.gae_lambda
+    )
+    stats = ppo_update(
+        model, optimizer, buffer, adv, returns, centers,
+        sigma=0.375, config=config, device=torch.device("cpu"),
+    )
+    # run_ppo anneals by handing ppo_update a per-iteration config + setting the optimizer lr;
+    # the stats must echo both back so a scheduled run is auditable per iteration.
+    assert stats["ent_coef"] == pytest.approx(0.004)
+    assert stats["lr"] == pytest.approx(7e-5)
+
+
+def test_ppo_config_schedule_defaults_to_no_schedule():
+    from lategame.train.ppo import PPOConfig
+
+    config = PPOConfig()
+    assert config.ent_coef_final is None
+    assert config.lr_final is None

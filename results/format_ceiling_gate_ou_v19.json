@@ -1,0 +1,114 @@
+{
+  "gate": "format_ceiling",
+  "format": "gen9ou",
+  "m1": {
+    "n": 300,
+    "format": "gen9ou",
+    "mirror": {
+      "p1": "heuristic",
+      "p2": "heuristic",
+      "rate": 0.4866666666666667,
+      "wins": 146,
+      "ci95": [
+        0.43063348243848176,
+        0.5430370090281246
+      ]
+    },
+    "simpleheuristics": {
+      "p1": "simpleheuristics",
+      "p2": "heuristic",
+      "rate": 0.6433333333333333,
+      "wins": 193,
+      "ci95": [
+        0.5876287210234448,
+        0.6954134957105376
+      ]
+    },
+    "maxbasepower": {
+      "p1": "maxbasepower",
+      "p2": "heuristic",
+      "rate": 0.06666666666666667,
+      "wins": 20,
+      "ci95": [
+        0.04356717679698387,
+        0.10072379586772039
+      ]
+    },
+    "random": {
+      "p1": "random",
+      "p2": "heuristic",
+      "rate": 0.03,
+      "wins": 9,
+      "ci95": [
+        0.015861673205964575,
+        0.05602315099190695
+      ]
+    },
+    "offrl_ou": {
+      "p1": "offrl",
+      "p2": "heuristic",
+      "rate": 0.49,
+      "wins": 147,
+      "ci95": [
+        0.43391603364256914,
+        0.5463368349573855
+      ]
+    },
+    "bc_v11": {
+      "p1": "bc",
+      "p2": "heuristic",
+      "rate": 0.04,
+      "wins": 12,
+      "ci95": [
+        0.02302709213793877,
+        0.06860486345997804
+      ]
+    }
+  },
+  "ou_assessment": {
+    "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+    "mirror_sanity_ok": true,
+    "gradient_ok": true,
+    "harness_ok": true,
+    "ou_band": {
+      "mirror": 0.4866666666666667,
+      "simpleheuristics": 0.6433333333333333,
+      "maxbasepower": 0.06666666666666667,
+      "random": 0.03
+    },
+    "rb_band_reference": {
+      "mirror": 0.513,
+      "simpleheuristics": 0.523,
+      "maxbasepower": 0.107,
+      "random": 0.007,
+      "offrl_green": 0.43
+    },
+    "band_width": {
+      "ou": 0.6133333333333333,
+      "rb": 0.516,
+      "wider_than_rb": true
+    },
+    "ou_verdict": {
+      "verdict": "MODEL_BOUND",
+      "reason": "competent bot (simpleheuristics 0.643) >= HEADROOM 0.58 over the heuristic => OU rewards skill, format is not the ceiling; the learned agent's low win is a model gap, not a format cap. FORMAT_BOUND rejected for OU.",
+      "competent_rate": 0.6433333333333333,
+      "headroom": 0.58,
+      "format_bound_rejected": true,
+      "learned_bc": {
+        "rate": 0.04,
+        "ci95": [
+          0.02302709213793877,
+          0.06860486345997804
+        ]
+      },
+      "learned_offrl": {
+        "rate": 0.49,
+        "ci95": [
+          0.43391603364256914,
+          0.5463368349573855
+        ]
+      },
+      "model_gap": 0.15333333333333332
+    }
+  }
+}
