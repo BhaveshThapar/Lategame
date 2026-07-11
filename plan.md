@@ -1402,6 +1402,39 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     a stronger/larger warm-start become the diagnosable levers only *once* vs_heuristic flattens while vs_random
     stays high. Watch for late instability from the stale uniform league / fixed lr over longer runs.
 
+- **OU Pivot — Build 18: extend PPO self-play iterations (25 → 50) — the curve PLATEAUED, and at a *higher* level.
+  Outcome 1 (plateau found) + stronger `AMBER` in one build.**
+  - **Motivation.** Build 17's pre-registered decision tree said extend iters once more to resolve the vs-heuristic
+    asymptote (s1's best was still the final iter). Single-lever isolation, exactly as Build 17 isolated 10→25:
+    same warm-start (`offrl_gen9ou_v7_s0`), same 12-team pool, same lp=4, same eval protocol — only `iters` 25→50,
+    fresh `--ckpt-prefix ppo_ou_x50`. Runs-only, no code change.
+  - **Infra recovery (per-seed chunking).** The full 3-seed run kept dying at session teardowns, which reap the whole
+    process tree **and wipe scratchpad** — even `start_new_session`/setsid-detached daemons (PPID→launchd) did **not**
+    survive. Only the repo disk persists (the per-iter `iter_XX.pt` + `curve.json` the gate writes each iteration). So
+    the run was completed **one seed at a time** (each a standalone `ppo_continue_gate --seeds N`, identical config,
+    throwaway `--ladder-n 20`): seed 0 was salvaged complete from the first attempt; seeds 1,2 re-run standalone. This
+    bounds teardown loss to a single partial seed. Consolidated into `results/ppo_ou_gate_v18.json` (provenance noted
+    in the file); the authoritative n=300 eval is a single clean `format_ceiling_gate` run.
+  - **Result — UNANIMOUS PLATEAU (all 3 seeds).** `best_iter` = **41 / 44 / 46** — every seed peaks in the low-40s,
+    *interior* (vs v17's 19/25/22 with s1 at the final iter). Each tail (iters 35–50) is **flat within eval noise and
+    *above* the mid-run (20–34) mean** (s0 0.475 vs 0.415; s1 0.396 vs 0.269; s2 0.377 vs 0.325 — climb-then-flatten,
+    not decline), and `vs_iter0` never drops below **0.90** (final mean **0.977**) → **no collapse, the *destabilized*
+    branch of the tree is ruled out** (no fixed-lr / stale-league instability at 50 iters). `best_vs_heuristic` per-seed
+    **0.503 ± 0.048** (0.57 / 0.46 / 0.48) — *higher* than v17's 0.307, so 25→50 both **lifted** the peak and **revealed**
+    the ceiling.
+  - **Authoritative M1 (n=300, best ckpt `ppo_ou_x50_s0/iter_41` + `LoopGuard(4)`, harness clean — mirror 0.520,
+    monotone gradient random 0.013 < maxbasepower 0.073 < simpleheuristics 0.633, band 0.62 > RB 0.516):**
+    **`offrl_ou` 0.453 [0.398, 0.510]** vs v17's **0.303 [0.254, 0.358]** — **disjoint CIs** (0.398 > 0.358), a real
+    **~1.5×** gain from the extra iterations; `bc_v11` unchanged **0.043 [0.025, 0.073]**. **`model_gap` 0.317 → 0.18**
+    (43% below v17, **68% below Build 15's 0.567**) — PPO is now near parity with the competent heuristic (0.633).
+    `MODEL_BOUND` reconfirmed, `format_bound_rejected`.
+  - **Verdict: PLATEAU FOUND — the iterations lever is exhausted at 50, and it paid off (0.303 → 0.453, gap halved).**
+    Suite **289 pass** (no code change), ruff + mypy clean; `results/ppo_ou_gate_v18.json` +
+    `results/format_ceiling_gate_ou_v18.json`; `checkpoints/ppo_ou_x50_s{0,1,2}/` gitignored. **Open next:** the plateau
+    finally makes the *expensive* levers diagnosable — **team-pool expansion** (`build_ou_teampool.py`, 12 → ~24) and a
+    **stronger/larger warm-start** are now the evidenced Build-19 candidates (each isolated). The *destabilized* branch
+    did not trigger, so lr-decay / PFSP-league hardening is **not** indicated. More iterations is retired (curve flat).
+
 ---
 
 ## 14. Risks & mitigations
