@@ -361,6 +361,25 @@ code change), ruff + mypy clean; `results/ppo_ou_gate_v17.json`, `results/format
 plateau still not reached → **extend iters again** (cheapest, still-evidenced); team-pool expansion and a stronger
 warm-start become diagnosable only once vs_heuristic flattens while vs_random stays high.
 
+**OU pivot Build 18 — extend PPO self-play iterations (25 → 50): the curve PLATEAUED, at a *higher* level. Outcome 1
+(plateau found) + stronger `AMBER`.** Build 17's pre-registered decision tree said extend once more to resolve the
+asymptote. Single-lever, runs-only — only `iters` 25→50 (same warm-start, 12-team pool, lp=4, eval protocol),
+`--ckpt-prefix ppo_ou_x50`. (Infra: session teardowns reap all processes *and* wipe scratchpad — even setsid-detached
+daemons didn't survive — so the run was completed **one seed at a time**, persisting each iteration to the repo-disk
+`checkpoints/`; seed 0 salvaged complete, seeds 1,2 re-run standalone, identical config.) **Result — UNANIMOUS PLATEAU:**
+`best_iter` = **41 / 44 / 46** (all *interior*, vs v17's 19/25/22 with s1 at the final iter); each tail (35–50) is flat
+within noise and *above* the mid-run mean (climb-then-flatten, not decline); `vs_iter0` never < **0.90** (final mean
+**0.977**) → no collapse, the *destabilized* branch is ruled out. `best_vs_heuristic` per-seed **0.503 ± 0.048**
+(0.57/0.46/0.48) — *higher* than v17's 0.307. Authoritative M1 (n=300, best ckpt `ppo_ou_x50_s0/iter_41` +
+`LoopGuard(4)`, harness clean — mirror 0.520, monotone gradient 0.013 < 0.073 < 0.633, band 0.62 > RB 0.516):
+**`offrl_ou` 0.453 [0.398, 0.510]** vs v17's **0.303 [0.254, 0.358]** — **disjoint CIs**, a real **~1.5×** gain from
+iterations; `bc_v11` unchanged **0.043**; **`model_gap` 0.317 → 0.18** (68% below Build 15's 0.567), PPO now near parity
+with the competent heuristic. `MODEL_BOUND` reconfirmed. **Verdict: plateau found — the iterations lever is exhausted at
+50 and it paid off (gap halved).** Suite **289 pass** (no code change), ruff + mypy clean; `results/ppo_ou_gate_v18.json`,
+`results/format_ceiling_gate_ou_v18.json`. Open next: the plateau makes the expensive levers diagnosable — **team-pool
+expansion** (`build_ou_teampool.py`, 12 → ~24) and a **stronger warm-start** are the evidenced Build-19 candidates (each
+isolated); lr-decay / PFSP hardening is *not* indicated (no instability observed); more iterations retired.
+
 ## Setup
 
 ```bash
