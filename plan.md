@@ -1369,6 +1369,39 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     climbing at iter 10 and self-play ran on only a **12-team pool** — the prime ceiling suspect. Candidates:
     expand the team pool (`build_ou_teampool.py`), more PPO iters, a stronger/larger warm-start or more BC data.
 
+- **OU Pivot — Build 17: extend PPO self-play iterations (10 → 25) — the run was cut short, not plateaued;
+  extending it ~2.3×'d OU vs-heuristic. Stronger `AMBER`.**
+  - **Motivation (which follow-up first).** Build 16 left three AMBER candidates (team pool / more iters /
+    stronger warm-start). Re-reading the v16 curves settled the order: **every** metric was monotone-climbing at
+    iter 10 and `best_iter` was the *final* iter for 2/3 seeds — the run never plateaued. You cannot diagnose a
+    "12-team pool ceiling" or "weak warm-start ceiling" from a run that never plateaued (it confounds "the lever
+    helped" with "we just trained longer"). So Build 17 isolates the cheapest, only directly-evidenced lever —
+    **more iterations** — which also *tells us which* expensive lever to spend on next.
+  - **Approach (runs-only, no code change).** Both gate scripts already expose every flag. A fresh 25-iter run
+    from the **same** warm-start (`offrl_gen9ou_v7_s0`) + **same** 12-team pool + **lp=4** as Build 16 (isolates
+    iterations as the one changed lever), seeds 0/1/2, `--eval-n 100` (per-iter eval is diagnostic; the n=300
+    ladder/harness is authoritative), `--ckpt-prefix ppo_ou_long` (preserves the v16 `ppo_ou_et_prior_s*` dirs).
+    Fresh restart (not a continue-from-iter10) keeps `vs_iter0` anchored to the true warm-start → apples-to-apples
+    curves.
+  - **Result — extended gate (3 seeds × 25 iters).** Every metric kept climbing well past iter 10 with **no
+    collapse**: `best_vs_heuristic` **0.307 ± 0.065** (per-seed 0.23 / 0.30 / 0.39 at iters 19 / 25 / 22 — s1 peaks
+    at the *final* iter, so the plateau is still not reached), `final_vs_iter0` **0.947 ± 0.012**, `vs_random` →
+    0.91–0.98, `vs_simpleheuristics` → 0.25–0.26. Authoritative M1 (n=300, best ckpt `ppo_ou_long_s2/iter_22` +
+    `LoopGuard(4)`) is harness-clean (mirror **0.473**, gradient monotone **random 0.013 < maxbasepower 0.047 <
+    simpleheuristics 0.620**, band 0.607 > RB 0.516): **`offrl_ou` 0.303 [0.254, 0.358]** vs v16's
+    **0.133 [0.099, 0.176]** — the CIs are **disjoint** (0.254 > 0.176), a real **~2.3×** gain from iterations
+    alone, and **~5.3×** over the unchanged `bc_v11` 0.057 [0.036, 0.089]. **`model_gap` 0.510 → 0.317** (now
+    **44%** below Build 15's 0.567).
+  - **Verdict: stronger `AMBER` — the "still-climbing" outcome.** Iterations were the binding lever, not the pool:
+    the same 12 teams and warm-start went from 0.133 → 0.303 vs heuristic purely on more training, and the curve is
+    *still rising* at iter 25 (plateau not yet found). `MODEL_BOUND` reconfirmed; the gap is dented ~1/3 more but
+    not closed. Suite **289 pass** (no code change this build), ruff + mypy(lategame) clean;
+    `results/ppo_ou_gate_v17.json` + `results/format_ceiling_gate_ou_v17.json` + `checkpoints/ppo_ou_long_s{0,1,2}/`
+    (gitignored). **Open next:** the plateau is *still* not reached (s1 best = final iter) → **extend iters again**
+    is the cheapest, still-evidenced move (watch for the flatten); team-pool expansion (`build_ou_teampool.py`) and
+    a stronger/larger warm-start become the diagnosable levers only *once* vs_heuristic flattens while vs_random
+    stays high. Watch for late instability from the stale uniform league / fixed lr over longer runs.
+
 ---
 
 ## 14. Risks & mitigations

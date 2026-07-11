@@ -344,6 +344,23 @@ so the gap is dented ~10%, not closed.** Suite **289 pass** (281 + 8), ruff + my
 `results/ppo_ou_gate_v16.json`, `results/format_ceiling_gate_ou_v16.json`. Open next (AMBER follow-ups): expand the
 12-team self-play pool (prime ceiling suspect), more PPO iters (curve still climbing), stronger warm-start / more BC data.
 
+**OU pivot Build 17 — extend PPO self-play iterations (10 → 25): the run was cut short, not plateaued; extending it
+~2.3×'d OU vs-heuristic. Stronger `AMBER`.** Build 16's curves settled which follow-up to run first: every metric was
+still monotone-climbing at iter 10 with `best_iter` = the *final* iter for 2/3 seeds — you can't diagnose a
+"12-team-pool ceiling" from a run that never plateaued. So Build 17 isolates the cheapest, only directly-evidenced
+lever (more iters). Runs-only, no code change — a fresh 25-iter run from the **same** warm-start + 12-team pool + lp=4,
+seeds 0/1/2, `--eval-n 100`, `--ckpt-prefix ppo_ou_long`. **Result:** every metric kept climbing with no collapse —
+`best_vs_heuristic` **0.307 ± 0.065** (0.23/0.30/0.39 at iters 19/25/22, s1 peaks at the *final* iter), `vs_iter0`
+**0.947**, `vs_random` → 0.91–0.98. Authoritative M1 (n=300, best ckpt `ppo_ou_long_s2/iter_22` + `LoopGuard(4)`,
+harness clean — mirror 0.473, monotone gradient, band 0.607 > RB 0.516): **`offrl_ou` 0.303 [0.254, 0.358]** vs v16's
+**0.133 [0.099, 0.176]** — **disjoint CIs**, a real **~2.3×** gain from iterations alone, ~5.3× over the unchanged
+`bc_v11` 0.057; **`model_gap` 0.510 → 0.317** (44% below Build 15's 0.567). **Verdict stronger `AMBER`:** iterations,
+not the pool, were the binding lever — the same 12 teams/warm-start rose 0.133 → 0.303 on more training, and the curve
+is *still climbing* at iter 25. `MODEL_BOUND` reconfirmed; gap dented ~1/3 more, not closed. Suite **289 pass** (no
+code change), ruff + mypy clean; `results/ppo_ou_gate_v17.json`, `results/format_ceiling_gate_ou_v17.json`. Open next:
+plateau still not reached → **extend iters again** (cheapest, still-evidenced); team-pool expansion and a stronger
+warm-start become diagnosable only once vs_heuristic flattens while vs_random stays high.
+
 ## Setup
 
 ```bash
