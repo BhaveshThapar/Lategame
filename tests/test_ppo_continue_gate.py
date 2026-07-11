@@ -41,3 +41,27 @@ def test_ppo_config_defaults_stay_rb_safe():
     assert cfg.team_pool is None
     assert cfg.loop_penalty == 0.0
     assert cfg.out_dir == "checkpoints/ppo_scale_et_prior_s0"
+
+
+def test_ppo_config_threads_build19_schedule():
+    cfg = gate._ppo_config(
+        "init.pt", seed=0, iters=50, games_per_opp=16, eval_n=100, device="cpu",
+        fmt="gen9ou", team_pool=None, loop_penalty=4.0, ckpt_prefix="ppo_ou_sched",
+        ent_coef=0.01, ent_coef_final=0.0, lr=2.5e-4, lr_final=5e-5,
+    )
+    assert cfg.ent_coef == 0.01
+    assert cfg.ent_coef_final == 0.0
+    assert cfg.lr == 2.5e-4
+    assert cfg.lr_final == 5e-5
+
+
+def test_ppo_config_without_schedule_flags_is_build18_constant():
+    # Omitting the *-final flags must reproduce Build 16-18 exactly: no schedule at all.
+    cfg = gate._ppo_config(
+        "init.pt", seed=0, iters=50, games_per_opp=16, eval_n=100, device="cpu",
+        fmt="gen9ou", team_pool=None, loop_penalty=4.0, ckpt_prefix="ppo_ou_sched",
+    )
+    assert cfg.ent_coef_final is None
+    assert cfg.lr_final is None
+    assert cfg.ent_coef == 0.01  # the Build 16-18 constants
+    assert cfg.lr == 2.5e-4

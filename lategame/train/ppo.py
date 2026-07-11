@@ -22,7 +22,7 @@ the environment stationary within a rollout, which the advantage estimates assum
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import torch
@@ -76,6 +76,14 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     ent_coef: float = 0.01
+    # Build 19 (plan.md 19): linear schedules over the run. ``None`` holds the value constant,
+    # which is exactly the Build 16-18 behavior. Rollout SAMPLES but eval takes the ARGMAX, so a
+    # fixed entropy bonus optimizes a policy we never deploy: on the v18 plateau the sampled
+    # policy scored 0.347 vs the argmax's 0.487 (scripts/policy_sharpness_diag.py). Annealing
+    # ent_coef -> 0 collapses that train/eval gap by letting the distribution sharpen onto its
+    # own argmax.
+    ent_coef_final: float | None = None
+    lr_final: float | None = None
     value_coef: float = 0.5
     max_grad_norm: float = 0.5
     target_kl: float = 0.03  # early-stop the epoch loop past 1.5x this
@@ -83,6 +91,19 @@ class PPOConfig:
     device: str = "auto"
     seed: int = 0
     weights: RewardWeights = field(default_factory=RewardWeights)
+
+
+def anneal(start: float, final: float | None, iteration: int, iters: int) -> float:
+    """Linear interpolation from ``start`` (iteration 1) to ``final`` (iteration ``iters``).
+
+    ``final is None`` holds ``start`` constant -- the pre-Build-19 behavior, so an unscheduled
+    config is bit-identical to Build 16-18. ``iteration`` is clamped into ``[1, iters]``.
+    """
+    if final is None or iters <= 1:
+        return start
+    k = min(max(iteration, 1), iters)
+    frac = (k - 1) / (iters - 1)
+    return start + (final - start) * frac
 
 
 def compute_gae(
@@ -202,6 +223,9 @@ def ppo_update(
         "ret_min": float(ret.min().item()),
         "ret_max": float(ret.max().item()),
         "epochs_run": float(epochs_run),
+        # The values this update actually ran at -- the schedule is auditable per iteration.
+        "ent_coef": config.ent_coef,
+        "lr": float(optimizer.param_groups[0]["lr"]),
     }
 
 
@@ -234,7 +258,8 @@ def _print_stats(iteration: int, n_turns: int, stats: dict[str, float]) -> None:
         f"pi_loss {stats['policy_loss']:.4f}  v_loss {stats['value_loss']:.4f}  "
         f"entropy {stats['entropy']:.3f}  approx_kl {stats['approx_kl']:.4f}  "
         f"clip {stats['clip_frac']:.3f}  R[{stats['ret_min']:.2f},{stats['ret_max']:.2f}]  "
-        f"vmae {stats['vmae']:.3f}  epochs {int(stats['epochs_run'])}"
+        f"vmae {stats['vmae']:.3f}  epochs {int(stats['epochs_run'])}  "
+        f"ent_coef {stats['ent_coef']:.4f}  lr {stats['lr']:.2e}"
     )
 
 
@@ -357,8 +382,16 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
         advantages, returns = compute_gae(
             buffer.reward, buffer.value, buffer.done, config.gamma, config.gae_lambda
         )
+        # Build 19: linear ent_coef / lr schedules. Both default to None (constant), so an
+        # unscheduled run is identical to Build 18. ``replace`` keeps ppo_update pure -- it
+        # reads config.ent_coef, so hand it a config that already carries this iteration's value.
+        for group in optimizer.param_groups:
+            group["lr"] = anneal(config.lr, config.lr_final, k, config.iters)
+        iter_config = replace(
+            config, ent_coef=anneal(config.ent_coef, config.ent_coef_final, k, config.iters)
+        )
         stats = ppo_update(
-            model, optimizer, buffer, advantages, returns, centers, sigma, config, device
+            model, optimizer, buffer, advantages, returns, centers, sigma, iter_config, device
         )
 
         # Overwrite with the UPDATED policy -- used for eval and as a league opponent.
