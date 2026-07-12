@@ -43,6 +43,19 @@ from lategame.train.bc import BC_POLICY, select_device
 # checkpoints carry no ``model_type`` (default "bc"); ``train_bc`` now stamps BC_POLICY.
 _BC_WARM_START_KINDS = ("bc", BC_POLICY)
 
+# The arch fields that fix the transformer's parameter shapes. An AC->AC warm-start
+# cannot honour a request that differs on any of these.
+_ARCH_SHAPE_KEYS = ("d_model", "n_layers", "n_heads", "ff_dim")
+
+
+def _arch_conflicts(requested: dict[str, object], init: dict[str, object]) -> list[str]:
+    """Shape keys on which an explicit arch request disagrees with a warm-start ckpt."""
+    return [
+        f"{k}: requested {requested[k]!r} != checkpoint {init[k]!r}"
+        for k in _ARCH_SHAPE_KEYS
+        if k in init and requested[k] != init[k]
+    ]
+
 
 @dataclass
 class OfflineRLConfig:
@@ -68,6 +81,11 @@ class OfflineRLConfig:
     n_layers: int = 2
     n_heads: int = 4
     ff_dim: int = 256
+    # True when the caller explicitly asked for the shape above (i.e. passed the CLI
+    # flags). An AC->AC warm-start must adopt the init checkpoint's arch -- the strict
+    # state-dict load demands it -- which would SILENTLY discard that request, so we
+    # raise instead. The self-play loop leaves this False: it defers to the checkpoint.
+    arch_explicit: bool = False
     # Learned species/move/item/ability identity embeddings (transformer only).
     # The R-ENCODE gate adopted prior-init as the BC default; offrl must pass it
     # through too, else the factory silently falls back to random-init embeddings.
@@ -211,6 +229,15 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
                 raise ValueError(
                     f"Warm-start n_bins {init_ckpt['n_bins']} != config n_bins {config.n_bins}; "
                     "match them to continue an actor-critic checkpoint."
+                )
+            init_arch = init_ckpt.get("arch") or {}
+            conflicts = _arch_conflicts(config.arch(), init_arch) if config.arch_explicit else []
+            if conflicts:
+                raise ValueError(
+                    "Warm-start checkpoint arch conflicts with the requested architecture, "
+                    "which an AC->AC warm-start cannot honour (the full state dict must "
+                    f"load). {'; '.join(conflicts)}. To train the requested arch, drop the "
+                    "warm-start (bc_init='') and train from scratch."
                 )
             model_meta = {
                 "model_type": init_kind,

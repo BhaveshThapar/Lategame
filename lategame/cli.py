@@ -103,6 +103,12 @@ def _run_train_rl(args: argparse.Namespace) -> None:
     if args.model != "actor_critic" and bc_init == _DEFAULT_BC_INIT:
         bc_init = None
 
+    # Unset arch flags fall back to the dataclass defaults; passing any of them marks the
+    # request explicit, so a conflicting warm-start raises instead of silently winning.
+    defaults = OfflineRLConfig()
+    requested = {k: getattr(args, k) for k in ("d_model", "n_layers", "n_heads", "ff_dim")}
+    arch = {k: getattr(defaults, k) if v is None else v for k, v in requested.items()}
+
     config = OfflineRLConfig(
         epochs=args.epochs,
         batch_size=args.batch_size,
@@ -114,9 +120,8 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         device=args.device,
         bc_init=bc_init,
         model_type=args.model,
-        d_model=args.d_model,
-        n_layers=args.n_layers,
-        n_heads=args.n_heads,
+        **arch,
+        arch_explicit=any(v is not None for v in requested.values()),
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
         seed=args.seed,
@@ -369,9 +374,21 @@ def build_parser() -> argparse.ArgumentParser:
     train_rl.add_argument("--batch-size", type=int, default=256)
     train_rl.add_argument("--lr", type=float, default=1e-3)
     train_rl.add_argument("--hidden-dim", type=int, default=256, help="MLP trunk width")
-    train_rl.add_argument("--d-model", type=int, default=128, help="Transformer token width")
-    train_rl.add_argument("--n-layers", type=int, default=2, help="Transformer encoder layers")
-    train_rl.add_argument("--n-heads", type=int, default=4, help="Transformer attention heads")
+    # Arch flags default to None so an explicit request is distinguishable from silence:
+    # an AC->AC warm-start adopts the checkpoint's arch, and a conflicting explicit
+    # request must fail loud rather than be discarded (see offline_rl._arch_conflicts).
+    train_rl.add_argument(
+        "--d-model", type=int, default=None, help="Transformer token width (default: 128)"
+    )
+    train_rl.add_argument(
+        "--n-layers", type=int, default=None, help="Transformer encoder layers (default: 2)"
+    )
+    train_rl.add_argument(
+        "--n-heads", type=int, default=None, help="Transformer attention heads (default: 4)"
+    )
+    train_rl.add_argument(
+        "--ff-dim", type=int, default=None, help="Transformer feed-forward width (default: 256)"
+    )
     train_rl.add_argument(
         "--no-id-embed",
         dest="id_embed",
