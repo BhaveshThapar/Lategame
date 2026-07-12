@@ -1,0 +1,103 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "n_per_checkpoint": 300,
+  "format": "gen9ou",
+  "loop_penalty": 4.0,
+  "builds": {
+    "v19": {
+      "wins": 403,
+      "n": 900,
+      "rate": 0.4478,
+      "ci95": [
+        0.41558009001007745,
+        0.4804193860043037
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_ou_sched_s0/iter_47.pt",
+          "wins": 150,
+          "n": 300,
+          "rate": 0.5,
+          "ci95": [
+            0.4437784961119509,
+            0.556221503888049
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_ou_sched_s1/iter_42.pt",
+          "wins": 103,
+          "n": 300,
+          "rate": 0.3433,
+          "ci95": [
+            0.291887036388584,
+            0.3987412383440398
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_ou_sched_s2/iter_49.pt",
+          "wins": 150,
+          "n": 300,
+          "rate": 0.5,
+          "ci95": [
+            0.4437784961119509,
+            0.556221503888049
+          ]
+        }
+      ]
+    },
+    "v20": {
+      "wins": 425,
+      "n": 900,
+      "rate": 0.4722,
+      "ci95": [
+        0.43979324404702086,
+        0.5048873283010542
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_ou_budget_s0/iter_46.pt",
+          "wins": 146,
+          "n": 300,
+          "rate": 0.4867,
+          "ci95": [
+            0.43063348243848176,
+            0.5430370090281246
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_ou_budget_s1/iter_47.pt",
+          "wins": 139,
+          "n": 300,
+          "rate": 0.4633,
+          "ci95": [
+            0.40772488257071904,
+            0.5198689689624482
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_ou_budget_s2/iter_45.pt",
+          "wins": 140,
+          "n": 300,
+          "rate": 0.4667,
+          "ci95": [
+            0.41099010312059053,
+            0.5231861255459253
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too.",
+  "comparison": {
+    "baseline": "v19",
+    "candidate": "v20",
+    "disjoint_ci": false,
+    "significant_at_05": false,
+    "diff": 0.0244,
+    "z": 1.04,
+    "p_value": 0.2981,
+    "se": 0.0235,
+    "verdict": "NULL"
+  }
+}
