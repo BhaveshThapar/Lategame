@@ -1499,6 +1499,75 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     evals — an optimistically biased statistic (winner's curse; v18 shrank 0.503 → 0.453 at n=300). Compare builds on
     the authoritative n=300 CI, never on `best_vs_heuristic`.**
 
+- **OU Pivot — Build 20: the per-iteration sample budget — the plateau is a STATIONARY POINT, not a sampling-noise
+  floor. `NULL` on strength; the whole optimization/sampling family of levers is RETIRED.**
+  - **Lever:** 3× the rollout, `--games-per-opp 16 → 48` (already a flag ⇒ **zero code change**), everything else
+    byte-identical to v19. Reading the code first corrected two things. **(a) The cost model was wrong in our favour:**
+    each iteration plays **48 rollout battles but 400 eval battles** (`_eval_point` runs `eval_n=100` vs 3 baselines
+    *plus* iter0), so **~89% of every PPO run's battle budget is measurement, not learning** (2,384 rollout vs 20,300
+    eval battles over 50 iters) and tripling the rollout costs **~+21% battles**, not the 3× wall-clock v19 assumed.
+    **(b) "More gradient steps" was the wrong mechanism:** advantages are normalized **per-buffer** (`ppo.py:169`) and
+    the epoch loop **KL-early-stops** (`ppo.py:212`), so per-iteration *displacement* is governed by the trust region,
+    not the step count. A bigger buffer buys a **lower-variance estimate of the gradient direction** — nothing else.
+  - **Stage A — the probe reframed the build before it was paid for** (`scripts/grad_noise_diag.py`, new, committed).
+    On shipped v19 checkpoints it takes the gradient at **θ_old** (PPO ratio 1, clip inactive ⇒ the vanilla policy
+    gradient — the first step the iteration would take) and compares it across **independent rollouts**.
+    **Result: the noise is CONSTANT and the signal VANISHES.** At iters 10 / 47 / 50: `tr(Σ)` (noise) **3284 → 2741 →
+    3295** (flat), `|G|²` (signal) **4.54 → 0.93 → −0.41** — a *negative* estimate, i.e. indistinguishable from zero;
+    `B_simple` **723 → 2945 → ∞**, exploding only because it is the **ratio**. The plateau lands exactly where the
+    ~1.6K buffer crosses the noise scale. Verdict `NOISE_LIMITED` (pre-registered ⇒ run Stage B) — **but flagged at the
+    time as the Build-19 trap in a new costume: `B_simple → ∞` is the signature of a growing noise floor AND of a
+    vanishing gradient (a stationary point). A bigger batch estimates a near-zero gradient more precisely; it cannot
+    manufacture one.** Prior on a win lowered *before* the seeds ran.
+  - **Two method fixes, both load-bearing** (each caught by its own failing test): **(1)** compare **independent
+    rollouts**, never two halves of one buffer — halves share that rollout's league/team/episode draw, so they agree
+    more than two real PPO iterations do; the bias runs *toward agreement* and could have manufactured a false
+    `SIGNAL_LIMITED` and wrongly cancelled Stage B. **(2) Two arms**, because `--games-per-opp` only buys battles
+    against the mix an iteration **already drew**: `same_mix` (league pinned) decides the verdict; `fresh_mix` isolates
+    opponent-**selection** variance that no per-opponent budget can touch. Measured `opponent_draw_dominates=False`
+    everywhere ⇒ that alternative is refuted and the budget is the right knob.
+  - **Stage B — the lever landed and the metric did not move.** Telemetry is unambiguous: gradient steps/iter **24 →
+    71** (2.96×), `epochs` held at **4 in 40/40** late iters, `approx_kl` 0.008 → 0.014 against a 0.045 bar ⇒ **the
+    trust region never bound** (so a NULL cannot be blamed on it), and the critic even fit better (`vmae` 1.44 → 1.09).
+    3-seed `best_vs_heuristic` **0.493 → 0.567 ± 0.029** (per-seed 0.570/0.600/0.530, best iters 46/47/45 all interior
+    ⇒ plateaued) — and it was **almost entirely winner's curse**.
+  - **The MEASUREMENT itself had to be fixed** (`scripts/seed_strength_gate.py`, new, committed). The authoritative
+    protocol used through Build 19 — score the **single best checkpoint** at n=300 — is **not fit for build-vs-build**:
+    **UNDERPOWERED** (a difference has SE ≈ 0.041 ⇒ resolves only gaps **> 0.08**; the candidate effect was 0.074 —
+    *under its own detection floor*) and **SELECTION-BIASED** (that checkpoint is the argmax over ~150 noisy curve
+    evals, then re-scored ⇒ regression to the mean, and build-dependent: v20's best fell **0.600 → 0.480**, v19's only
+    0.493 → 0.490). Fix, applied **symmetrically to both builds**: score **every seed's best** checkpoint and pool
+    (SE 0.041 → **0.024**, resolving +0.07 at z ≈ 3), and read a **z-test** alongside CI-disjointness — **CI overlap is
+    a CONSERVATIVE test** (at +0.05 over 900/arm the intervals overlap while p = 0.034). Per-seed "best iter" is still a
+    max over 50 evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias
+    **cancels in the DIFFERENCE**, which is the quantity under test.
+  - **Corrected verdict: v19 `0.448 [0.416, 0.480]` → v20 `0.472 [0.440, 0.505]`; diff +0.024, z = 1.04, p = 0.30 ⇒
+    NULL.** (The old single-ckpt gate said 0.490 → 0.480, p = 0.81 — same call, but it could not have seen the effect
+    either way.) Harness clean (mirror 0.493, gradient 0.013 < 0.073 < 0.613, band 0.600 > RB 0.516); MODEL_BOUND
+    reconfirmed.
+  - **What the null teaches — the part worth keeping: 3× the samples collapsed seed-to-seed variance ~7× (std 0.074 →
+    0.010) WITHOUT moving the mean.** That is exactly the signature of estimating a **near-zero** gradient more
+    precisely: a far more *reproducible* policy that converges to the same place. Stage A's reframing was right — **the
+    plateau is a stationary point of the PPO objective, not a sampling-noise floor.** With Build 19 (entropy/lr, NULL)
+    and opponent-variety (refuted), the **entire optimization/sampling family is now exhausted**; the binding constraint
+    is the **model class**. Suite **328 pass** (296 + 25 + 7), ruff + mypy clean;
+    `results/{grad_noise_diag,ppo_ou_gate,format_ceiling_gate_ou,seed_strength_gate}_v20.json`;
+    `checkpoints/ppo_ou_budget_s{0,1,2}/` gitignored.
+  - **Open next (Build 21) — CAPACITY, now the sole indicated lever.** A bigger model changes the loss landscape and
+    can carry a nonzero gradient where the current **0.72M-param** net has none. **Zero-code path:** `train-rl --model
+    entity_transformer --d-model 256 --n-layers 4 --n-heads 8 --id-embed-init prior` trains a wide net **from scratch**
+    on the 120K-row RL shard; PPO's `build_model(ckpt)` reads `arch` and fine-tunes **all** of it (`ppo.py:346-348`).
+    This **bypasses BC's 0.63 val-acc gate entirely** — which matters, because at 0.086 rows/param that gate would
+    likely reject a bigger teacher for *overfitting*: a false negative w.r.t. what PPO wants. **Confound:** from-scratch
+    offline-RL loses the BC warm-start, so the clean version still needs the 4 edits to `bc.py`/`cli.py` (`d_model`/
+    `n_layers`/`n_heads`/`ff_dim` → `TrainConfig` → `_build_model`'s `arch` dict → 4 CLI flags). **Footgun found:**
+    `--d-model` is **silently ignored** when `--bc-init` is passed (`offline_rl.py:215-223` overwrites `model_meta` from
+    the checkpoint's `arch`; it must, or the strict `load_state_dict` would explode) — worth a guard. **Secondary
+    lever:** the **critic** (EV ≈ 0.30 — a better critic shrinks `tr(Σ)` directly, with **no extra samples**). Reuse
+    `grad_noise_diag.py` as a cheap **pre-filter**: a candidate that fixes the plateau must show `|G|²` *recovering*.
+    **Methodology, updated: compare builds with `seed_strength_gate.py` (pooled seed-bests + z-test). The
+    single-checkpoint n=300 gate is RETIRED for build-vs-build — it cannot see effects below ~0.08.**
+
 ---
 
 ## 14. Risks & mitigations

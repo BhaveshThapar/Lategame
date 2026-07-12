@@ -421,6 +421,62 @@ already reads `d_model/n_layers/…` from `arch`; only `bc.py::_build_model` fai
 `best_vs_heuristic` is a max over 50 noisy n=100 evals — an optimistically biased statistic (winner's curse). Compare
 builds on the authoritative n=300 CI.*
 
+**OU pivot Build 20 — the per-iteration sample budget: the plateau is a STATIONARY POINT, not a sampling-noise floor.
+`NULL` on strength; the whole optimization/sampling family of levers is RETIRED.** The lever was 3× the rollout
+(`--games-per-opp 16 → 48`, zero code change). Reading the code first reprised its usual value: each iteration plays
+**48 rollout battles but 400 eval battles** (`_eval_point` runs `eval_n=100` against 3 baselines *plus* iter0), so ~89%
+of every PPO run's battle budget is **measurement, not learning**, and tripling the rollout costs only **~+21% battles**
+— not the 3× wall-clock the Build-19 notes assumed. It also killed the naive mechanism: advantages are normalized
+**per-buffer** and the epoch loop **KL-early-stops**, so per-iteration policy *displacement* is governed by the trust
+region, not the step count. A bigger buffer buys a **lower-variance estimate of the gradient direction**, nothing else.
+
+*Stage A — the probe (`scripts/grad_noise_diag.py`, new) reframed the build before it was paid for.* On shipped v19
+checkpoints it takes the gradient at θ_old (ratio 1, clip inactive ⇒ the vanilla policy gradient) and compares it across
+**independent rollouts**. Result — sharper than the pre-registered question: **the noise is constant and the signal
+vanishes.** `tr(Σ)` is flat across training (**3284 → 2741 → 3295** at iters 10/47/50) while **`|G|²` collapses
+(4.54 → 0.93 → −0.41**, a *negative* estimate ⇒ indistinguishable from zero); `B_simple` explodes 723 → 2945 → ∞ only
+because it is the **ratio**, and the plateau lands exactly where the ~1.6K buffer crosses the noise scale. Verdict
+`NOISE_LIMITED` (pre-registered) → run Stage B — **but flagged at the time as the Build-19 trap in a new costume:
+`B_simple → ∞` is the signature of a growing noise floor *and* of a vanishing gradient (a stationary point), and a
+bigger batch estimates a near-zero gradient more precisely — it cannot manufacture one.** Two method fixes, both
+load-bearing: compare **independent rollouts**, never two halves of one buffer (halves share that rollout's
+league/team/episode draw ⇒ biased *toward agreement* ⇒ could have manufactured a false `SIGNAL_LIMITED` and wrongly
+cancelled Stage B); and run **two arms**, since `--games-per-opp` only buys battles against the mix an iteration
+*already drew* (`same_mix` decides the verdict; `fresh_mix` isolates opponent-**selection** variance no budget can touch
+— measured `opponent_draw_dominates=False` everywhere, refuting that alternative).
+
+*Stage B — the run (zero code change).* **The lever landed and the metric did not move.** Telemetry is unambiguous:
+gradient steps/iter **24 → 71** (2.96×), `epochs` held at **4 in 40/40** late iterations, `approx_kl` 0.008 → 0.014
+against a 0.045 bar ⇒ **the trust region never bound**, and the critic even fit better (`vmae` 1.44 → 1.09). 3-seed
+`best_vs_heuristic` rose **0.493 → 0.567 ± 0.029**… and it was **almost entirely winner's curse**.
+
+*The measurement itself had to be fixed (`scripts/seed_strength_gate.py`, new).* The old authoritative protocol — score
+the **single best checkpoint** at n=300 — is **not fit for these comparisons**: it is **underpowered** (a build-vs-build
+difference has SE ≈ 0.041 ⇒ resolves only gaps **> 0.08**, while the candidate effect was 0.074) and
+**selection-biased** (that checkpoint is the argmax over ~150 noisy curve evals, then re-scored ⇒ regression to the mean,
+build-dependent: v20's best fell 0.600 → 0.480, v19's 0.493 → 0.490). The fix, applied **symmetrically to both builds**:
+score **every seed's best** checkpoint and pool (SE 0.041 → **0.024**, resolving +0.07 at z ≈ 3), and read a **z-test**
+alongside CI-disjointness (CI overlap is a *conservative* test — at +0.05/900 the intervals overlap while p = 0.034).
+**Corrected result: v19 `0.448 [0.416,0.480]` → v20 `0.472 [0.440,0.505]`, diff +0.024, z = 1.04, p = 0.30 ⇒ NULL.**
+
+**What the null teaches:** **3× the samples collapsed seed-to-seed variance ~7× (std 0.074 → 0.010) without moving the
+mean.** That is precisely the signature of estimating a **near-zero** gradient more precisely — a far more *reproducible*
+policy that converges to the same place. Stage A's reframing was right: **the plateau is a stationary point of the PPO
+objective, not a noise floor.** Combined with Build 19 (entropy/lr, NULL) and the refutation of opponent variety, the
+entire **optimization/sampling family is exhausted** — the binding constraint is the **model class**. Suite **328 pass**
+(296 + 25 + 7), ruff + mypy clean; `results/grad_noise_diag_v20.json`, `results/ppo_ou_gate_v20.json`,
+`results/format_ceiling_gate_ou_v20.json`, `results/seed_strength_gate_v20.json`.
+**Open next (Build 21) — CAPACITY**, now the sole indicated lever: a bigger model changes the landscape and can carry a
+nonzero gradient where the current **0.72M-param** net has none. `train-rl --model entity_transformer --d-model 256
+--n-layers 4 --n-heads 8` trains a wide net **from scratch with zero code change** (PPO's `build_model(ckpt)` reads
+`arch` and fine-tunes all of it), **bypassing BC's 0.63 val-acc gate** — which matters, since at 0.086 rows/param that
+gate would likely reject a bigger teacher for *overfitting*, a false negative w.r.t. what PPO wants. Confound: from-scratch
+offline-RL loses the BC warm-start, so the clean version still needs 4 edits to `bc.py`/`cli.py`. Footgun found:
+**`--d-model` is silently ignored when `--bc-init` is passed** (`offline_rl.py:215-223` overwrites `model_meta` from the
+checkpoint's `arch`). Secondary: the **critic** (EV ≈ 0.30 — a better critic shrinks `tr(Σ)` with no extra samples).
+*Methodology, updated: compare builds with `seed_strength_gate.py` (pooled seed-bests + z-test). The single-checkpoint
+n=300 gate is retired for build-vs-build — it cannot see effects below ~0.08.*
+
 ## Setup
 
 ```bash
