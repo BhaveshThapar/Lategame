@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Shared job prologue: bring up a PRIVATE Showdown for this job and tear it down on exit.
+#
+# poke-env pins ws://localhost:8000, so two jobs on one host would share a server and silently
+# battle into each other's games. Each job therefore gets its own port, and lategame/config.py
+# reads it from LATEGAME_SHOWDOWN_PORT.
+#
+# Sourced, not executed:  source scripts/cluster/_job_common.sh
+set -euo pipefail
+
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$REPO_DIR"
+
+# Port from the array index, so tasks on the same node cannot collide. 8000 stays the
+# interactive default; jobs live above it.
+TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
+export LATEGAME_SHOWDOWN_PORT="${LATEGAME_SHOWDOWN_PORT:-$((8100 + TASK_ID))}"
+
+SERVER_LOG="${SERVER_LOG:-showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
+
+start_showdown() {
+  echo "[job] starting Showdown on port ${LATEGAME_SHOWDOWN_PORT}"
+  bash scripts/run_server.sh "$LATEGAME_SHOWDOWN_PORT" > "$SERVER_LOG" 2>&1 &
+  SHOWDOWN_PID=$!
+  # Do NOT proceed until the port actually accepts connections. poke-env does not fail fast on a
+  # dead server -- it HANGS, for hours, which is how a whole run gets silently wasted.
+  for _ in $(seq 1 60); do
+    if python -c "
+import socket,sys
+s=socket.socket()
+s.settimeout(1)
+sys.exit(0 if s.connect_ex(('127.0.0.1', ${LATEGAME_SHOWDOWN_PORT})) == 0 else 1)
+" 2>/dev/null; then
+      echo "[job] Showdown up (pid $SHOWDOWN_PID)"
+      return 0
+    fi
+    if ! kill -0 "$SHOWDOWN_PID" 2>/dev/null; then
+      echo "[job] FATAL: Showdown died on startup. Log:" >&2
+      tail -20 "$SERVER_LOG" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "[job] FATAL: Showdown never opened port ${LATEGAME_SHOWDOWN_PORT} after 120s" >&2
+  tail -20 "$SERVER_LOG" >&2
+  exit 1
+}
+
+stop_showdown() {
+  if [[ -n "${SHOWDOWN_PID:-}" ]] && kill -0 "$SHOWDOWN_PID" 2>/dev/null; then
+    echo "[job] stopping Showdown (pid $SHOWDOWN_PID)"
+    kill "$SHOWDOWN_PID" 2>/dev/null || true
+    wait "$SHOWDOWN_PID" 2>/dev/null || true
+  fi
+}
+# Fires on success, failure, and scancel alike -- a leaked node server would poison the next job
+# that lands on this host.
+trap stop_showdown EXIT

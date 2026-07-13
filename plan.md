@@ -1620,6 +1620,57 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     a **high-RAM CPU cluster node (no GPU** — the net is 4.56M params**)**, where seeds run in parallel rather than
     sequentially and a sleeping laptop cannot reap the job (which killed one probe run and its unwritten JSON).
 
+- **Build 22 — PRE-REGISTERED (written 2026-07-13, BEFORE running). The exit "critic bias" is WITHDRAWN.**
+  - **Why the pre-registered exit is dead.** Build 21 slated Build 22 as *critic bias*, on the theory that "a better
+    critic shrinks `tr(Σ)` directly, with no extra samples." **Build 21 incidentally ran that experiment and refuted
+    both halves.** Its wide net *is* a much better critic (offline value MAE 0.531 → 0.370), its `tr(Σ)` *did* fall as
+    predicted (**3284 → 580, 5.7×**) — **and the policy got WORSE** (−0.047). Worse for the theory: the critic's
+    **explained variance is FLAT across the two builds** (EV@iter_10 **0.112** for v20 vs **0.074** for v21; EV@late
+    0.27–0.30 vs 0.24–0.25) while `|G|²` moves **~80×**. **EV does not predict `|G|²`** — it is the one variable that
+    did *not* change between the build that worked and the build that didn't. Spending Build 22 there would be
+    spending it on the known-non-discriminating variable.
+  - **What Build 21's data actually says.** Nothing measurable differs except capacity and the warm start. The wide net
+    is **not stuck**: entropy@10 **1.071** (vs 1.064 — *higher*), `|pi_loss|`@10 **0.0215** (vs 0.0122 — *larger*),
+    return span 14.5 (vs 13.9 — same), KL normal. **It takes full-sized steps in NOISE directions** (cos ≈ 0,
+    `|G|²` ≈ 0) and random-walks away from a good initialization — which is *why* it regressed rather than merely
+    plateauing.
+  - **HYPOTHESIS (H22): the OFFLINE warm start manufactures the stationary point.** The wide net enters PPO already
+    flat — `|G|²` = 0.057 at iter_10, where the narrow net was at 4.540 (its own iter_50 value). The one thing that
+    improved dramatically is the *offline fit*. H22: **fitting the offline objective harder lands the policy in a
+    region that is flat under the ON-POLICY objective** — better offline, no gradient left to improve from. Consistent
+    with the BC ablation (warm start contributes **nothing** to final strength, 0.6485 either way): the offline stage
+    may be **actively harmful**, not merely decorative.
+    **HONESTY FLAG: H22 is POST-HOC** — derived from Build 21's data after the fact. It is a hypothesis, not a result,
+    and is pre-registered here *before* the test precisely so it cannot be quietly reshaped into one (HARKing).
+  - **STAGE A — the cheap discriminator (~1–1.5 h, run FIRST; a full build is NOT authorized until it passes).**
+    Probe `|G|²` at **iter_0 — the warm start itself, before any PPO** — for both nets, at `--games-per-opp 48` (the
+    budget both v20 and v21 actually trained at), `--rollouts 6 --splits 5`. `_league_for` handles `k=0`: the league is
+    `[init]` + anchors, exactly the mix iteration 0 faced.
+
+    ```
+    scripts/grad_noise_diag.py --policy checkpoints/offrl_gen9ou_wide_s0.pt \
+        --init checkpoints/offrl_gen9ou_wide_s0.pt --games-per-opp 48 --rollouts 6 --splits 5
+    scripts/grad_noise_diag.py --policy checkpoints/offrl_gen9ou_v7_s0.pt   \
+        --init checkpoints/offrl_gen9ou_v7_s0.pt   --games-per-opp 48 --rollouts 6 --splits 5
+    ```
+
+    **Read the WITHIN-architecture trend, not the cross-architecture ratio** — absolute `|G|²` is *not* comparable
+    across parameterizations (gradient norms scale with width); only `cos` and `B_simple` are scale-free. Pre-registered
+    outcomes:
+
+    | Stage A result | reading | Build 22 becomes |
+    |---|---|---|
+    | wide `\|G\|²`(0) ≈ 0.057 (its iter_10 value) | **BORN FLAT** — H22 CONFIRMED; the offline stage creates it | weaken/shorten offline training, or PPO from a less-converged init (BC already shown unnecessary) |
+    | wide `\|G\|²`(0) ≫ 0.057 | signal **COLLAPSED during PPO iters 1–10** — H22 REFUTED; a PPO×capacity interaction | probe iters 1,2,3,5 to localize the death; H22 is retired |
+    | narrow `\|G\|²`(0) ≉ its 4.540 @ iter_10 | the probe is **not measuring what we think** at k=0 | fix the instrument before trusting either arm |
+
+    The narrow arm is the **control**: it must show real signal at iter_0 (it had 4.540 by iter_10). If it does not,
+    Stage A is uninterpretable and nothing else may be concluded from it.
+  - **Infra prerequisite.** Run Stage A on **UMIACS**, not the laptop — see `scripts/cluster/`. High-RAM CPU nodes, **no
+    GPU** (4.56M params; the GPU is irrelevant and only lengthens the queue). The binding constraints measured in Build
+    21 are **RAM** (16 GB → 14.8 GB swap → a 48-min `UN` stall on one gradient phase) and **job durability** (a sleeping
+    laptop reaped a probe and its unwritten JSON — `grad_noise_diag` serializes only at the end).
+
 ---
 
 ## 14. Risks & mitigations
