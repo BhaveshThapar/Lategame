@@ -1,0 +1,57 @@
+# Running on a Slurm cluster (UMIACS)
+
+## Why the cluster, and what to ask for
+
+Build 21 measured the actual constraints, and they are **not** what you would guess:
+
+| resource | verdict |
+|---|---|
+| **GPU** | **Do not request one.** The net is 4.56M params. A GPU does nothing for it and only lengthens the queue. |
+| **RAM** | **The binding constraint.** `grad_noise_diag` drove a 16 GB machine to 14.8 GB swap and stalled **48 min** in `UN` (uninterruptible I/O wait) on a single gradient phase. Ask for **64 GB+**. |
+| **CPU** | Modest per job (~2 cores are actually busy). The parallelism you want is **across** jobs, not within one. |
+| **Job durability** | A sleeping laptop reaped a probe run and its unwritten JSON. `grad_noise_diag` serializes only at the end, so an interrupted run loses **everything**. Slurm fixes this. |
+
+The win is that seeds run **in parallel** rather than sequentially: 3 seeds went 4.6 h serial on the
+laptop; as an `sbatch` array they are one seed's wall-clock.
+
+## The one thing that made this possible
+
+poke-env's `LocalhostServerConfiguration` **hardcodes `ws://localhost:8000`**. Two jobs on one host
+would therefore share a single Showdown server and silently see each other's battles — a data
+corruption that no gate here would catch. `lategame/config.py` now reads **`LATEGAME_SHOWDOWN_PORT`**
+(default 8000, byte-identical to poke-env's config — see `tests/test_config.py`), and each job starts
+its own server on its own port.
+
+## Setup (once)
+
+```bash
+bash scripts/cluster/setup_umiacs.sh
+```
+
+Builds Showdown (needs `node`; load it from a module or use conda's) and creates the conda env from
+`environment.yml`. Adjust the module lines to whatever UMIACS actually provides — that is the one
+part of this that is guessed rather than measured.
+
+## Run
+
+```bash
+# Build 22 Stage A: probe |G|^2 at iter_0 for both warm starts (the pre-registered discriminator)
+sbatch scripts/cluster/stage_a.slurm
+
+# A 3-seed PPO sweep, in parallel
+sbatch --array=0-2 scripts/cluster/ppo_seed.slurm
+```
+
+Each task picks a port from its array index, starts a private Showdown on it, waits for the port to
+accept connections, runs, and tears the server down on exit (including on failure — see the `trap`).
+
+## Before you trust a result
+
+Everything in `plan.md` §13.1 still applies, in particular:
+
+- Run `scripts/ppo_telemetry.py` **first** after a run. The stdout log is gitignored; that JSON is the
+  durable copy of the trust-region certificate, and without it a NULL cannot be attributed to the lever.
+- Pool seeds with `scripts/merge_gate_seeds.py`. A dropped seed silently halves the strength gate's
+  power — it still prints a verdict.
+- `grad_noise_diag`'s `NOISE_LIMITED` verdict answers **Build 20's** question. `B_simple` is a ratio,
+  `tr(Σ)/|G|²`; when `|G|²` → 0 it explodes and "collect more samples" is exactly wrong.
