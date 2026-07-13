@@ -1568,6 +1568,58 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     **Methodology, updated: compare builds with `seed_strength_gate.py` (pooled seed-bests + z-test). The
     single-checkpoint n=300 gate is RETIRED for build-vs-build — it cannot see effects below ~0.08.**
 
+- **Build 21 — CAPACITY (0.72M → 4.56M params): NULL, and a REGRESSION. The model-side story is CLOSED.**
+  - **Lever:** warm-start widened to a 4.56M-param entity transformer (`--ff-dim` exposed, Stage A0), PPO self-play
+    otherwise **identical to v20** (50 iters × 3 seeds, `games_per_opp` 48, ent/lr schedules unchanged).
+  - **Verdict (`seed_strength_gate.py`, the authoritative protocol): v20 `0.499 [0.466, 0.531]` → v21
+    `0.452 [0.420, 0.485]`; diff **−0.047**, z = −1.98, p = 0.047 ⇒ NULL.** 6.3× the parameters made the agent
+    **slightly worse**, not better. (Note v20's arm re-scored at 0.499 here vs 0.472 in its own build — same
+    checkpoints, same protocol, a 0.027 swing between independent n=900 evals. **Only the within-run difference is
+    trustworthy**; this gate's absolute rates move.)
+  - **Trust region CERTIFIED CLEAN, so the NULL is unconfounded** (`scripts/ppo_telemetry.py`,
+    `results/ppo_ou_telemetry_v{19,20,21}.json`): bound in **4/150 iters** (s0 [1], s1 [1,31], s2 [1]), 96–98%
+    full-epoch, `approx_kl` max **0.0675** vs **v20's 0.1602**. **Every build in this lineage binds at iteration 1** —
+    v19 [1,2]/[1,2]/[1], v20 [1]/[1]/[1] — so the opening KL overshoot is the pipeline's standard transient, **not** a
+    capacity artifact. The wide net takes **more consistent** steps, not bigger ones.
+  - **The explainer, and the whole point of the build (`grad_noise_diag_v21.json`, gpo=48/rollouts 6/splits 5 to match
+    v20): `|G|²` does NOT recover — it was NEVER THERE.** Same-mix, by iterate:
+
+    | | `\|G\|²` (signal) | `tr(Σ)` (noise) | `B_simple` | cos |
+    |---|---|---|---|---|
+    | v20 (0.72M) iter_10 | **4.540** | 3284 | 723 *(< budget)* | +0.585 |
+    | v20 iter_47 → iter_50 | 0.931 → −0.408 | 2741 → 3295 | 2945 → ∞ | +0.053 → −0.037 |
+    | v21 (4.56M) iter_10 | **0.057** | **580** | 10188 | +0.429 |
+    | v21 iter_40 → iter_50 | 0.004 → −0.109 | 1698 → 2642 | 395113 → ∞ | +0.017 → +0.143 |
+
+    The 0.72M net had **real gradient signal early (4.540) and lost it**. The 4.56M net **enters PPO already at a
+    stationary point** — its iter_10 `|G|²` (0.057) is where the narrow net *ended up* after fully converging. §13.1's
+    pre-registered pre-filter ("a candidate that fixes the plateau must show `|G|²` **recovering**") is **failed
+    outright**. `opponent_draw_dominates: False` — the noise is not the league draw.
+  - **TRAP, and it cost a wrong read mid-build: `B_simple` is a RATIO (`tr(Σ)/|G|²`). v21's is huge (10k–395k vs a
+    ~4–6k budget), and the script's own `NOISE_LIMITED` verdict duly says "run with more battles."** That is **WRONG
+    here**: `B_simple` exploded because the **denominator collapsed**, not because noise grew — v21's `tr(Σ)` is
+    *lower* than v20's (580 vs 3284). **More samples buy nothing against a vanished gradient.** This is the *same*
+    ratio-as-headroom trap the project already booked; `grad_noise_diag`'s verdict answers **Build 20's** question and
+    must not be read as the capacity finding. (Caveats: absolute `|G|²` is **not** strictly comparable across
+    architectures — quote the scale-free `cos`/`B_simple`; and `cos` at iter_10 read 0.182 on a first, killed probe vs
+    0.429 on the rerun — **the cos estimate is itself noisy across probe runs**.)
+  - **Banked regardless of the verdict.** (1) The wide net is a **much better critic** — offline value MAE 0.531 →
+    0.370, in-run `vmae` 0.78–0.84 vs v20's 1.20–1.31. It still **degrades** over training (→ 1.12–1.22), just from a
+    far better start; the "wide critic holds while others degrade" reading was an artifact of the first 13 iters.
+    (2) **The BC warm-start contributes NOTHING** — a from-scratch control matched it at **0.6485 accuracy exactly**
+    (`stage_a_confound_v21.json`), retiring a whole pipeline stage as decorative.
+  - **Correction to the record:** commit `f77acd7`'s message and `ppo_telemetry.py`'s docstring assert v20's telemetry
+    was *unrecoverable*. **False** — `results/ppo_ou_budget_s{0,1,2}.log` were on disk the whole time.
+  - **Open next (Build 22) — CRITIC BIAS, per the pre-registered exit.** Capacity is refuted as the lever: it did not
+    restore `|G|²`, and it *cost* 0.047. With optimization/sampling (Builds 19–20) and now the model class exhausted,
+    the remaining model-side suspect is the **value function biasing the advantage** — EV ≈ 0.23–0.33 in-probe. The
+    wide net proves a **better critic is achievable** (MAE 0.370) *without* improving the policy gradient, which is
+    itself the clue: the critic is fit well but the **advantage estimator** is what feeds `|G|²`.
+  - **Infra:** this workload is **memory-bound, not compute-bound** — the probe drove a 16 GB M2 Pro to 14.8 GB swap
+    and stalled 48 min in `UN` (uninterruptible I/O wait) on one gradient phase, at ~2 of 10 cores. Build 22 belongs on
+    a **high-RAM CPU cluster node (no GPU** — the net is 4.56M params**)**, where seeds run in parallel rather than
+    sequentially and a sleeping laptop cannot reap the job (which killed one probe run and its unwritten JSON).
+
 ---
 
 ## 14. Risks & mitigations

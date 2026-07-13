@@ -529,6 +529,25 @@ python scripts/curriculum_gate.py        --out results/curriculum_gate.json   # 
 python scripts/rpredict_oppmodel_gate.py --gate a   # Lever 14 Gate A: opponent-model fidelity (PASS)
 python scripts/rpredict_oppmodel_gate.py --gate b --arms whitebox,learned --concurrency 6  # Lever 14 Gate B: real-opponent-model search (AMBER)
 
+# Gen 9 OU PPO builds (19-21) — the build-vs-build toolchain. Run in this order.
+# Seeds are trained ONE AT A TIME (checkpoint disk), so each writes its own _s{N}.json.
+python scripts/ppo_telemetry.py --log 0 run_s0.log --out results/ppo_ou_telemetry_v21.json
+#   ^ the TRUST-REGION CERTIFICATE. Run FIRST: the run log is gitignored, this JSON is the durable copy.
+#     A NULL is only attributable to the lever if the trust region did not bind.
+python scripts/merge_gate_seeds.py --seed-json results/ppo_ou_gate_v21_s{0,1,2}.json \
+    --ladder-source ... --note ... --out results/ppo_ou_gate_v21.json
+#   ^ pools the per-seed runs. Drop a seed here and the z-test below silently loses its power.
+python scripts/seed_strength_gate.py --build v20 ... --build v21 ... --out results/seed_strength_gate_v21.json
+#   ^ THE AUTHORITATIVE verdict: every seed's best ckpt, n=300 each, pooled to 900/arm, two-proportion z.
+#     Resolves ~+0.07 at z~3. The training curve does NOT decide WIN vs NULL. Absolute rates move
+#     between runs (winner's curse); only the within-run DIFFERENCE is trustworthy.
+python scripts/grad_noise_diag.py --policy <best> --init <warm-start> --league-dir <run> \
+    --games-per-opp 48 --rollouts 6 --splits 5 --out results/grad_noise_diag_v21.json
+#   ^ the EXPLAINER: reads |G|^2 (probes[*].arms.same_mix.policy.noise_scale.g_norm_sq).
+#     --games-per-opp MUST match the run under test; --splits defaults to 20 (v20 used 5).
+#     WARNING: its NOISE_LIMITED verdict answers Build 20's question, not yours. B_simple is a RATIO
+#     (tr(Sigma)/|G|^2) — when |G|^2 -> 0 it explodes and "collect more samples" is exactly WRONG.
+
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
 python -m lategame.cli fetch-replays  --min-rating 1200 --limit 200
