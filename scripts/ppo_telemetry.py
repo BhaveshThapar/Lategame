@@ -1,10 +1,18 @@
 """Persist PPO per-iteration telemetry from a run log into results/ (committed).
 
-Build 21 needed to know whether Build 20's trust region ever bound in its EARLY iterations
-and could not find out: ppo_continue_gate's JSON stores only the win-rate curve, and the raw
-stdout log is gitignored and its session is gone. Build 20's note certifies "epochs held at 4
-in 40/40 LATE iters" -- silent on the early ones, which is exactly where a bigger model takes
-its largest step and where the KL early-stop is most likely to fire.
+Build 21 needed to know whether Build 20's trust region ever bound in its EARLY iterations, and
+ppo_continue_gate's JSON could not say: it stores only the win-rate curve. Build 20's note certifies
+"epochs held at 4 in 40/40 LATE iters" -- silent on the early ones, which is exactly where a bigger
+model takes its largest step and where the KL early-stop is most likely to fire.
+
+The raw stdout log DOES carry it, but the log is gitignored (*.log), so it survives only as long as
+nobody cleans the disk -- it is not an artifact a later build can rely on. Hence this script: parse
+the log while it exists and commit the result as JSON.
+
+(A correction to this file's own history: its first version, and commit f77acd7's message, claimed
+Build 20's logs were already GONE. They were not -- results/ppo_ou_budget_s{0,1,2}.log were on disk
+the whole time, and Build 21 recomputed v20's certificate from them. The premise was wrong; the
+script is still needed, for the durability reason above.)
 
 So: extract the telemetry a build's verdict actually leans on -- did the trust region bind?
 did the critic fit? -- and commit it alongside the gate JSON, so the NEXT build can audit this
