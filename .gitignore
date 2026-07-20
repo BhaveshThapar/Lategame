@@ -1,6 +1,10 @@
 # Local Showdown server (cloned, not vendored)
 third_party/
 
+# Self-bootstrapped conda (scripts/cluster/setup_umiacs.sh, only created when the
+# cluster has no conda module/install of its own -- e.g. UMIACS Nexus login nodes)
+/.miniforge3/
+
 # Python
 __pycache__/
 *.py[cod]

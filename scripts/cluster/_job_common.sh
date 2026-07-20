@@ -11,6 +11,29 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$REPO_DIR"
 
+# sbatch does NOT inherit an interactive shell's `conda activate` -- without this every job
+# silently runs against whatever bare `python` happens to be on PATH (wrong deps, or none).
+# Mirrors setup_umiacs.sh's own conda discovery: PATH first, then the private bootstrap it
+# creates at $REPO_DIR/.miniforge3 when the cluster has no conda module at all (measured on
+# UMIACS Nexus: no module, no system install).
+activate_env() {
+  local base
+  if command -v conda >/dev/null 2>&1; then
+    base="$(conda info --base)"
+  elif [[ -x "$REPO_DIR/.miniforge3/bin/conda" ]]; then
+    base="$REPO_DIR/.miniforge3"
+  else
+    echo "[job] FATAL: no conda found on PATH or at $REPO_DIR/.miniforge3." >&2
+    echo "[job]        Run scripts/cluster/setup_umiacs.sh first." >&2
+    exit 1
+  fi
+  # shellcheck disable=SC1091
+  source "$base/etc/profile.d/conda.sh"
+  conda activate lategame
+}
+activate_env
+echo "[job] python: $(command -v python)  ($(python --version 2>&1))"
+
 # Port from the array index, so tasks on the same node cannot collide. 8000 stays the
 # interactive default; jobs live above it.
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"

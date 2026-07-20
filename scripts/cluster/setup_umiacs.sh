@@ -1,25 +1,54 @@
 #!/usr/bin/env bash
-# One-time cluster setup: conda env + a built Showdown.
+# One-time cluster setup: conda (bootstrapped if absent) + the lategame env + a built Showdown.
 #
-# UNVERIFIED ON UMIACS -- the module names below are a guess and are the one part of this that was
-# not measured. Everything else (the port override, the server handshake, the job scripts) is tested
-# locally. Adjust the module lines to whatever `module avail` actually reports, then run once.
+# MEASURED on UMIACS Nexus (not guessed): `module avail`, `which conda`, and every common install
+# path (~/miniconda3, ~/anaconda3, /opt/conda, ...) all come up EMPTY. There is no conda anywhere
+# on the login node. So this does not try to locate one -- it bootstraps a private Miniforge3
+# under $REPO_DIR/.miniforge3 (no root needed, self-contained, gitignored). Everything else here
+# (the port override, the server handshake, the job scripts) is tested locally.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_DIR"
+CONDA_ROOT="$REPO_DIR/.miniforge3"
 
 echo "== node =="
-# Showdown needs node. Prefer a cluster module; fall back to conda's nodejs if there is none.
+# Showdown needs node >=16 (third_party/pokemon-showdown/package.json). Prefer a cluster module --
+# on Nexus `module load nodejs` alone already satisfies this (measured: v16.20.2). If the conda env
+# below pulls a newer nodejs (environment.yml wants >=18), `conda activate` puts it first on PATH
+# and it takes over harmlessly; nothing here depends on which one wins.
 if command -v module >/dev/null 2>&1; then
   module load nodejs 2>/dev/null || module load node 2>/dev/null || \
     echo "  no nodejs module found -- will rely on conda's"
 fi
-if ! command -v node >/dev/null 2>&1; then
-  echo "  installing nodejs into the conda env"
-  conda install -y -c conda-forge nodejs
+command -v node >/dev/null 2>&1 && echo "  $(node --version) (pre-conda)"
+
+echo "== conda =="
+if command -v conda >/dev/null 2>&1; then
+  echo "  found on PATH: $(command -v conda)"
+  CONDA_BASE="$(conda info --base)"
+elif [ -x "$CONDA_ROOT/bin/conda" ]; then
+  echo "  found a previous bootstrap at $CONDA_ROOT"
+  CONDA_BASE="$CONDA_ROOT"
+else
+  echo "  none found -- bootstrapping Miniforge3 into $CONDA_ROOT"
+  ARCH="$(uname -m)"
+  case "$ARCH" in
+    x86_64)         INSTALLER=Miniforge3-Linux-x86_64.sh ;;
+    aarch64|arm64)  INSTALLER=Miniforge3-Linux-aarch64.sh ;;
+    *) echo "  unsupported architecture '$ARCH' -- install conda manually" >&2; exit 1 ;;
+  esac
+  FETCH="curl -fsSL"
+  command -v curl >/dev/null 2>&1 || FETCH="wget -qO-"
+  TMP_INSTALLER="$(mktemp)"
+  $FETCH "https://github.com/conda-forge/miniforge/releases/latest/download/$INSTALLER" > "$TMP_INSTALLER"
+  bash "$TMP_INSTALLER" -b -p "$CONDA_ROOT"
+  rm -f "$TMP_INSTALLER"
+  CONDA_BASE="$CONDA_ROOT"
 fi
-node --version
+# shellcheck disable=SC1091
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+echo "  $(conda --version)"
 
 echo "== conda env =="
 if conda env list | grep -q '^lategame '; then
@@ -28,6 +57,8 @@ if conda env list | grep -q '^lategame '; then
 else
   conda env create -f environment.yml
 fi
+conda activate lategame
+echo "  active env node: $(node --version)"
 
 echo "== showdown =="
 if [ ! -d third_party/pokemon-showdown ]; then
