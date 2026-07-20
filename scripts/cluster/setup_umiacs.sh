@@ -40,10 +40,26 @@ else
   esac
   FETCH="curl -fsSL"
   command -v curl >/dev/null 2>&1 || FETCH="wget -qO-"
-  TMP_INSTALLER="$(mktemp)"
-  $FETCH "https://github.com/conda-forge/miniforge/releases/latest/download/$INSTALLER" > "$TMP_INSTALLER"
-  bash "$TMP_INSTALLER" -b -p "$CONDA_ROOT"
-  rm -f "$TMP_INSTALLER"
+  # A NAMED .sh file in its own directory, NOT a bare extensionless `mktemp` path: the
+  # constructor-based Miniforge/Miniconda installer self-checks whether it is being sourced by
+  # comparing $0 to BASH_SOURCE, and that check is known to misfire on an extensionless temp
+  # file -- especially when /tmp is itself a symlinked or bind-mounted path, which some HPC
+  # systems use. A clean, named, non-symlinked path avoids it.
+  INSTALL_TMP_DIR="$(mktemp -d)"
+  INSTALLER_PATH="$INSTALL_TMP_DIR/$INSTALLER"
+  $FETCH "https://github.com/conda-forge/miniforge/releases/latest/download/$INSTALLER" > "$INSTALLER_PATH"
+  chmod +x "$INSTALLER_PATH"
+  if ! bash "$INSTALLER_PATH" -b -p "$CONDA_ROOT"; then
+    echo >&2
+    echo "  FATAL: the Miniforge installer refused to run." >&2
+    echo "  If it printed \"Please run using bash/dash/sh/zsh, but not '.' or 'source'\", that" >&2
+    echo "  is a known installer quirk (its sourced-vs-executed self-check misfiring), not this" >&2
+    echo "  script actually sourcing anything. Try running it by hand once:" >&2
+    echo "    curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/$INSTALLER -o \$HOME/mf.sh" >&2
+    echo "    chmod +x \$HOME/mf.sh && bash \$HOME/mf.sh -b -p \"$CONDA_ROOT\"" >&2
+    exit 1
+  fi
+  rm -rf "$INSTALL_TMP_DIR"
   CONDA_BASE="$CONDA_ROOT"
 fi
 # shellcheck disable=SC1091
