@@ -6,4 +6,8 @@ dependencies:
   - nodejs>=18
   - pip
   - pip:
-      - -e ".[dev]"
+      # [ml] pulls torch, which grad_noise_diag / train / the bc agent all import;
+      # without it a fresh cluster env dies at the first `import torch`. On CPU nodes
+      # install the CPU wheel manually (pip install "torch>=2.2" --index-url
+      # https://download.pytorch.org/whl/cpu) to avoid the multi-GB CUDA build.
+      - -e ".[dev,ml]"
