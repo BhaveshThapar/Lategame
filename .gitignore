@@ -23,6 +23,7 @@ dist/
 /data/
 /checkpoints/
 *.log
+slurm-*.out
 
 # OS / editor
 .DS_Store

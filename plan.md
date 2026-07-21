@@ -1670,6 +1670,61 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     GPU** (4.56M params; the GPU is irrelevant and only lengthens the queue). The binding constraints measured in Build
     21 are **RAM** (16 GB → 14.8 GB swap → a 48-min `UN` stall on one gradient phase) and **job durability** (a sleeping
     laptop reaped a probe and its unwritten JSON — `grad_noise_diag` serializes only at the end).
+  - **STAGE A — RESULT (ran on UMIACS 2026-07-20, s0 per the spec). H22 CONFIRMED: the wide net is BORN FLAT.**
+    `same_mix.policy.noise_scale.g_norm_sq` at **iter_0 — the warm start itself, before a single PPO step**
+    (`results/grad_noise_diag_b22_stageA_{narrow,wide}.json`, `--games-per-opp 48 --rollouts 6 --splits 5`):
+
+    | arm | `\|G\|²`(0) iter_0 | (Build 21 iter_10) | cos@budget | tr(Σ) |
+    |---|---|---|---|---|
+    | narrow (control, v7) | 3.014 | 4.540 | 0.451 | 8825 |
+    | wide (under test) | 0.064 | 0.057 | 0.186 | 1701 |
+
+    - **Control PASSES — the instrument is sound.** The narrow net shows real, resolvable signal at the warm
+      start: `|G|²`(0) = 3.014, cos@budget 0.451 (well above the 0.3 noise floor — independent rollouts genuinely
+      agree in direction), the same real-signal regime as its own iter_10 (4.540). The pre-registered requirement
+      ("must show real signal at iter_0") is met, so Stage A is interpretable.
+    - **Wide is BORN FLAT** (within-architecture trend, per the constraint — no cross-arch ratio): `|G|²`(0) =
+      0.064 ≈ its Build-21 iter_10 value 0.057 — **not ≫ it**. The wide net enters PPO already at the stationary
+      point it later sits in; PPO iters 1–10 did not manufacture the flatness. Scale-free corroboration: cos@budget
+      0.186 is *below* the 0.3 floor — the iter_0 gradient direction is noise-dominated, exactly what a vanished
+      `|G|²` looks like (contrast narrow's 0.451). This is the pre-registered **BORN FLAT → H22 CONFIRMED** row.
+      `opponent_draw_dominates: False` in both arms — not the league draw.
+    - **Ignore the scripts' self-verdicts** (narrow `AMBIGUOUS`, wide `NOISE_LIMITED`): that is `grad_noise_diag`'s
+      Build-20 sample-budget logic, which §13.1 says must not be read as the capacity finding. Wide's
+      `NOISE_LIMITED` is the `B_simple` ratio trap — it exploded only because the denominator `|G|²` collapsed to
+      0.064, while its `tr(Σ)` = 1701 is *lower* than narrow's 8825: **noise did not grow, signal vanished**.
+      "Collect more samples" is exactly wrong against a vanished gradient.
+    - **HONESTY.** H22 was flagged POST-HOC (from Build 21's data); this Stage A is the pre-registered test that
+      confirms it, so the discipline held. Clean result, but a **single seed per arm (s0)**, as Stage A specified.
+    - **Triggers (pre-registered):** Build 22 becomes **weaken/shorten offline training / PPO from a less-converged
+      init** — BC already shown unnecessary (0.6485 either way), so the offline stage may be *actively harmful*.
+  - **STAGE B — PRE-REGISTERED (written 2026-07-20, BEFORE running). Reduced-epoch offline dose-response,
+    cheap-probe-gated.** Claim: the wide net is born flat *because* offline AWR is fit to convergence; a
+    less-converged wide init should (i) still have real `|G|²` at iter_0 and (ii) let PPO improve. Wide arch read
+    from the checkpoint (do **not** guess): `entity_transformer d_model=256 n_layers=4 n_heads=8 ff_dim=512
+    id_embed_init=prior n_bins=51`, support pinned `v_min=-9.5695 v_max=10.2248`. `train_offline_rl` saves
+    best-by-val-loss (default 30 epochs), so a reduced `--epochs` caps convergence depth.
+    - **Blocking prereq:** stage the *same* `gen9ou` RL shard that built `offrl_gen9ou_wide_s0.pt` (`data/` is empty
+      on the current node); a different shard confounds the comparison.
+    - **B-0 (cheap qualifier, ~1–1.5 h): retrain wide @ `--epochs {3,10}`, then probe `|G|²` at iter_0** on each
+      (Stage-A protocol). Ignore the script's `NOISE_LIMITED`/`AMBIGUOUS` verdict; quote scale-free `cos` + the
+      within-arch `|G|²` trend only. Gate:
+
+      | B-0 result (vs converged wide's 0.064) | reading | action |
+      |---|---|---|
+      | weakened `\|G\|²`(0) ≫ 0.064 AND cos > 0.3 | offline fit is what flattens it — mechanism **ACTIONABLE** | proceed to B (PPO) |
+      | weakened `\|G\|²`(0) ≈ 0.064, cos < 0.3 | offline convergence is **not** the flattener | **CANCEL PPO**; the flat point is architectural — revisit |
+
+    - **B (gated, only if B-0 passes): `BUILD=v22 INIT=<weakened> sbatch --array=0-2 scripts/cluster/ppo_seed.slurm`**
+      (~45 min/seed ×3), then `ppo_telemetry` (certify the trust region did not bind) → `merge_gate_seeds` (pool 3
+      seeds; never hand a single-seed file to the strength gate) → `seed_strength_gate` vs the converged wide **v21
+      (0.452)** — same arch, only offline convergence differs, so it isolates H22 — and vs the narrow champion
+      (v20/v7 ~0.499) for the north-star win-rate. Gate:
+
+      | strength v22 vs v21 | conclusion |
+      |---|---|
+      | v22 > v21 (significant) | offline over-fit was **actively harmful**; weakening it is the first lever that moved win-rate — set Build 23 dose direction |
+      | v22 ≈ v21 (NULL) | flatness is real but **not** the binding constraint on strength; offline convergence is a red herring for win-rate — retire the lever, pivot |
 
 ---
 

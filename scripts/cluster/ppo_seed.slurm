@@ -20,7 +20,12 @@
 # NOTE: no --gres=gpu (4.56M params). NOTE: set --partition for UMIACS.
 
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/_job_common.sh"
+# sbatch runs a spool COPY of this script, so ${BASH_SOURCE[0]}'s sibling _job_common.sh is NOT
+# beside it at run time. Try the sibling first (direct `bash` runs), else fall back to the submit
+# dir -- the repo root, per scripts/cluster/README.md's documented `sbatch` cwd.
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"
+source "$COMMON_DIR/_job_common.sh"
 
 SEED="${SLURM_ARRAY_TASK_ID:-0}"
 BUILD="${BUILD:?set BUILD, e.g. BUILD=v22 sbatch --array=0-2 ...}"
