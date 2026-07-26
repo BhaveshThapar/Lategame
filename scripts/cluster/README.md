@@ -44,16 +44,45 @@ anything else. If a job fails with "no conda found," rerun this setup script fir
 
 ## Run
 
+**Always pass `-p tron --qos=medium`.** The association default QoS has a **max of 4 CPUs per job**,
+so every script here — all of which ask for 8 — is rejected outright at submit time with
+`CPU count specification invalid`. There is no way to discover this except by hitting it. `medium`
+allows the 8-CPU/64 GB spec and a 2-day wall clock (`sacctmgr show qos`); `nexus` is the account.
+
 ```bash
 # Build 22 Stage A: probe |G|^2 at iter_0 for both warm starts (the pre-registered discriminator)
-sbatch scripts/cluster/stage_a.slurm
+sbatch -p tron --qos=medium scripts/cluster/stage_a.slurm
+
+# Build 22 Stage B-0: the reduced-epoch offline dose-response qualifier (train + probe per task).
+# Needs the RL shard staged first -- see below.
+sbatch -p tron --qos=medium --array=0-2 scripts/cluster/stage_b0.slurm
 
 # A 3-seed PPO sweep, in parallel
-sbatch --array=0-2 scripts/cluster/ppo_seed.slurm
+sbatch -p tron --qos=medium --array=0-2 scripts/cluster/ppo_seed.slurm
 ```
 
 Each task picks a port from its array index, starts a private Showdown on it, waits for the port to
 accept connections, runs, and tears the server down on exit (including on failure — see the `trap`).
+Array tasks routinely land on the **same node** (measured: 7141999 tasks 1 and 2 both on tron64),
+which is precisely the collision the per-task port exists to prevent.
+
+## Staging data
+
+`/data/` is gitignored, so **no shard arrives with a clone** — a fresh node has checkpoints but no
+training data. Copy the original from the machine that produced it:
+
+```bash
+rsync -avP <laptop>:<repo>/data/gen9ou_v7_rl.npz $REPO_DIR/data/
+```
+
+**Do not regenerate a shard with `fetch-replays`.** It walks Showdown's *live* search index, so a
+re-fetch months later returns a different replay set, and any build comparing against an older
+checkpoint is then confounded by data rather than by the lever under test.
+
+To check a shard **is** the one that trained a given checkpoint: `train_offline_rl` derives the value
+support from the shard's own returns and stamps it into the checkpoint, so `v_min`/`v_max` act as a
+fingerprint of the training data. `stage_b0.slurm`'s preflight asserts exactly this (and `RLDataset`
+independently raises on an `obs_version`/dim mismatch, so a stale-encoder shard cannot slip through).
 
 ## Before you trust a result
 
