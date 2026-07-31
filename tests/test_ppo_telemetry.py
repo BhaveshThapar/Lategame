@@ -70,6 +70,16 @@ def test_summary_names_the_iters_where_the_trust_region_bound(tmp_path):
     assert s["kl_bar"] == 0.045
 
 
+def test_reported_bar_follows_the_run_not_the_default(tmp_path):
+    """Build 23 raises target_kl to 0.06. A certificate that still claimed 0.045 would name a
+    bar the optimizer never enforced -- in the one artifact the build's attribution rests on."""
+    s = summarize(parse_log(_write(tmp_path)), 0.09)
+    assert s["kl_bar"] == 0.09
+    # Binding is read off the epoch count, so it is unchanged by the bar: iter 1 still stopped
+    # after 1 of 4 epochs. The bar is provenance, not the detector.
+    assert s["trust_region_bound_iters"] == [1]
+
+
 def test_clean_run_reports_no_bind(tmp_path):
     clean = "\n".join(line for line in LOG.splitlines() if "epochs 1" not in line)
     s = summarize(parse_log(_write(tmp_path, clean)))

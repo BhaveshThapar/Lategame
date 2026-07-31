@@ -39,7 +39,7 @@ STATS = re.compile(
 )
 
 MAX_EPOCHS = 4  # PPOConfig.epochs; fewer means the KL early-stop fired (ppo.py:212)
-KL_BAR = 0.045  # 1.5 * target_kl
+KL_BAR = 0.045  # 1.5 * PPOConfig.target_kl (0.03) -- the bar v17-v22 all ran at
 
 
 _FLOATS = ("pi_loss", "v_loss", "entropy", "approx_kl", "clip_frac", "vmae", "ent_coef", "lr")
@@ -62,15 +62,20 @@ def parse_log(path: str | Path) -> list[dict[str, Any]]:
     return rows
 
 
-def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """The trust-region certificate: a NULL can only be blamed on capacity if this is clean."""
+def summarize(rows: list[dict[str, Any]], kl_bar: float = KL_BAR) -> dict[str, Any]:
+    """The trust-region certificate: a NULL can only be blamed on capacity if this is clean.
+
+    ``kl_bar`` is REPORTED, not used to detect binding -- binding is read off the epoch count,
+    which is bar-independent. But it must match the ``target_kl`` the run actually used, or the
+    certificate claims a bar the optimizer never enforced. Build 23 is the first run to move it.
+    """
     bound = [r for r in rows if r["epochs"] < MAX_EPOCHS]
     kls = [r["approx_kl"] for r in rows]
     late = [r for r in rows if r["iter"] > len(rows) // 5]  # past the opening transient
     kl_late = round(sum(r["approx_kl"] for r in late) / len(late), 4) if late else None
     return {
         "n_iters": len(rows),
-        "kl_bar": KL_BAR,
+        "kl_bar": kl_bar,
         "trust_region_bound_iters": [r["iter"] for r in bound],
         "trust_region_bound_count": len(bound),
         "epochs_full_fraction": round(1 - len(bound) / max(len(rows), 1), 4),
@@ -86,18 +91,25 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="ppo_telemetry")
     ap.add_argument("--log", action="append", nargs=2, metavar=("SEED", "PATH"), required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument(
+        "--kl-bar",
+        dest="kl_bar",
+        type=float,
+        default=KL_BAR,
+        help="1.5 * the run's target_kl; MUST match the run (omit = 0.045, the v17-v22 bar)",
+    )
     args = ap.parse_args(argv)
 
     result: dict[str, Any] = {"seeds": {}}
     for seed, path in args.log:
         rows = parse_log(path)
-        result["seeds"][seed] = {"summary": summarize(rows), "iters": rows}
+        result["seeds"][seed] = {"summary": summarize(rows, args.kl_bar), "iters": rows}
         s = result["seeds"][seed]["summary"]
         print(
             f"seed {seed}: {s['n_iters']} iters | trust region bound at "
             f"{s['trust_region_bound_iters'] or 'NEVER'} "
             f"({s['epochs_full_fraction']:.0%} full-epoch) | kl "
-            f"[{s['approx_kl_min']}, {s['approx_kl_max']}] bar {KL_BAR} | "
+            f"[{s['approx_kl_min']}, {s['approx_kl_max']}] bar {s['kl_bar']} | "
             f"vmae {s['vmae_first']} -> {s['vmae_last']}"
         )
 

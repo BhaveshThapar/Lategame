@@ -36,8 +36,15 @@ echo "[job] python: $(command -v python)  ($(python --version 2>&1))"
 
 # Port from the array index, so tasks on the same node cannot collide. 8000 stays the
 # interactive default; jobs live above it.
+#
+# The array index alone is only unique WITHIN one array. Build 23 runs two arms as two concurrent
+# 0-2 arrays: without a distinct base they both compute 8100-8102, and any two tasks landing on the
+# same node share a server -- poke-env does not error, it silently battles into the other arm's
+# games, contaminating the exact comparison the build exists to make. So give each concurrent array
+# its own base:  LATEGAME_SHOWDOWN_PORT_BASE=8200 sbatch --array=0-2 ...
+# Set the BASE, never LATEGAME_SHOWDOWN_PORT itself -- that would pin all three tasks to one port.
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-export LATEGAME_SHOWDOWN_PORT="${LATEGAME_SHOWDOWN_PORT:-$((8100 + TASK_ID))}"
+export LATEGAME_SHOWDOWN_PORT="${LATEGAME_SHOWDOWN_PORT:-$((${LATEGAME_SHOWDOWN_PORT_BASE:-8100} + TASK_ID))}"
 
 SERVER_LOG="${SERVER_LOG:-showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
 

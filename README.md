@@ -477,6 +477,48 @@ checkpoint's `arch`). Secondary: the **critic** (EV ≈ 0.30 — a better critic
 *Methodology, updated: compare builds with `seed_strength_gate.py` (pooled seed-bests + z-test). The single-checkpoint
 n=300 gate is retired for build-vs-build — it cannot see effects below ~0.08.*
 
+**OU pivot Build 21 — CAPACITY (0.72M → 4.56M params): NULL, and the model-side story is CLOSED.** Warm-start widened to
+a 4.56M-param entity transformer, PPO otherwise identical to v20. `seed_strength_gate`: v20 `0.499 [0.466,0.531]` → v21
+`0.452 [0.420,0.485]`, **diff −0.047, z −1.98, p 0.047**. 6.3× the parameters made the agent slightly *worse*. The NULL is
+unconfounded — the trust region bound in only **4/150** iters (96–98% full-epoch). The explainer: **`|G|²` never recovers,
+it was never there** — v21 enters PPO at `|G|²` 0.057, where the narrow net *ended up* after fully converging, failing the
+pre-registered "a candidate must show `|G|²` recovering" filter outright. *Banked:* the wide net is a far better critic
+(offline value MAE 0.531 → 0.370), and a from-scratch control matched the BC warm-start at 0.6485 accuracy **exactly**,
+retiring a pipeline stage as decorative. *TRAP booked:* `B_simple` is a **ratio** `tr(Σ)/|G|²` — v21's exploded because the
+denominator collapsed, not because noise grew (`tr(Σ)` *fell*, 3284 → 580), so its own `NOISE_LIMITED` "collect more
+samples" verdict is exactly wrong. `results/{grad_noise_diag,ppo_ou_gate,seed_strength_gate}_v21.json`.
+
+**OU pivot Build 22 — WEAKEN THE OFFLINE FIT (H22: the wide net is *born* flat, so PPO inherits a stationary point):
+mechanism CONFIRMED, strength NULL — and the NULL is NOT ATTRIBUTABLE.** If capacity did not help because the wide net
+arrives at PPO already converged, a *less*-converged init should carry gradient. Three stages.
+*Stage A — the wide net is born flat (CONFIRMED).* `|G|²` measured at `iter_0`, before PPO touches anything: a **47×**
+narrow/wide gap, far outside any noise this build later uncovered. Stage A stands.
+*Stage B-0 — the dose-response (e3/e10/e30), and the finding that outlives the build.* The pre-registered gate PASSED on
+the **e10** arm — then a replication at a second probe seed **removed half of what passed it**: `|G|²` swung **2.7× on a
+fixed checkpoint from the probe seed alone**, larger than the **2.2×** effect the gate was built to detect. **`|G|²` is not
+a usable instrument at this budget.** The *cosine* replicated tightly (0.312 → 0.317) and separates e10 (~0.31) from both
+converged nets (~0.185); that half survived.
+*Stage B — the strength test.* PPO warm-started from `offrl_gen9ou_wide_e10_s0` (acc 0.613 / vMAE 0.703) instead of v21's
+converged wide net — offline convergence the only changed variable. v22 `0.4622` (416/900) vs v21 `0.4522`, **+0.010,
+z 0.43, p 0.67 ⇒ NULL**. **But §13.1's own rule refuses to attribute it:** the trust region **bound in 59/150 iters** at
+56–64% full-epoch, against v21's **4/150** at 96–98% (`approx_kl_mean_late` 0.031 vs 0.023). v22 was **throttled through
+36–44% of its optimization**, and a NULL under a binding trust region cannot separate "the lever does nothing" from "the
+lever worked and the optimizer would not follow it." The caveat was written into the merged gate's `_note` *before* the
+comparison ran. Two independent signs the run was **cut off, not converged**: seed 1's best checkpoint is `iter_50` — the
+**final** iteration — and it is also the strongest single checkpoint (0.5033).
+*CALIBRATION FINDING — build-vs-build differences of ~0.03 are NOT resolvable in one run.* v20's **identical** checkpoints
+scored **0.472** in one scoring and **0.499** in another — 0.027 apart, right at the 0.023 SE. Consistent with sampling
+noise, not a bug, **but it makes Build 21's headline regression fragile**: against v20's *other* scoring the same v21 sits
+only −0.020 away, nowhere near significance. Capacity's *direction* (it did not help) survives; "capacity is a
+**regression**" does not. Score both arms **in one run** from here on (`scripts/cluster/strength_gate.slurm`).
+`results/{grad_noise_diag_b22_*,ppo_ou_gate_v22,ppo_ou_telemetry_v22,seed_strength_gate_v22}.json`.
+**Open next (Build 23) — RAISE THE KL BUDGET, indicated by telemetry rather than theory.** `kl_bar` is **0.045** and v22's
+`approx_kl_max` reached **0.074**: for the first time in this project the binding constraint is the **trust region**, not a
+vanished gradient — Builds 19–20 closed optimization/sampling, Build 21 closed capacity. Raising it is the one experiment
+that converts this NULL into an attributable result; extending past 50 iterations is indicated by the same data. *Both
+arms must be re-run at the new budget* — comparing a raised-budget arm against v21's old-budget checkpoints would differ in
+init **and** budget, reproducing exactly the ambiguity that cost Build 22 its verdict.
+
 ## Setup
 
 ```bash
@@ -529,11 +571,13 @@ python scripts/curriculum_gate.py        --out results/curriculum_gate.json   # 
 python scripts/rpredict_oppmodel_gate.py --gate a   # Lever 14 Gate A: opponent-model fidelity (PASS)
 python scripts/rpredict_oppmodel_gate.py --gate b --arms whitebox,learned --concurrency 6  # Lever 14 Gate B: real-opponent-model search (AMBER)
 
-# Gen 9 OU PPO builds (19-21) — the build-vs-build toolchain. Run in this order.
-# Seeds are trained ONE AT A TIME (checkpoint disk), so each writes its own _s{N}.json.
-python scripts/ppo_telemetry.py --log 0 run_s0.log --out results/ppo_ou_telemetry_v21.json
+# Gen 9 OU PPO builds (19-23) — the build-vs-build toolchain. Run in this order.
+# On the cluster the seeds are an array job (scripts/cluster/ppo_seed.slurm); each writes its own _s{N}.json.
+python scripts/ppo_telemetry.py --log 0 run_s0.log --kl-bar 0.045 --out results/ppo_ou_telemetry_v21.json
 #   ^ the TRUST-REGION CERTIFICATE. Run FIRST: the run log is gitignored, this JSON is the durable copy.
-#     A NULL is only attributable to the lever if the trust region did not bind.
+#     A NULL is only attributable to the lever if the trust region did not bind (Build 22: it bound 59/150,
+#     which cost that build its verdict). --kl-bar MUST be 1.5 * the run's --target-kl, or the certificate
+#     names a bar the optimizer never enforced. ppo_seed.slurm derives both from TARGET_KL so they cannot drift.
 python scripts/merge_gate_seeds.py --seed-json results/ppo_ou_gate_v21_s{0,1,2}.json \
     --ladder-source ... --note ... --out results/ppo_ou_gate_v21.json
 #   ^ pools the per-seed runs. Drop a seed here and the z-test below silently loses its power.
@@ -541,12 +585,21 @@ python scripts/seed_strength_gate.py --build v20 ... --build v21 ... --out resul
 #   ^ THE AUTHORITATIVE verdict: every seed's best ckpt, n=300 each, pooled to 900/arm, two-proportion z.
 #     Resolves ~+0.07 at z~3. The training curve does NOT decide WIN vs NULL. Absolute rates move
 #     between runs (winner's curse); only the within-run DIFFERENCE is trustworthy.
+#     ALWAYS pass BOTH arms to ONE invocation (cluster: scripts/cluster/strength_gate.slurm, which
+#     preflights that each arm's best checkpoints are staged and NAMES the missing ones). Build 22
+#     measured v20's IDENTICAL checkpoints at 0.472 and 0.499 in two runs -- 0.027 apart, at the 0.023
+#     SE -- so a cross-run difference under ~0.03 is not a result.
 python scripts/grad_noise_diag.py --policy <best> --init <warm-start> --league-dir <run> \
     --games-per-opp 48 --rollouts 6 --splits 5 --out results/grad_noise_diag_v21.json
 #   ^ the EXPLAINER: reads |G|^2 (probes[*].arms.same_mix.policy.noise_scale.g_norm_sq).
 #     --games-per-opp MUST match the run under test; --splits defaults to 20 (v20 used 5).
 #     WARNING: its NOISE_LIMITED verdict answers Build 20's question, not yours. B_simple is a RATIO
 #     (tr(Sigma)/|G|^2) — when |G|^2 -> 0 it explodes and "collect more samples" is exactly WRONG.
+#     RETIRED for small effects (Build 22): a FIXED checkpoint swung 2.7x on the --seed alone, larger
+#     than the 2.2x effect the gate was built to detect. Any gate reading a |G|^2 difference under ~3x
+#     MUST run >=2 probe seeds (scripts/cluster/probe_replicate.slurm) and report both, or it is
+#     reporting noise. The seed is NOT recorded in the output JSON -- provenance is the filename only.
+#     The COSINE from the same runs did replicate (0.312 -> 0.317) and remains usable.
 
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
