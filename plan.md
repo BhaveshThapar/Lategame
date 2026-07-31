@@ -1864,6 +1864,55 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   best checkpoints are on disk, naming the missing files rather than failing an hour into battles —
   `/checkpoints/` is gitignored, so an arm trained elsewhere must be staged first.
 
+- **Build 23 — PRE-REGISTERED (written 2026-07-31, BEFORE running). OPEN THE TRUST REGION, and
+  re-run H22's comparison at a budget PPO can actually follow.**
+  - **Lever: unchanged from Build 22** — the offline convergence of the PPO init (reduced-epoch
+    `e10` vs converged). Build 23 does not test a new idea; it re-tests H22 with the throttle removed.
+  - **Budget, raised IDENTICALLY IN BOTH ARMS** (so it is not a second lever on the contrast):
+    `target_kl` 0.03 → **0.06** (`kl_bar` 0.045 → **0.090**) and `iters` 50 → **80**.
+    - **Why 0.06 and not less.** v22's `approx_kl_max` was **0.0737**. A bar at 0.0675 (`target_kl`
+      0.045) would still sit *under* the observed max and keep binding at the peaks. 0.090 clears it,
+      so the constraint goes **genuinely inactive** rather than merely looser. Not more, because
+      `ppo.py:74` records that PPO from a warm start collapses easily.
+    - **Why 80 iters.** v22's s1 peaked at `iter_50` — the cap — and s2 at `iter_48`. Two of three
+      seeds were still climbing when the run ended.
+  - **HYPOTHESIS (H23):** with the trust region inactive, the `e10` init converts its measured
+    gradient advantage (cosine 0.31 vs 0.185, replicated; trust region 20× more binding) into
+    **strength** over the converged init.
+  - **DESIGN — both arms are trained FRESH at the new budget.** `v23a` = `e10` init (treatment),
+    `v23b` = converged wide init (control), 3 seeds each, everything else identical. **The tempting
+    cheaper design is wrong:** scoring `v23a` against v21's staged checkpoints would compare arms
+    differing in **init AND budget**, which is exactly the two-variable ambiguity that cost Build 22
+    its verdict. One could argue v21's trust region was inactive anyway (4/150, `mean_late` 0.023),
+    so raising its bar would be a no-op — but that is an **assumption**, and this project has just
+    spent a build discovering what assumptions cost. Both arms fresh also removes the staging
+    dependency entirely: both inits are already on the node.
+  - **PRE-REGISTERED GATE — read the certificate BEFORE the win rate.**
+
+    | trust-region certificate | strength (`v23a` − `v23b`, one run, 1800 battles) | verdict |
+    |---|---|---|
+    | both arms bound < 10% of iters | diff > 0, p < 0.05 | **H22 CONFIRMED** — weakening the offline fit helps, once PPO is permitted to follow it |
+    | both arms bound < 10% of iters | p ≥ 0.05 | **H22 REFUTED** — an *attributable* NULL. The mechanism is real but does not reach strength; the init-quality axis closes |
+    | `v23a` still bound > 25% of iters | any | **INCONCLUSIVE AGAIN** — the raise was insufficient. This is not a result; do not report a verdict |
+    | entropy → 0, or `vs_iter0` < 0.5 late | any | **COLLAPSE** — the warm-start failure `ppo.py:74` warns of. The budget is too loose; report as collapse, never as a NULL |
+
+    The COLLAPSE row is pre-registered because at `kl_bar` 0.090 it is a live outcome, and it must
+    not be rationalized afterwards into evidence about the init. v22's endpoint for reference:
+    entropy 0.778, `vs_iter0` 1.000.
+  - **What Build 23 deliberately gives up.** Moving KL and iters together means `v23` vs `v22` is
+    **not** a clean read on the KL raise in isolation. That is the accepted cost of keeping the
+    *contrast under test* (init) single-levered, which is the comparison that matters.
+  - **Plumbing this needed (`a8e72d6`, landed before the pre-registration, per the house rule that
+    harnesses ship before results).** "One changed number" was not achievable: **no trust-region knob
+    was reachable from a v20/v21/v22 run** — `ppo_seed.slurm` passed no KL flag and `_ppo_config()`
+    never forwarded one, so the whole lineage ran at the frozen `PPOConfig` default. `--target-kl` is
+    now threaded through to the result JSON and guarded in `ARM_FIELDS`; `ppo_telemetry.py --kl-bar`
+    stops the certificate from naming a bar the optimizer never enforced; and
+    `LATEGAME_SHOWDOWN_PORT_BASE` keeps two concurrent arrays off each other's Showdown servers —
+    without it both arms compute ports 8100-8102 and silently battle into each other's games.
+  - **Cost:** ~9–11 h wall-clock with the arms concurrent; 6 seeds × 80 × 17.4 MiB = **8.4 GB** of
+    new checkpoints (85 GB free). The two-arm strength gate is ~11 min.
+
 ---
 
 ## 14. Risks & mitigations
