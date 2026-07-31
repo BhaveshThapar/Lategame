@@ -1788,6 +1788,51 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
       replication then removed one of the two conditions that produced that PASS. Stage B's strength
       verdict is therefore the **load-bearing** test, not a confirmation of a settled mechanism.
 
+  - **STAGE B — RESULT (ran on UMIACS 2026-07-30/31, jobs 7172508 + 7180385). NULL on strength, and
+    the NULL is NOT ATTRIBUTABLE.** PPO warm-started from the reduced-epoch `offrl_gen9ou_wide_e10_s0`
+    (acc 0.613 / vMAE 0.703) instead of v21's converged wide net (0.635 / 0.370). Same arch, same
+    shard, same PPO config — **offline convergence is the only changed variable**, which is what makes
+    it a test of H22. 3 seeds × 50 iters, pooled with `merge_gate_seeds.py` (900 battles/arm, never a
+    single-seed file).
+
+    | build | pooled | CI95 | diff vs v22 | z | p | verdict |
+    |---|---|---|---|---|---|---|
+    | v22 (wide e10) | **0.4622** (416/900) | [0.430, 0.495] | — | — | — | — |
+    | v21 (wide converged) | 0.4522 (407/900) | [0.420, 0.485] | +0.010 | +0.43 | 0.67 | **NULL** |
+    | v20 (narrow champ) | 0.4722 (425/900) | [0.440, 0.505] | −0.010 | −0.43 | 0.67 | **NULL** |
+
+    Per-checkpoint: s0 `iter_41` 0.4567, s1 **`iter_50` 0.5033**, s2 `iter_48` 0.4267. On the strength
+    axis, weakening the offline fit did **nothing**: +0.010 against SE 0.024.
+    - **WHY THE NULL DOES NOT INDICT THE LEVER — the trust region BOUND.** §13.1's own rule is that a
+      NULL is attributable only if the trust region did not bind. It bound in **59/150 iters at 56–64%
+      full-epoch** (s0 18, s1 22, s2 19), vs **v21's 4/150** and **v20's 3/150** at 96–98%;
+      `approx_kl_mean_late` 0.031 vs 0.023 / 0.013. **v22 was THROTTLED through 36–44% of its
+      optimization.** This caveat was written into the merged gate's `_note` BEFORE the comparison ran,
+      so it is not a post-hoc rescue. A NULL under a binding trust region cannot separate "the lever
+      does nothing" from "the lever worked and the optimizer would not follow it."
+    - **Two independent signs the build was CUT OFF, not converged:** seed 1's best checkpoint is
+      `iter_50` — the **final** iteration — and it is also the strongest single checkpoint (0.5033).
+    - **The trust-region telemetry INDEPENDENTLY corroborates B-0's cosine.** A 20× difference in
+      binding frequency (59 vs 4) is nowhere near measurement noise, unlike the 2.2× `|G|²` claim the
+      replication destroyed. The e10 init keeps taking steps large enough to hit the KL ceiling —
+      which is what an init with real gradient looks like, measured from the PPO run itself.
+    - **CALIBRATION FINDING — build-vs-build differences of ~0.03 are NOT resolvable in one run.**
+      v20's *identical* checkpoints scored **425/900 (0.472)** in `seed_strength_gate_v20.json` and
+      **449/900 (0.499)** in `seed_strength_gate_v21.json` — 0.027 apart, right at the 0.023 SE.
+      Consistent with sampling noise, not a bug. **But it makes Build 21's headline regression
+      (−0.047, p = 0.047) fragile**: against v20's *other* scoring the same v21 sits only −0.020 away,
+      nowhere near significance. Build 21's "capacity is a REGRESSION" rests on which v20 scoring it
+      drew. The *direction* (capacity did not help) survives; the *regression* claim does not.
+  - **Open next (Build 23) — RAISE THE KL BUDGET, indicated by telemetry rather than theory.**
+    `kl_bar` is **0.045** and v22's `approx_kl_max` reached **0.074**: for the first time in this
+    project the trust region is the **active constraint**, not a vanished gradient. Re-running v22
+    with a larger trust region is the one experiment that converts this NULL into an attributable
+    result, and it is cheap — same init, same config, one changed number. Extending iterations past 50
+    is indicated by the same data (s1 peaked at the cap). **State of the evidence for H22:** cos 0.31
+    vs 0.185 (replicated) and a 20×-more-binding trust region support it; a flat win-rate from a
+    throttled run neither confirms nor refutes it. Those are consistent, not contradictory — an init
+    with real gradient that PPO was not permitted to follow.
+
 ---
 
 ## 14. Risks & mitigations
