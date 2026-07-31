@@ -61,6 +61,7 @@ def _ppo_config(
     ent_coef_final: float | None = None,
     lr: float = PPOConfig.lr,
     lr_final: float | None = None,
+    target_kl: float = PPOConfig.target_kl,
 ) -> PPOConfig:
     return PPOConfig(
         init=init,
@@ -81,6 +82,9 @@ def _ppo_config(
         ent_coef_final=ent_coef_final,
         lr=lr,
         lr_final=lr_final,
+        # Build 23: the KL early-stop bar (1.5 * this) was the ACTIVE constraint in v22 -- it bound
+        # 59/150 iters, which is why that NULL was not attributable. Reachable from the CLI now.
+        target_kl=target_kl,
     )
 
 
@@ -184,6 +188,7 @@ async def run_gate(
     ent_coef_final: float | None = None,
     lr: float = PPOConfig.lr,
     lr_final: float | None = None,
+    target_kl: float = PPOConfig.target_kl,
 ) -> dict:
     if not Path(init).exists():
         raise SystemExit(f"GREEN warm-start checkpoint '{init}' not found.")
@@ -192,6 +197,9 @@ async def run_gate(
         f"games_per_opp {games_per_opp} | eval_n {eval_n} | "
         f"team_pool {team_pool} | loop_penalty {loop_penalty} | prefix {ckpt_prefix}"
     )
+    # The gate JSON stores only the win-rate curve, so the trust region is reconstructed from the
+    # log. Print the bar the run actually used -- ppo_telemetry.py's --kl-bar must match it.
+    print(f"trust region: target_kl {target_kl} | kl_bar {1.5 * target_kl:.4g}")
     ent_end = ent_coef if ent_coef_final is None else ent_coef_final
     lr_end = lr if lr_final is None else lr_final
     print(
@@ -207,6 +215,7 @@ async def run_gate(
             init, seed, iters, games_per_opp, eval_n, device, fmt,
             team_pool, loop_penalty, ckpt_prefix,
             ent_coef=ent_coef, ent_coef_final=ent_coef_final, lr=lr, lr_final=lr_final,
+            target_kl=target_kl,
         )
         curve = await run_ppo(cfg)
         rec = _seed_record(init, seed, curve, ckpt_prefix)
@@ -234,6 +243,7 @@ async def run_gate(
         "ent_coef_final": ent_coef_final,
         "lr": lr,
         "lr_final": lr_final,
+        "target_kl": target_kl,
         "seeds": seeds,
         "iters": iters,
         "games_per_opp": games_per_opp,
@@ -299,6 +309,16 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Build-19: anneal lr linearly to this by the final iter (omit = constant)",
     )
+    # Build 20-22 all ran at the PPOConfig default (0.03) because nothing forwarded it. v22's
+    # trust region bound 59/150 iters and cost that build its attribution; omitting this flag
+    # reproduces v20-v22 exactly.
+    parser.add_argument(
+        "--target-kl",
+        dest="target_kl",
+        type=float,
+        default=PPOConfig.target_kl,
+        help="Approx-KL early-stop target; the epoch loop stops past 1.5x this (omit = 0.03)",
+    )
     args = parser.parse_args(argv)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -320,6 +340,7 @@ def main(argv: list[str] | None = None) -> None:
             ent_coef_final=args.ent_coef_final,
             lr=args.lr,
             lr_final=args.lr_final,
+            target_kl=args.target_kl,
         )
     )
 

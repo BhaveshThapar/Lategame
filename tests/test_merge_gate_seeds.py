@@ -62,6 +62,24 @@ def test_refuses_to_pool_seeds_from_different_arms():
         merge([a, b, c], "src", "note")
 
 
+def test_refuses_to_pool_seeds_run_at_different_kl_budgets():
+    """Build 23's lever. v22's NULL was unattributable because its trust region bound; pooling a
+    raised-budget seed with a throttled one would hide exactly that, and print a verdict anyway."""
+    a, b, c = _v20_seeds()
+    for g in (a, b, c):
+        g["target_kl"] = 0.06
+    b["target_kl"] = 0.03  # b was resubmitted before the budget was raised
+    with pytest.raises(ValueError, match="disagree on the arm"):
+        merge([a, b, c], "src", "note")
+
+
+def test_pre_build23_gates_still_pool_without_a_target_kl_key():
+    """v20-v22 predate the field entirely; they must keep merging (None == None)."""
+    seeds = _v20_seeds()
+    assert all("target_kl" not in g for g in seeds)
+    assert merge(seeds, "src", "note")["seeds"] == [0, 1, 2]
+
+
 def test_refuses_duplicate_seeds():
     """Re-running seed 0 into the s1 slot would pool the same checkpoint twice."""
     a, _, c = _v20_seeds()

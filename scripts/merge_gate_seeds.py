@@ -51,6 +51,9 @@ ARM_FIELDS = (
     "ent_coef_final",
     "lr",
     "lr_final",
+    # Build 23: absent from v20-v22 gate files, so those still pool (None == None). Present from
+    # here on, because two seeds run at different KL budgets are two experiments, not one arm.
+    "target_kl",
     "iters",
     "games_per_opp",
     "eval_n",

@@ -1833,6 +1833,37 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     throttled run neither confirms nor refutes it. Those are consistent, not contradictory — an init
     with real gradient that PPO was not permitted to follow.
 
+- **STANDING MEASUREMENT RULE (from Build 22 Stage B-0) — `|G|²` is RETIRED as a small-effect
+  instrument.** Recorded here as a rule rather than left inside Build 22's narrative, because it
+  constrains every future build and the project has leaned on `|G|²` since Build 20.
+  - **The rule.** A `|G|²` difference **under ~3×** is **not measurable at this budget**
+    (`--games-per-opp 48 --rollouts 6 --splits 5`). Any gate whose verdict turns on one **must** run
+    **≥2 probe seeds** (`scripts/cluster/probe_replicate.slurm`, which varies only `--seed`) and
+    report both. A single-seed reading below that threshold is noise, whatever it says.
+  - **The evidence.** On a **fixed** checkpoint, changing only the probe seed swung `|G|²` by
+    **2.7×** — larger than the **2.2×** effect Stage B-0's gate was pre-registered to detect. The
+    gate returned PASS on e10 and Stage B was launched on it; the replication then removed one of
+    the two conditions that produced that PASS.
+  - **What survives.** The **cosine** from the same probes replicated tightly (0.312 → 0.317) and
+    separates e10 (~0.31) from both converged nets (~0.185). Cosine remains usable; `|G|²` at these
+    effect sizes does not. **Stage A is unaffected** — its narrow/wide gap is **47×**, an order of
+    magnitude outside this noise.
+  - **Footgun in the tool.** `scripts/grad_noise_diag.py` takes a scalar `--seed` and **does not
+    record it in the output JSON** (top-level keys are policy/init/league_dir/…/verdict — no `seed`,
+    no `splits`). Provenance lives **only in the filename**, and the naming is asymmetric:
+    `stage_b0.slurm` writes seed 0 with no suffix while replicates get `_seed{N}`. Anyone comparing
+    two `grad_noise_diag_*.json` files must confirm from the filenames that the seeds differ.
+  - **Corollary already booked twice.** `B_simple` is a **ratio** `tr(Σ)/|G|²`; when the denominator
+    is unmeasurable the ratio is too, and its `NOISE_LIMITED` "collect more samples" advice is
+    actively misleading (Build 21's TRAP, `plan.md` above).
+
+- **STANDING MEASUREMENT RULE (from Build 22's CALIBRATION FINDING) — score both arms in ONE
+  strength-gate run.** v20's *identical* checkpoints scored 0.472 and 0.499 in two separate runs,
+  0.027 apart against a 0.023 SE. Cross-run differences below ~0.03 are therefore not results.
+  `scripts/cluster/strength_gate.slurm` takes `BUILD_A`/`BUILD_B` and preflights that **both** arms'
+  best checkpoints are on disk, naming the missing files rather than failing an hour into battles —
+  `/checkpoints/` is gitignored, so an arm trained elsewhere must be staged first.
+
 ---
 
 ## 14. Risks & mitigations
