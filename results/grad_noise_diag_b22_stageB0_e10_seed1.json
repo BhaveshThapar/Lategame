@@ -1,0 +1,207 @@
+{
+  "policy": "checkpoints/offrl_gen9ou_wide_e10_s0.pt",
+  "init": "checkpoints/offrl_gen9ou_wide_e10_s0.pt",
+  "league_dir": null,
+  "games_per_opp": 48,
+  "rollouts_per_checkpoint": 6,
+  "loop_penalty": 4.0,
+  "format": "gen9ou",
+  "thresholds": {
+    "noisy_cos": 0.3,
+    "clean_cos": 0.5,
+    "noise_scale_mult": 2.0
+  },
+  "probes": {
+    "checkpoints/offrl_gen9ou_wide_e10_s0.pt": {
+      "arms": {
+        "same_mix": {
+          "n_transitions": [
+            9996,
+            9490,
+            8970,
+            9481,
+            9363,
+            8984
+          ],
+          "n_rollouts": 6,
+          "budget_size": 8970,
+          "sizes": [
+            128,
+            256,
+            512,
+            8970
+          ],
+          "splits": 5,
+          "mean_abs_ratio_minus_1": 0.0,
+          "policy": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": 0.0277,
+                "cos_std": 0.1886,
+                "grad_norm_sq_mean": 10.15357545
+              },
+              "256": {
+                "cos_mean": -0.0011,
+                "cos_std": 0.1925,
+                "grad_norm_sq_mean": 5.0112553
+              },
+              "512": {
+                "cos_mean": 0.01,
+                "cos_std": 0.2296,
+                "grad_norm_sq_mean": 2.88658788
+              },
+              "8970": {
+                "cos_mean": 0.3169,
+                "cos_std": 0.1324,
+                "grad_norm_sq_mean": 0.19653854
+              }
+            },
+            "cos_at_budget": 0.3169,
+            "noise_scale": {
+              "g_norm_sq": 0.05239686,
+              "trace_sigma": 1292.950859,
+              "b_simple": 24676.1,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 8970
+            },
+            "signal_fraction_at_budget": 0.2666
+          },
+          "total": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": 0.4463,
+                "cos_std": 0.1066,
+                "grad_norm_sq_mean": 28.73866196
+              },
+              "256": {
+                "cos_mean": 0.5821,
+                "cos_std": 0.07,
+                "grad_norm_sq_mean": 20.62346064
+              },
+              "512": {
+                "cos_mean": 0.7111,
+                "cos_std": 0.0542,
+                "grad_norm_sq_mean": 17.89503765
+              },
+              "8970": {
+                "cos_mean": 0.8926,
+                "cos_std": 0.0131,
+                "grad_norm_sq_mean": 13.69427792
+              }
+            },
+            "cos_at_budget": 0.8926,
+            "noise_scale": {
+              "g_norm_sq": 13.47648996,
+              "trace_sigma": 1953.558015,
+              "b_simple": 145.0,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 8970
+            },
+            "signal_fraction_at_budget": 0.9841
+          },
+          "explained_variance": 0.1063,
+          "n_episodes": 576
+        },
+        "fresh_mix": {
+          "n_transitions": [
+            9646,
+            8849,
+            8979,
+            9281,
+            9525,
+            9113
+          ],
+          "n_rollouts": 6,
+          "budget_size": 8849,
+          "sizes": [
+            128,
+            256,
+            512,
+            8849
+          ],
+          "splits": 5,
+          "mean_abs_ratio_minus_1": 0.0,
+          "policy": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": -0.0088,
+                "cos_std": 0.1648,
+                "grad_norm_sq_mean": 10.03505232
+              },
+              "256": {
+                "cos_mean": 0.0585,
+                "cos_std": 0.2182,
+                "grad_norm_sq_mean": 6.62988576
+              },
+              "512": {
+                "cos_mean": 0.008,
+                "cos_std": 0.2379,
+                "grad_norm_sq_mean": 3.29819121
+              },
+              "8849": {
+                "cos_mean": 0.3132,
+                "cos_std": 0.2163,
+                "grad_norm_sq_mean": 0.24425118
+              }
+            },
+            "cos_at_budget": 0.3132,
+            "noise_scale": {
+              "g_norm_sq": 0.10054947,
+              "trace_sigma": 1271.616364,
+              "b_simple": 12646.7,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 8849
+            },
+            "signal_fraction_at_budget": 0.4117
+          },
+          "total": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": 0.4366,
+                "cos_std": 0.1005,
+                "grad_norm_sq_mean": 29.09243774
+              },
+              "256": {
+                "cos_mean": 0.5584,
+                "cos_std": 0.0887,
+                "grad_norm_sq_mean": 23.25946544
+              },
+              "512": {
+                "cos_mean": 0.6817,
+                "cos_std": 0.076,
+                "grad_norm_sq_mean": 19.32125184
+              },
+              "8849": {
+                "cos_mean": 0.8613,
+                "cos_std": 0.0587,
+                "grad_norm_sq_mean": 14.67353551
+              }
+            },
+            "cos_at_budget": 0.8613,
+            "noise_scale": {
+              "g_norm_sq": 14.46190616,
+              "trace_sigma": 1872.708042,
+              "b_simple": 129.5,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 8849
+            },
+            "signal_fraction_at_budget": 0.9856
+          },
+          "explained_variance": 0.1031,
+          "n_episodes": 576
+        }
+      },
+      "verdict": "AMBIGUOUS",
+      "why": "same-mix cos 0.317 and B_simple 24676 against a 8970-transition budget match neither pre-registered arm -- no clean call. Run Stage B anyway (~45 min/seed).",
+      "opponent_draw_dominates": false
+    }
+  },
+  "verdict": "AMBIGUOUS",
+  "why": "same-mix cos 0.317 and B_simple 24676 against a 8970-transition budget match neither pre-registered arm -- no clean call. Run Stage B anyway (~45 min/seed).",
+  "opponent_draw_dominates": false,
+  "note": "Gradients are taken at theta_old (PPO ratio 1, clip inactive), so this is the vanilla policy gradient -- the first update the iteration would take. cos is the similarity between gradients from INDEPENDENT rollouts, never two halves of one buffer: halves share that rollout's league/team/episode draw, so they agree more than two real PPO iterations would, biasing the cosine toward AGREEMENT and risking a false SIGNAL_LIMITED. TWO ARMS: same_mix pins the league draw, so its cosine isolates the within-mix sampling noise that --games-per-opp actually reduces -- the VERDICT reads it. fresh_mix re-draws the league per rollout, adding opponent-selection variance that no per-opponent budget can touch; if same_mix is clean while fresh_mix is not (opponent_draw_dominates), the binding variance is WHICH opponents got drawn (pop_size / league averaging), not how many battles were played against them. CAVEAT: Adam preconditions the raw gradient, so cosine similarity is a proxy for the true update direction -- directional evidence, not proof. The verdict reads the POLICY-term gradient (ent_coef-independent)."
+}

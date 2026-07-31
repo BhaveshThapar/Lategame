@@ -1726,6 +1726,68 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
       | v22 > v21 (significant) | offline over-fit was **actively harmful**; weakening it is the first lever that moved win-rate — set Build 23 dose direction |
       | v22 ≈ v21 (NULL) | flatness is real but **not** the binding constraint on strength; offline convergence is a red herring for win-rate — retire the lever, pivot |
 
+  - **STAGE B-0 — RESULT (ran on UMIACS 2026-07-26, job 7141999, one array task per dose).** The
+    shard was staged and **fingerprint-verified** before training: `train_offline_rl` derives the value
+    support from the shard's own returns and stamps it into the checkpoint, so `v_min`/`v_max` identify
+    the training data. `data/gen9ou_v7_rl.npz` reproduced the wide net's stamp to **delta 0.000e+00**
+    (119,996 rows, `gen9ou`) — same shard, so the dose-response is not confounded by data.
+    Arch was **read** from the checkpoint per the pre-registration (`d_model=256 n_layers=4 n_heads=8
+    ff_dim=512 n_bins=51`), and `--seed 0` made the three arms **bit-identical trajectories truncated at
+    different depths** (task 2's epoch-10 val line matched task 1's saved best to every printed digit,
+    from a separate process on a separate node).
+
+    | arm | offline fit (acc / vMAE) | `\|G\|²`(0) | cos | tr(Σ) | budget | EV |
+    |---|---|---|---|---|---|---|
+    | narrow ctrl (Stage A) | — | 3.014 | 0.451 | 8825 | 5244 | −0.010 |
+    | wide converged (ref) | 0.635 / 0.370 | 0.064 | 0.186 | 1701 | 7462 | 0.166 |
+    | wide e3 | 0.287 / 1.910 | **unresolvable** | 0.186 | 251 | 3591 | −0.022 |
+    | wide e10 | 0.613 / 0.703 | 0.142 | **0.312** | 1514 | 8226 | 0.133 |
+    | wide e30 (on-node) | 0.646 / 0.322 | 0.076 | 0.185 | 954 | 7369 | 0.135 |
+
+    - **e3 is uninterpretable, by its own numbers.** `|G|²` came back **≤ 0** — which the McCandlish
+      two-batch estimator returns when noise swamps the signal (`grad_noise_diag.py:146-171`), NOT a
+      negative gradient. But `tr(Σ)` fell 1701 → 251 and **EV went to −0.022**: the critic explains less
+      than predicting the mean, so its advantages are noise and the small gradient follows from a broken
+      critic rather than from the landscape. Signal *and* noise collapsed together. At acc 0.287 this arm
+      is barely trained; it fails the gate under H22 and under its negation alike, so it discriminates
+      nothing. **The dose was set too aggressively.**
+    - **e10 passed the gate as written** — `|G|²` 0.142 (2.2× ref) and cos 0.312 > 0.3, with EV 0.133
+      confirming a functioning critic. Dose ladder is an **inverted U** (e3 ≈ 0, e10 0.142, e30 0.076),
+      coherent with "too broken → functional-but-unconverged → converged and flat."
+    - **On-node control did its job.** e30 retrained here gives 0.076 / cos 0.185 vs the laptop-trained
+      reference's 0.064 / cos 0.186 — same regime, so **device numerics are not confounding** the
+      dose-response. It did *not* reproduce the reference's training exactly (best epoch 29, acc 0.646,
+      vMAE 0.322 vs epoch 25, 0.635, 0.370): same recipe, different run.
+
+  - **STAGE B-0 REPLICATION — the finding that matters (job 7172540, e10 re-probed at `--seed 1`,
+    protocol otherwise identical).** §13.1 already warned the cosine is noisy across probe runs
+    (0.182 vs 0.429 on one checkpoint), so the marginal cos 0.312 was re-run before spending PPO.
+    **The opposite of the expected result:**
+
+    | e10, same_mix | `\|G\|²`(0) | cos |
+    |---|---|---|
+    | seed 0 (the gate) | 0.142 | 0.312 |
+    | seed 1 (replication) | **0.052** | **0.317** |
+
+    - **cos REPLICATED tightly (0.312 → 0.317)**; across all four e10 measurements (2 seeds × 2 arms) it
+      spans a narrow 0.286–0.317.
+    - **`\|G\|²` DID NOT (0.142 → 0.052, a 2.7× swing from the probe seed alone)**, and seed 1 lands
+      *below* the converged reference's 0.064 rather than 2.2× above it.
+    - **Therefore: `\|G\|²` at this sample budget CANNOT RESOLVE the effect the gate was built to detect
+      — its probe-to-probe noise (2.7×) exceeds the signal (2.2×).** The "2.2× ref" that passed the gate
+      was within measurement noise. Any future gate reading `|G|²` differences of this size needs
+      multiple probe seeds, or it is reading noise. **This supersedes the `|G|²` half of the B-0 gate.**
+    - **What survives is the scale-free statistic the pre-registration told us to prefer:** e10 sits at
+      cos ≈ 0.31 while both converged nets sit at ≈ 0.185 (`same_mix`, replicated). Stage B rests on
+      that separation, not on `|G|²`. **Blemish, recorded not buried:** e30's `fresh_mix` read cos 0.546
+      with `|G|²` 0.018 — high agreement, near-zero gradient, internally incoherent and the one point
+      that does not fit.
+    - **Stage A is UNAFFECTED.** Its conclusion rested on narrow 3.014 vs wide 0.064 — a **47× gap**,
+      far outside this noise. "The wide net is born flat" stands.
+    - **HONESTY.** The pre-registered gate returned PASS on e10 and Stage B was launched on it. The
+      replication then removed one of the two conditions that produced that PASS. Stage B's strength
+      verdict is therefore the **load-bearing** test, not a confirmation of a settled mechanism.
+
 ---
 
 ## 14. Risks & mitigations

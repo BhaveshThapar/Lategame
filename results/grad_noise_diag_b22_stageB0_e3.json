@@ -1,0 +1,207 @@
+{
+  "policy": "checkpoints/offrl_gen9ou_wide_e3_s0.pt",
+  "init": "checkpoints/offrl_gen9ou_wide_e3_s0.pt",
+  "league_dir": null,
+  "games_per_opp": 48,
+  "rollouts_per_checkpoint": 6,
+  "loop_penalty": 4.0,
+  "format": "gen9ou",
+  "thresholds": {
+    "noisy_cos": 0.3,
+    "clean_cos": 0.5,
+    "noise_scale_mult": 2.0
+  },
+  "probes": {
+    "checkpoints/offrl_gen9ou_wide_e3_s0.pt": {
+      "arms": {
+        "same_mix": {
+          "n_transitions": [
+            3904,
+            3591,
+            3772,
+            3822,
+            3785,
+            3900
+          ],
+          "n_rollouts": 6,
+          "budget_size": 3591,
+          "sizes": [
+            128,
+            256,
+            512,
+            3591
+          ],
+          "splits": 5,
+          "mean_abs_ratio_minus_1": 0.0,
+          "policy": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": -0.0148,
+                "cos_std": 0.2528,
+                "grad_norm_sq_mean": 1.95869043
+              },
+              "256": {
+                "cos_mean": -0.0061,
+                "cos_std": 0.2338,
+                "grad_norm_sq_mean": 0.99761413
+              },
+              "512": {
+                "cos_mean": 0.0248,
+                "cos_std": 0.2296,
+                "grad_norm_sq_mean": 0.45731479
+              },
+              "3591": {
+                "cos_mean": 0.1864,
+                "cos_std": 0.2242,
+                "grad_norm_sq_mean": 0.06930947
+              }
+            },
+            "cos_at_budget": 0.1864,
+            "noise_scale": {
+              "g_norm_sq": -0.00052615,
+              "trace_sigma": 250.779722,
+              "b_simple": Infinity,
+              "resolvable": false,
+              "b_small": 128,
+              "b_big": 3591
+            },
+            "signal_fraction_at_budget": 0.0
+          },
+          "total": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": 0.5327,
+                "cos_std": 0.1352,
+                "grad_norm_sq_mean": 6.2107461
+              },
+              "256": {
+                "cos_mean": 0.686,
+                "cos_std": 0.0777,
+                "grad_norm_sq_mean": 4.77964019
+              },
+              "512": {
+                "cos_mean": 0.8067,
+                "cos_std": 0.0381,
+                "grad_norm_sq_mean": 4.28070321
+              },
+              "3591": {
+                "cos_mean": 0.9174,
+                "cos_std": 0.0098,
+                "grad_norm_sq_mean": 3.676306
+              }
+            },
+            "cos_at_budget": 0.9174,
+            "noise_scale": {
+              "g_norm_sq": 3.58262759,
+              "trace_sigma": 336.399169,
+              "b_simple": 93.9,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 3591
+            },
+            "signal_fraction_at_budget": 0.9745
+          },
+          "explained_variance": -0.022,
+          "n_episodes": 576
+        },
+        "fresh_mix": {
+          "n_transitions": [
+            4053,
+            3822,
+            4033,
+            3837,
+            3766,
+            3757
+          ],
+          "n_rollouts": 6,
+          "budget_size": 3757,
+          "sizes": [
+            128,
+            256,
+            512,
+            3757
+          ],
+          "splits": 5,
+          "mean_abs_ratio_minus_1": 0.0,
+          "policy": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": -0.0169,
+                "cos_std": 0.235,
+                "grad_norm_sq_mean": 1.98740888
+              },
+              "256": {
+                "cos_mean": -0.0159,
+                "cos_std": 0.2096,
+                "grad_norm_sq_mean": 1.00971003
+              },
+              "512": {
+                "cos_mean": 0.0117,
+                "cos_std": 0.2245,
+                "grad_norm_sq_mean": 0.50804071
+              },
+              "3757": {
+                "cos_mean": 0.2234,
+                "cos_std": 0.1396,
+                "grad_norm_sq_mean": 0.07485096
+              }
+            },
+            "cos_at_budget": 0.2234,
+            "noise_scale": {
+              "g_norm_sq": 0.00739232,
+              "trace_sigma": 253.44212,
+              "b_simple": 34284.5,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 3757
+            },
+            "signal_fraction_at_budget": 0.0988
+          },
+          "total": {
+            "cos_by_size": {
+              "128": {
+                "cos_mean": 0.5288,
+                "cos_std": 0.1089,
+                "grad_norm_sq_mean": 6.07557729
+              },
+              "256": {
+                "cos_mean": 0.685,
+                "cos_std": 0.0625,
+                "grad_norm_sq_mean": 4.95994542
+              },
+              "512": {
+                "cos_mean": 0.788,
+                "cos_std": 0.0518,
+                "grad_norm_sq_mean": 4.16230596
+              },
+              "3757": {
+                "cos_mean": 0.9093,
+                "cos_std": 0.0203,
+                "grad_norm_sq_mean": 3.69520145
+              }
+            },
+            "cos_at_budget": 0.9093,
+            "noise_scale": {
+              "g_norm_sq": 3.61124221,
+              "trace_sigma": 315.434891,
+              "b_simple": 87.3,
+              "resolvable": true,
+              "b_small": 128,
+              "b_big": 3757
+            },
+            "signal_fraction_at_budget": 0.9773
+          },
+          "explained_variance": -0.014,
+          "n_episodes": 576
+        }
+      },
+      "verdict": "NOISE_LIMITED",
+      "why": "same-mix cos 0.186 < 0.3 and B_simple unresolvable (noise swamps the signal) > 2x the 3591-transition budget: two rollouts against the SAME opponents still disagree on the update direction, so within-mix sampling noise dominates it -- exactly the variance more battles reduce. Run Stage B (--games-per-opp 48).",
+      "opponent_draw_dominates": false
+    }
+  },
+  "verdict": "NOISE_LIMITED",
+  "why": "same-mix cos 0.186 < 0.3 and B_simple unresolvable (noise swamps the signal) > 2x the 3591-transition budget: two rollouts against the SAME opponents still disagree on the update direction, so within-mix sampling noise dominates it -- exactly the variance more battles reduce. Run Stage B (--games-per-opp 48).",
+  "opponent_draw_dominates": false,
+  "note": "Gradients are taken at theta_old (PPO ratio 1, clip inactive), so this is the vanilla policy gradient -- the first update the iteration would take. cos is the similarity between gradients from INDEPENDENT rollouts, never two halves of one buffer: halves share that rollout's league/team/episode draw, so they agree more than two real PPO iterations would, biasing the cosine toward AGREEMENT and risking a false SIGNAL_LIMITED. TWO ARMS: same_mix pins the league draw, so its cosine isolates the within-mix sampling noise that --games-per-opp actually reduces -- the VERDICT reads it. fresh_mix re-draws the league per rollout, adding opponent-selection variance that no per-opponent budget can touch; if same_mix is clean while fresh_mix is not (opponent_draw_dominates), the binding variance is WHICH opponents got drawn (pop_size / league averaging), not how many battles were played against them. CAVEAT: Adam preconditions the raw gradient, so cosine similarity is a proxy for the true update direction -- directional evidence, not proof. The verdict reads the POLICY-term gradient (ent_coef-independent)."
+}
