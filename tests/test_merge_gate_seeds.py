@@ -80,6 +80,25 @@ def test_pre_build23_gates_still_pool_without_a_target_kl_key():
     assert merge(seeds, "src", "note")["seeds"] == [0, 1, 2]
 
 
+def test_refuses_to_pool_seeds_annealed_over_different_horizons():
+    """Build 24's decomposition arm. Two seeds at iters=80 are still DIFFERENT experiments if one
+    annealed over 80 and the other over 50 -- at iteration 40 that is lr 1.51e-04 vs 9.08e-05."""
+    a, b, c = _v20_seeds()
+    for g in (a, b, c):
+        g["iters"] = 80
+        g["anneal_iters"] = 50
+    b["anneal_iters"] = None  # b was resubmitted without the pin, so it annealed over 80
+    with pytest.raises(ValueError, match="disagree on the arm"):
+        merge([a, b, c], "src", "note")
+
+
+def test_pre_build24_gates_still_pool_without_an_anneal_iters_key():
+    """v20-v23 predate the field entirely; they must keep merging (None == None)."""
+    seeds = _v20_seeds()
+    assert all("anneal_iters" not in g for g in seeds)
+    assert merge(seeds, "src", "note")["seeds"] == [0, 1, 2]
+
+
 def test_refuses_duplicate_seeds():
     """Re-running seed 0 into the s1 slot would pool the same checkpoint twice."""
     a, _, c = _v20_seeds()

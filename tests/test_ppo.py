@@ -396,3 +396,50 @@ def test_ppo_config_schedule_defaults_to_no_schedule():
     config = PPOConfig()
     assert config.ent_coef_final is None
     assert config.lr_final is None
+
+
+# --------------------------------------------------------------------------- #
+# Build 24: the anneal HORIZON, decoupled from `iters`.
+#
+# `--iters` silently doubled as the schedule horizon, so "more iterations" was really three
+# changes at once. Measured in the shipped logs at the SAME iteration 40: v22 (iters=50) ran
+# lr 9.08e-05 / ent 0.0020 while v23b (iters=80) ran lr 1.51e-04 / ent 0.0051; by iteration 50
+# v22 was frozen at its finals and v23b was still at lr 1.26e-04. A strength difference between
+# those budgets therefore could not be attributed to update count.
+# --------------------------------------------------------------------------- #
+def test_anneal_horizon_defaults_to_iters_so_v17_v23_are_unchanged():
+    from lategame.train.ppo import PPOConfig
+
+    assert PPOConfig().anneal_iters is None
+    assert PPOConfig(iters=80).anneal_horizon == 80
+    assert PPOConfig(iters=50).anneal_horizon == 50
+
+
+def test_pinned_horizon_overrides_iters():
+    from lategame.train.ppo import PPOConfig
+
+    assert PPOConfig(iters=80, anneal_iters=50).anneal_horizon == 50
+
+
+def test_pinned_horizon_holds_both_schedules_at_their_finals_past_it():
+    """The v24d arm: 80 iterations of updates on a schedule that finished at 50."""
+    from lategame.train.ppo import PPOConfig, anneal
+
+    cfg = PPOConfig(iters=80, anneal_iters=50, lr=2.5e-4, lr_final=5e-5,
+                    ent_coef=0.01, ent_coef_final=0.0)
+    h = cfg.anneal_horizon
+    assert anneal(cfg.lr, cfg.lr_final, 50, h) == pytest.approx(5e-5)
+    for k in (51, 65, 80):  # past the horizon: frozen, not extrapolated past the final
+        assert anneal(cfg.lr, cfg.lr_final, k, h) == pytest.approx(5e-5)
+        assert anneal(cfg.ent_coef, cfg.ent_coef_final, k, h) == pytest.approx(0.0)
+
+
+def test_the_horizon_is_what_made_v22_and_v23b_differ_mid_run():
+    """Reproduces the confound: same iteration, same schedule endpoints, different horizon."""
+    from lategame.train.ppo import anneal
+
+    lr_at_40_short = anneal(2.5e-4, 5e-5, 40, 50)  # v22's budget
+    lr_at_40_long = anneal(2.5e-4, 5e-5, 40, 80)  # v23b's budget
+    assert lr_at_40_short == pytest.approx(9.08e-05, rel=0.01)
+    assert lr_at_40_long == pytest.approx(1.51e-04, rel=0.01)
+    assert lr_at_40_long > 1.6 * lr_at_40_short  # the same iteration, a 1.7x different optimizer

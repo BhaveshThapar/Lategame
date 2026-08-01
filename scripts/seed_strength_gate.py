@@ -25,6 +25,20 @@ Absolute rates from this gate are therefore still optimistic; only the differenc
       --build v20 results/ppo_ou_gate_v20.json \
       --opponent heuristic --n 300 --loop-penalty 4 \
       --out results/seed_strength_gate_v20.json
+
+TWO OR MORE ARMS. Every pair is compared, into ``comparisons``; a two-arm run also keeps the
+single ``comparison`` key the Build 20-23 result files use. Scoring k arms in ONE invocation is
+not a convenience -- it is the standing measurement rule (Build 22's calibration finding: v20's
+IDENTICAL checkpoints scored 0.472 and 0.499 in two separate runs, 0.027 apart against a 0.023 SE,
+so a cross-run difference under ~0.03 is not a result). Pairwise tests over k > 2 arms are MULTIPLE
+COMPARISONS: pre-register the contrasts that decide the build and pass --alpha corrected for them.
+
+TWO INFERENCE LEVELS (Build 24). The pooled z-test is the pre-registered verdict, and it is a claim
+about THESE CHECKPOINTS. Each contrast also carries a ``seed_level`` block -- the same contrast
+paired by seed -- which is the claim about the TRAINING PROCEDURE. They routinely disagree, because
+the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise: Build 23's pooled
+p = 0.0003 is a seed-level t of 2.04. Raising --n does NOT close that gap (the procedure-level SE
+of a difference moves 0.0622 -> 0.0579 going from n=300 to n=5000); only more SEEDS would.
 """
 
 from __future__ import annotations
@@ -62,6 +76,97 @@ def two_proportion_z(w1: int, n1: int, w2: int, n2: int) -> dict[str, float]:
         "p_value": round(math.erfc(abs(z) / math.sqrt(2)), 4),
         "se": round(se, 4),
     }
+
+
+def verdict_of(diff: float, significant: bool) -> str:
+    """Three-way verdict. Build 23: the two-way version could not say REGRESSION.
+
+    Through Build 23 this read ``"WIN" if significant and diff > 0 else "NULL"``, which stamped
+    Build 23's CI-disjoint p = 0.0003 REVERSAL as ``NULL`` -- indistinguishable from Build 22's
+    p = 0.67 nothing. A significant negative effect is a finding, not an absence of one, and on the
+    strength axis it has so far been the LARGER of the two the project has measured.
+    """
+    if not significant:
+        return "NULL"
+    return "WIN" if diff > 0 else "REGRESSION"
+
+
+def seed_level_stats(
+    base: list[dict[str, Any]], cand: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Paired-by-seed view of a contrast -- the SECOND inference level, REPORTED not adjudicated.
+
+    The pooled z-test above treats all 900+ battles as iid. The SEEDS ARE NOT. Build 23 measured
+    per-seed rates of 0.597/0.470/0.607 (v23b) against a within-seed binomial sd of 0.0287 at
+    n=300, so the between-seed sd is ~0.0706 -- 2.5x the within-seed noise. That makes the pooled
+    verdict a claim about THESE CHECKPOINTS, not about the training procedure, and it means raising
+    ``--n`` barely moves the procedure-level SE (0.0622 -> 0.0579 going from n=300 to n=5000).
+    Both facts are invisible in the pooled number, so they are written into the artifact here.
+
+    ``t`` is reported for CALIBRATION against the pooled ``z``, deliberately WITHOUT a p-value:
+    scipy is not in the env, and a second p-value would need its own multiplicity correction and
+    would read as a second pre-registered test, which it is not. ``sign_test_p`` IS exact (a
+    two-sided binomial at 0.5, stdlib ``math.comb``) and is the honest cheap check on direction.
+
+    Returns ``None`` when the arms cannot be paired -- unequal seed counts, or fewer than 2 seeds.
+    Pairing is only meaningful because an arm's checkpoints come from ``best_checkpoints`` in the
+    gate JSON's record order, i.e. seed order, and Build 24's arms share seeds AND init.
+    """
+    if len(base) != len(cand) or len(base) < 2:
+        return None
+    a_rates = [float(c["rate"]) for c in base]
+    b_rates = [float(c["rate"]) for c in cand]
+    diffs = [b - a for a, b in zip(a_rates, b_rates, strict=True)]
+    k = len(diffs)
+    mean = sum(diffs) / k
+    sd = math.sqrt(sum((d - mean) ** 2 for d in diffs) / (k - 1))
+    se = sd / math.sqrt(k)
+    n_pos = sum(1 for d in diffs if d > 0)
+    # Two-sided exact sign test at p=0.5, ignoring exact ties (none occur at these sample sizes).
+    tail = sum(math.comb(k, i) for i in range(min(n_pos, k - n_pos) + 1))
+    return {
+        "baseline_rates": [round(r, 4) for r in a_rates],
+        "candidate_rates": [round(r, 4) for r in b_rates],
+        "paired_diffs": [round(d, 4) for d in diffs],
+        "mean_paired_diff": round(mean, 4),
+        "sd_paired_diff": round(sd, 4),
+        "t": round(mean / se, 3) if se > 0 else 0.0,
+        "seeds": k,
+        "n_positive": n_pos,
+        "sign_test_p": round(min(1.0, 2.0 * tail / 2**k), 4),
+    }
+
+
+def pairwise_comparisons(
+    builds: dict[str, Any], names: list[str], alpha: float = 0.05
+) -> list[dict[str, Any]]:
+    """Every pair, earlier arm as baseline, so a k-arm factorial reads as k(k-1)/2 tests.
+
+    Kept pure and separate from ``main`` because this is the arithmetic a build's verdict rests
+    on, and it must be testable without standing up a Showdown server.
+    """
+    out: list[dict[str, Any]] = []
+    for i, base in enumerate(names):
+        for cand in names[i + 1 :]:
+            a, b = builds[base], builds[cand]
+            test = two_proportion_z(a["wins"], a["n"], b["wins"], b["n"])
+            significant = test["p_value"] < alpha
+            out.append(
+                {
+                    "baseline": base,
+                    "candidate": cand,
+                    "disjoint_ci": b["ci95"][0] > a["ci95"][1] or a["ci95"][0] > b["ci95"][1],
+                    "alpha": alpha,
+                    "significant": significant,
+                    **test,
+                    "verdict": verdict_of(test["diff"], significant),
+                    # Never overrides the verdict -- see seed_level_stats' docstring.
+                    "seed_level": seed_level_stats(
+                        a.get("per_checkpoint", []), b.get("per_checkpoint", [])
+                    ),
+                }
+            )
+    return out
 
 
 async def score_build(
@@ -122,7 +227,15 @@ def main() -> None:
         action="append",
         metavar=("NAME", "GATE_JSON"),
         required=True,
-        help="build label + its ppo_continue_gate JSON; pass twice to compare",
+        help="build label + its ppo_continue_gate JSON; pass 2+ times -- EVERY PAIR is compared",
+    )
+    ap.add_argument(
+        "--alpha",
+        type=float,
+        default=0.05,
+        help="significance level. With k>2 arms the pairwise tests are MULTIPLE COMPARISONS: pass "
+        "the pre-registered Bonferroni level (e.g. 0.0125 for 4 planned contrasts), do not read "
+        "the default 0.05 off a factorial run",
     )
     ap.add_argument("--opponent", default="heuristic")
     ap.add_argument("--n", type=int, default=300, help="battles per checkpoint")
@@ -156,34 +269,46 @@ def main() -> None:
             "old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max "
             "over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is "
             "identical across builds, so that bias cancels in the DIFFERENCE, which is what is "
-            "under test. CI overlap is a CONSERVATIVE test -- read the z-test too."
+            "under test. CI overlap is a CONSERVATIVE test -- read the z-test too. "
+            "TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') "
+            "is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' "
+            "is the same contrast paired by seed, and is the claim about the TRAINING "
+            "PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed "
+            "binomial noise, so procedure-level evidence is far weaker than the pooled p reads, "
+            "and raising --n does not fix it (only more SEEDS would). Report both; the verdict "
+            "field reflects the pooled test alone."
         ),
     }
 
     names = [name for name, _ in args.build]
-    if len(names) == 2:
-        a, b = builds[names[0]], builds[names[1]]
-        test = two_proportion_z(a["wins"], a["n"], b["wins"], b["n"])
-        disjoint = b["ci95"][0] > a["ci95"][1] or a["ci95"][0] > b["ci95"][1]
-        significant = test["p_value"] < 0.05
-        result["comparison"] = {
-            "baseline": names[0],
-            "candidate": names[1],
-            "disjoint_ci": disjoint,
-            "significant_at_05": significant,
-            **test,
-            "verdict": "WIN" if significant and test["diff"] > 0 else "NULL",
-        }
-        c = result["comparison"]
-        print(f"\n=== {names[0]} -> {names[1]} ===")
+    comparisons = pairwise_comparisons(builds, names, args.alpha)
+
+    if comparisons:
+        result["alpha"] = args.alpha
+        result["comparisons"] = comparisons
+        # Back-compat: through Build 23 a two-arm run wrote a single ``comparison`` object, and the
+        # four historical results/seed_strength_gate_v2*.json are read in that shape.
+        if len(comparisons) == 1:
+            result["comparison"] = comparisons[0]
+
+    for c in comparisons:
+        a, b = builds[c["baseline"]], builds[c["candidate"]]
+        print(f"\n=== {c['baseline']} -> {c['candidate']} ===")
         print(
             f"  {a['rate']:.3f} [{a['ci95'][0]:.3f},{a['ci95'][1]:.3f}]  ->  "
             f"{b['rate']:.3f} [{b['ci95'][0]:.3f},{b['ci95'][1]:.3f}]"
         )
         print(
             f"  diff {c['diff']:+.3f}   z {c['z']:+.2f}   p {c['p_value']:.4f}   "
-            f"disjoint_ci {disjoint}"
+            f"disjoint_ci {c['disjoint_ci']}   alpha {c['alpha']}"
         )
+        s = c.get("seed_level")
+        if s:
+            print(
+                f"  seed-level  diffs [{','.join(f'{d:+.3f}' for d in s['paired_diffs'])}]"
+                f"  mean {s['mean_paired_diff']:+.3f}  t {s['t']:+.2f}"
+                f"  {s['n_positive']}/{s['seeds']} positive  sign p {s['sign_test_p']:.3f}"
+            )
         print(f"  VERDICT {c['verdict']}")
 
     Path(args.out).write_text(json.dumps(result, indent=2))

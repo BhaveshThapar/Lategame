@@ -14,6 +14,14 @@ Build 21 measured the actual constraints, and they are **not** what you would gu
 The win is that seeds run **in parallel** rather than sequentially: 3 seeds went 4.6 h serial on the
 laptop; as an `sbatch` array they are one seed's wall-clock.
 
+**But the parallelism stops at 4 tasks** (measured, Build 24 planning). `tron` caps a *user* at
+`cpu=32,mem=256G` (`sacctmgr show qos where name=tron format=MaxTRESPU`), and every script here asks
+8 CPU / 64 GB — so **exactly 4 tasks run concurrently**, with CPU and memory binding at the same
+time. A 3-seed array fits; two of them do not. Build 23 submitted 6 tasks and `sacct` shows four
+starting at once and the rest starting *the second* a slot freed (`7181042_1` at 00:51:10 against
+`7181042_0`'s 00:51:09 end). Slurm backfills perfectly, so **submit everything and never stage waves
+by hand** — but estimate in **task-hours ÷ 4**, not "the arms run concurrently."
+
 ## The one thing that made this possible
 
 poke-env's `LocalhostServerConfiguration` **hardcodes `ws://localhost:8000`**. Two jobs on one host
