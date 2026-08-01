@@ -548,6 +548,36 @@ floor and is the first thing in five builds to move this far — so it is the **
 iters, both scored against `v23b` in one gate, to resolve which half of the raise did the work. The init-quality axis is
 **closed** (refuted, sign against it), as are capacity (21) and optimization/sampling (19–20).
 
+**OU pivot Build 24 — PRE-REGISTERED (written 2026-08-01, before running): WHICH HALF OF THE BUDGET RAISE DID THE WORK?**
+A **2×2 factorial on (`target_kl`, `iters`) plus a decomposition arm**, five arms scored in ONE gate run, all warm-started
+from the converged `offrl_gen9ou_wide_s0` at seeds 0/1/2: `v23b` (0.06/80, reused), `v24a` (0.06/50), `v24b` (0.03/80),
+`v24c` (0.03/50 — v21's config, retrained fresh), and `v24d` (0.06/80 with the **anneal horizon pinned to 50**).
+*Why the anneal knob had to ship first.* `iters` silently doubled as the lr/ent anneal horizon, so "50 → 80" was never one
+change — at iteration 40, v22 sat at lr 9.08e-05 / ent 0.0020 while v23b sat at 1.51e-04 / 0.0051. `config.iters` is used
+in exactly two places (the loop range and `anneal_horizon`), so with the horizon pinned **`v24d`'s iterations 1–50 run the
+identical code path to `v24a`** — and `v24d − v24a` differs in nothing but whether the loop kept going.
+*Four pre-registered contrasts at α = 0.0125:* the **total** (`v24c`→`v23b`, does +0.059 reproduce within one run?), the
+**KL half** (`v24b`→`v23b`), pure **update count** (`v24a`→`v24d`), and pure **anneal** (`v24d`→`v23b`). The last two sum
+to the `iters` half by construction — reported as a consistency check, not a fifth test. The gate prints all 10 pairs;
+**the other six are not pre-registered.** Pre-registered rows cover NOT REPLICATED / KL DID IT / ITERS DID IT / BOTH /
+**UNDERPOWERED SPLIT** (a real total with both halves under the MDE — explicitly *not* a finding that neither matters) /
+REVERSAL / COLLAPSE.
+*A deliberate departure from Build 23's rule:* trust-region binding in the `kl` 0.03 arms is **the treatment, not a
+defect**. Build 23 voided a comparison when the trust region bound because there it was a nuisance; here `target_kl` **is**
+the lever, so the certificate characterises the dose rather than invalidating the arm.
+*Scope, stated up front:* the pooled z-test treats 900+ battles as iid and **the seeds are not** — Build 23's between-seed
+sd is **~0.0706 against a within-seed 0.0287**, so its p = 0.0003 is a paired **t = 2.04** (3/3 seeds positive, sign-test
+p = 0.25). Direction replicates; procedure-level evidence is far weaker than the pooled p reads, and no feasible seed count
+fixes it (~24 seeds/arm for 80% power). Every contrast now carries a `seed_level` block, and **every Build 24 verdict is
+scoped to the checkpoints it scored**, not to the training procedure.
+*`N=1800`, not 300:* battles are the cheapest power here (1800 ran in 9:14). At a ~0.030 half, N=300/900/1800 gives ~7% /
+~24% / **~73%** power at α = 0.0125 — at N=900 the likely outcome is the UNDERPOWERED SPLIT row, which answers nothing.
+The argmax-selection bias favouring longer arms was simulated and is **+0.0014**, negligible.
+*Cost:* `tron` caps a user at `cpu=32,mem=256G` and each task asks 8 CPU / 64 GB, so **exactly 4 of the 12 tasks run at a
+time** (measured on Build 23's `sacct`: queued tasks started the second a slot freed). Slurm backfills, so all 12 are
+submitted at once — but the estimate is **~60 task-hours ÷ 4 ≈ 15–18 h**, not "the arms run concurrently." Plus 13.3 GB of
+checkpoints and a ~2.3 h gate.
+
 ## Setup
 
 ```bash
