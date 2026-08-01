@@ -1,0 +1,326 @@
+{
+  "init": "checkpoints/offrl_gen9ou_v7_s0.pt",
+  "arm": "ppo_et_prior",
+  "format": "gen9ou",
+  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "loop_penalty": 4.0,
+  "ckpt_prefix": "ppo_ou_et_prior",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "iters": 10,
+  "games_per_opp": 16,
+  "eval_n": 150,
+  "ladder_n": 300,
+  "opponent": "heuristic",
+  "best_checkpoint": "checkpoints/ppo_ou_et_prior_s1/iter_10.pt",
+  "confirmatory_ladder": {
+    "random": 0.7667,
+    "maxbasepower": 0.4733,
+    "simpleheuristics": 0.12,
+    "heuristic": 0.12
+  },
+  "records": [
+    {
+      "seed": 0,
+      "out_dir": "checkpoints/ppo_ou_et_prior_s0",
+      "start_vs_heuristic": 0.0267,
+      "best_iter": 10,
+      "best_vs_heuristic": 0.1267,
+      "best_checkpoint": "checkpoints/ppo_ou_et_prior_s0/iter_10.pt",
+      "final_vs_iter0": 0.8733,
+      "delta_vs_start": 0.1,
+      "curve": [
+        {
+          "iter": 0,
+          "vs_random": 0.3467,
+          "vs_simpleheuristics": 0.0133,
+          "vs_heuristic": 0.0267
+        },
+        {
+          "iter": 1,
+          "vs_random": 0.4667,
+          "vs_simpleheuristics": 0.0133,
+          "vs_heuristic": 0.0133,
+          "vs_iter0": 0.5933
+        },
+        {
+          "iter": 2,
+          "vs_random": 0.66,
+          "vs_simpleheuristics": 0.0267,
+          "vs_heuristic": 0.0267,
+          "vs_iter0": 0.76
+        },
+        {
+          "iter": 3,
+          "vs_random": 0.7,
+          "vs_simpleheuristics": 0.0733,
+          "vs_heuristic": 0.0333,
+          "vs_iter0": 0.8067
+        },
+        {
+          "iter": 4,
+          "vs_random": 0.6867,
+          "vs_simpleheuristics": 0.0733,
+          "vs_heuristic": 0.0267,
+          "vs_iter0": 0.8067
+        },
+        {
+          "iter": 5,
+          "vs_random": 0.74,
+          "vs_simpleheuristics": 0.0467,
+          "vs_heuristic": 0.06,
+          "vs_iter0": 0.82
+        },
+        {
+          "iter": 6,
+          "vs_random": 0.82,
+          "vs_simpleheuristics": 0.1,
+          "vs_heuristic": 0.06,
+          "vs_iter0": 0.8267
+        },
+        {
+          "iter": 7,
+          "vs_random": 0.7667,
+          "vs_simpleheuristics": 0.0733,
+          "vs_heuristic": 0.06,
+          "vs_iter0": 0.8733
+        },
+        {
+          "iter": 8,
+          "vs_random": 0.76,
+          "vs_simpleheuristics": 0.0667,
+          "vs_heuristic": 0.1,
+          "vs_iter0": 0.9067
+        },
+        {
+          "iter": 9,
+          "vs_random": 0.8533,
+          "vs_simpleheuristics": 0.1067,
+          "vs_heuristic": 0.0733,
+          "vs_iter0": 0.86
+        },
+        {
+          "iter": 10,
+          "vs_random": 0.8867,
+          "vs_simpleheuristics": 0.14,
+          "vs_heuristic": 0.1267,
+          "vs_iter0": 0.8733
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "out_dir": "checkpoints/ppo_ou_et_prior_s1",
+      "start_vs_heuristic": 0.02,
+      "best_iter": 10,
+      "best_vs_heuristic": 0.18,
+      "best_checkpoint": "checkpoints/ppo_ou_et_prior_s1/iter_10.pt",
+      "final_vs_iter0": 0.8333,
+      "delta_vs_start": 0.16,
+      "curve": [
+        {
+          "iter": 0,
+          "vs_random": 0.3467,
+          "vs_simpleheuristics": 0.0067,
+          "vs_heuristic": 0.02
+        },
+        {
+          "iter": 1,
+          "vs_random": 0.5467,
+          "vs_simpleheuristics": 0.04,
+          "vs_heuristic": 0.02,
+          "vs_iter0": 0.5733
+        },
+        {
+          "iter": 2,
+          "vs_random": 0.62,
+          "vs_simpleheuristics": 0.04,
+          "vs_heuristic": 0.0267,
+          "vs_iter0": 0.7
+        },
+        {
+          "iter": 3,
+          "vs_random": 0.68,
+          "vs_simpleheuristics": 0.0533,
+          "vs_heuristic": 0.02,
+          "vs_iter0": 0.7467
+        },
+        {
+          "iter": 4,
+          "vs_random": 0.76,
+          "vs_simpleheuristics": 0.0667,
+          "vs_heuristic": 0.0467,
+          "vs_iter0": 0.8067
+        },
+        {
+          "iter": 5,
+          "vs_random": 0.6733,
+          "vs_simpleheuristics": 0.0333,
+          "vs_heuristic": 0.0667,
+          "vs_iter0": 0.7933
+        },
+        {
+          "iter": 6,
+          "vs_random": 0.6667,
+          "vs_simpleheuristics": 0.04,
+          "vs_heuristic": 0.04,
+          "vs_iter0": 0.72
+        },
+        {
+          "iter": 7,
+          "vs_random": 0.6867,
+          "vs_simpleheuristics": 0.0467,
+          "vs_heuristic": 0.0667,
+          "vs_iter0": 0.78
+        },
+        {
+          "iter": 8,
+          "vs_random": 0.78,
+          "vs_simpleheuristics": 0.0867,
+          "vs_heuristic": 0.1,
+          "vs_iter0": 0.78
+        },
+        {
+          "iter": 9,
+          "vs_random": 0.7733,
+          "vs_simpleheuristics": 0.0933,
+          "vs_heuristic": 0.0933,
+          "vs_iter0": 0.8467
+        },
+        {
+          "iter": 10,
+          "vs_random": 0.8133,
+          "vs_simpleheuristics": 0.1133,
+          "vs_heuristic": 0.18,
+          "vs_iter0": 0.8333
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "out_dir": "checkpoints/ppo_ou_et_prior_s2",
+      "start_vs_heuristic": 0.0133,
+      "best_iter": 9,
+      "best_vs_heuristic": 0.0667,
+      "best_checkpoint": "checkpoints/ppo_ou_et_prior_s2/iter_09.pt",
+      "final_vs_iter0": 0.84,
+      "delta_vs_start": 0.0534,
+      "curve": [
+        {
+          "iter": 0,
+          "vs_random": 0.4,
+          "vs_simpleheuristics": 0.0067,
+          "vs_heuristic": 0.0133
+        },
+        {
+          "iter": 1,
+          "vs_random": 0.3733,
+          "vs_simpleheuristics": 0.0133,
+          "vs_heuristic": 0.0067,
+          "vs_iter0": 0.4667
+        },
+        {
+          "iter": 2,
+          "vs_random": 0.3867,
+          "vs_simpleheuristics": 0.0133,
+          "vs_heuristic": 0.02,
+          "vs_iter0": 0.5
+        },
+        {
+          "iter": 3,
+          "vs_random": 0.4667,
+          "vs_simpleheuristics": 0.0067,
+          "vs_heuristic": 0.0333,
+          "vs_iter0": 0.5267
+        },
+        {
+          "iter": 4,
+          "vs_random": 0.4867,
+          "vs_simpleheuristics": 0.0333,
+          "vs_heuristic": 0.0333,
+          "vs_iter0": 0.7133
+        },
+        {
+          "iter": 5,
+          "vs_random": 0.5333,
+          "vs_simpleheuristics": 0.0267,
+          "vs_heuristic": 0.0267,
+          "vs_iter0": 0.66
+        },
+        {
+          "iter": 6,
+          "vs_random": 0.64,
+          "vs_simpleheuristics": 0.0333,
+          "vs_heuristic": 0.04,
+          "vs_iter0": 0.74
+        },
+        {
+          "iter": 7,
+          "vs_random": 0.6867,
+          "vs_simpleheuristics": 0.04,
+          "vs_heuristic": 0.0533,
+          "vs_iter0": 0.7333
+        },
+        {
+          "iter": 8,
+          "vs_random": 0.74,
+          "vs_simpleheuristics": 0.08,
+          "vs_heuristic": 0.0533,
+          "vs_iter0": 0.7467
+        },
+        {
+          "iter": 9,
+          "vs_random": 0.78,
+          "vs_simpleheuristics": 0.0667,
+          "vs_heuristic": 0.0667,
+          "vs_iter0": 0.8333
+        },
+        {
+          "iter": 10,
+          "vs_random": 0.78,
+          "vs_simpleheuristics": 0.0667,
+          "vs_heuristic": 0.06,
+          "vs_iter0": 0.84
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "start_vs_heuristic": {
+      "values": [
+        0.0267,
+        0.02,
+        0.0133
+      ],
+      "mean": 0.02,
+      "std": 0.005470527092215766,
+      "min": 0.0133,
+      "max": 0.0267
+    },
+    "best_vs_heuristic": {
+      "values": [
+        0.1267,
+        0.18,
+        0.0667
+      ],
+      "mean": 0.12446666666666667,
+      "std": 0.04628148177787262,
+      "min": 0.0667,
+      "max": 0.18
+    },
+    "final_vs_iter0": {
+      "values": [
+        0.8733,
+        0.8333,
+        0.84
+      ],
+      "mean": 0.8488666666666667,
+      "std": 0.017492156972642187,
+      "min": 0.8333,
+      "max": 0.8733
+    }
+  }
+}

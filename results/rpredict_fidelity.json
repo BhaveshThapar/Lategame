@@ -1,0 +1,17 @@
+{
+  "gate": "rpredict_fidelity",
+  "cache_dir": "replays/gen9randombattle",
+  "limit": 300,
+  "seed": 0,
+  "threshold": 0.99,
+  "verdict": "PASS",
+  "replays": 300,
+  "errored": 0,
+  "transitions": 9734,
+  "core_mismatch": 0,
+  "full_mismatch": 0,
+  "drive_errors": 0,
+  "core_match_rate": 1.0,
+  "full_match_rate": 1.0,
+  "samples": []
+}

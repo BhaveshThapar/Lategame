@@ -1,0 +1,59 @@
+{
+  "build": 9,
+  "gate": "B",
+  "lever": "keep pp; add an explicit own-active first_turn recency channel (last global scalar)",
+  "obs_version": "v5-09831e17c378",
+  "obs_dim": 761,
+  "bc_shard": "data/gen9ou_v7_bc.npz",
+  "rl_shard": "data/gen9ou_v7_rl.npz",
+  "n_bc_samples": 61723,
+  "checkpoints": [
+    "checkpoints/bc_gen9ou_v7_s0.pt",
+    "checkpoints/bc_gen9ou_v7_s1.pt",
+    "checkpoints/bc_gen9ou_v7_s2.pt"
+  ],
+  "surgical_diff_check": {
+    "v7_first760_cols_identical_to_v5": true,
+    "pp_restored_nonzero_frac": 0.9924
+  },
+  "bc_gate": {
+    "bar": 0.63,
+    "val_acc": [0.6554, 0.6492, 0.6565],
+    "val_acc_mean": 0.6537,
+    "baseline_v5_pp_only_mean": 0.647,
+    "verdict": "PASS (also beats pp-only baseline -> first_turn is informative for imitation)"
+  },
+  "shard_signal_in_distribution": {
+    "first_turn_frac1": 0.3937,
+    "switch_frac_overall": 0.1836,
+    "switch_frac_first_turn_1": 0.0978,
+    "switch_frac_first_turn_0": 0.2393,
+    "note": "in human data, just-switched-in states switch again 2.4x LESS -- the honest anti-loop signal"
+  },
+  "live_behavior_probe": {
+    "checkpoint": "bc_gen9ou_v7_s0.pt",
+    "n_per_arm": 20,
+    "control_win_rate": 0.5,
+    "bc_vs_random": {"win_rate": 0.05, "voluntary_switch_fraction": 0.485, "max_switch_run": 110, "ping_pong_rate": 0.727, "classification": "c_pathological"},
+    "bc_vs_heuristic": {"win_rate": 0.0, "voluntary_switch_fraction": 0.636, "max_switch_run": 77, "ping_pong_rate": 0.649, "classification": "c_pathological"},
+    "vs_build8_baseline": "attenuated (vol-switch ~0.49-0.64 vs ~0.67-0.85; max_run 77-110 vs 194) but loop PERSISTS"
+  },
+  "live_obs_diagnosis": {
+    "first_turn_present_live": true,
+    "first_turn_frac1_live": 0.5648,
+    "switch_frac_first_turn_1_live": 0.8691,
+    "switch_frac_first_turn_0_live": 0.0395,
+    "pp_frac_full_live_on_switch_decisions": 0.9645,
+    "note": "first_turn is NOT drifted (fires live), but the policy INVERTS the shard prior under OOD: shard first_turn=1 -> 9.8% switch, live first_turn=1 -> 87% switch, because pp stays full (never attacks)"
+  },
+  "causal_counterfactual_v7_bc_s0": {
+    "rows": 2748,
+    "baseline_switch_mass": 0.6036,
+    "pp_to_in_distribution": {"switch_mass": 0.2436, "dP": -0.36},
+    "first_turn_to_0": {"switch_mass": 0.6278, "dP": 0.0242},
+    "first_turn_to_1": {"switch_mass": 0.5600, "dP": -0.0436},
+    "interpretation": "neutralizing pp collapses switch mass by 0.36 (toward shard ~0.2); first_turn moves it only +/-0.03-0.04. pp remains the causal carrier ~10x stronger than first_turn, even with first_turn present."
+  },
+  "verdict": "first_turn KEPT (drift-free, improves val-acc 0.647->0.654) but INSUFFICIENT to break the loop (RED as a standalone loop-fix). pp remains the dominant OOD carrier.",
+  "next_lever": "Build 10: ROBUSTIFY pp -- keep pp + first_turn, neutralize pp's OOD brittleness via train-time augmentation (noise/dropout on the pp channel, or synthesize full-pp deep-game states so 'full pp deep in a game -> attack' is in-distribution). This is the only remaining branch: pp can't be dropped (Gate A: load-bearing) and can't be out-voted by a parallel feature (Gate B: pp dP -0.36 >> first_turn dP 0.03)."
+}

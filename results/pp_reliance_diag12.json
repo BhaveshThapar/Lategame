@@ -1,0 +1,12 @@
+{
+  "policy": "checkpoints/bc_gen9ou_v12_s0.pt",
+  "states": "results/behavior_probe_obs_v7.npz",
+  "shard": "data/gen9ou_v7_bc.npz",
+  "n_rows": 2748,
+  "shard_pp_pool_frac_full": 0.4961,
+  "frac_full_live": 0.8606,
+  "baseline_switch_mass": 0.3426,
+  "pp_neutralized_switch_mass": 0.2201,
+  "dP": 0.1224,
+  "note": "dP = baseline - pp_neutralized. Large dP => policy keys on exactly-full pp."
+}

@@ -1,0 +1,98 @@
+{
+  "gate": "format_ceiling",
+  "m2": {
+    "source": "results/rpredict_oppmodel_gate_b_whitebox_n120.json",
+    "n": 120,
+    "depth": 2,
+    "base_vs_heuristic": 0.4833,
+    "search_vs_heuristic": 0.5,
+    "note": "L14 depth-2 expectimax, near-perfect white-box opponent (ceiling from above)"
+  },
+  "m3": {
+    "n_replays_scanned": 500,
+    "n_battles_used": 500,
+    "oov_species": 0,
+    "p1_win_frac": 0.486,
+    "auc": 0.4945637379705689,
+    "auc_ci95": [
+      0.44403689377922995,
+      0.5457720112995492
+    ],
+    "auc_bst_z": 0.4687995388384493,
+    "strength_proxy": "sum of level-adjusted real stats (mon.stats), per team"
+  },
+  "m1": {
+    "n": 300,
+    "mirror": {
+      "p1": "heuristic",
+      "p2": "heuristic",
+      "rate": 0.5133333333333333,
+      "wins": 154,
+      "ci95": [
+        0.4569629909718754,
+        0.5693665175615182
+      ]
+    },
+    "simpleheuristics": {
+      "p1": "simpleheuristics",
+      "p2": "heuristic",
+      "rate": 0.5233333333333333,
+      "wins": 157,
+      "ci95": [
+        0.46687729355961566,
+        0.5791993463738232
+      ]
+    },
+    "maxbasepower": {
+      "p1": "maxbasepower",
+      "p2": "heuristic",
+      "rate": 0.10666666666666667,
+      "wins": 32,
+      "ci95": [
+        0.07657538053068277,
+        0.14670411773420264
+      ]
+    },
+    "random": {
+      "p1": "random",
+      "p2": "heuristic",
+      "rate": 0.006666666666666667,
+      "wins": 2,
+      "ci95": [
+        0.0018301100329710784,
+        0.023978074231461442
+      ]
+    },
+    "offrl_green": {
+      "p1": "offrl",
+      "p2": "heuristic",
+      "rate": 0.43,
+      "wins": 129,
+      "ci95": [
+        0.3752101984887211,
+        0.4865598817109618
+      ]
+    }
+  },
+  "decision": {
+    "verdict": "FORMAT_BOUND",
+    "next_branch": "ou_pivot",
+    "reason": "nothing beats the heuristic: best competent agent 0.523 <= 0.53 (white-box near-optimal inference 0.500 at parity) -> the ceiling is the format",
+    "mirror_sanity_ok": true,
+    "m3_corroboration": {
+      "rng_bound_corroborated": false,
+      "note": "team-strength AUC 0.495 < 0.65: gross team strength does NOT predict the winner (RB balances via level) -> the format is balanced; wins come from matchup/variance + fine play a competent heuristic already captures, not from a stronger team"
+    },
+    "signals": {
+      "simpleheuristics_s": 0.5233333333333333,
+      "offrl_green_g": 0.43,
+      "whitebox_w": 0.5,
+      "auc_a": 0.4945637379705689
+    },
+    "thresholds": {
+      "band_top": 0.53,
+      "headroom": 0.58,
+      "auc_hi": 0.65
+    }
+  }
+}

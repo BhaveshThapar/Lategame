@@ -1,0 +1,51 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "n_per_checkpoint": 300,
+  "format": "gen9ou",
+  "loop_penalty": 4.0,
+  "builds": {
+    "v22": {
+      "wins": 416,
+      "n": 900,
+      "rate": 0.4622,
+      "ci95": [
+        0.429878397422478,
+        0.494887180970904
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v22_s0/iter_41.pt",
+          "wins": 137,
+          "n": 300,
+          "rate": 0.4567,
+          "ci95": [
+            0.40120190611211703,
+            0.5132271911543533
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v22_s1/iter_50.pt",
+          "wins": 151,
+          "n": 300,
+          "rate": 0.5033,
+          "ci95": [
+            0.44707091826263046,
+            0.559511458870718
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v22_s2/iter_48.pt",
+          "wins": 128,
+          "n": 300,
+          "rate": 0.4267,
+          "ci95": [
+            0.37197260006995525,
+            0.4832151029963794
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too."
+}

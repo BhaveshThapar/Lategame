@@ -1,0 +1,83 @@
+{
+  "gate": "format_ceiling",
+  "format": "gen9ou",
+  "m1": {
+    "n": 300,
+    "format": "gen9ou",
+    "mirror": {
+      "p1": "heuristic",
+      "p2": "heuristic",
+      "rate": 0.49333333333333335,
+      "wins": 148,
+      "ci95": [
+        0.4372010534770382,
+        0.549634192256265
+      ]
+    },
+    "simpleheuristics": {
+      "p1": "simpleheuristics",
+      "p2": "heuristic",
+      "rate": 0.63,
+      "wins": 189,
+      "ci95": [
+        0.574043509355098,
+        0.6826691988454907
+      ]
+    },
+    "maxbasepower": {
+      "p1": "maxbasepower",
+      "p2": "heuristic",
+      "rate": 0.09,
+      "wins": 27,
+      "ci95": [
+        0.06258980739496589,
+        0.12777780520317736
+      ]
+    },
+    "random": {
+      "p1": "random",
+      "p2": "heuristic",
+      "rate": 0.013333333333333334,
+      "wins": 4,
+      "ci95": [
+        0.005196877684679467,
+        0.03377606084644991
+      ]
+    },
+    "offrl_green": {
+      "p1": "offrl",
+      "p2": "heuristic",
+      "rate": 0.02,
+      "wins": 6,
+      "ci95": [
+        0.009197506067771085,
+        0.042940186730055147
+      ]
+    }
+  },
+  "ou_assessment": {
+    "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+    "mirror_sanity_ok": true,
+    "gradient_ok": true,
+    "harness_ok": true,
+    "ou_band": {
+      "mirror": 0.49333333333333335,
+      "simpleheuristics": 0.63,
+      "maxbasepower": 0.09,
+      "random": 0.013333333333333334,
+      "offrl_green": 0.02
+    },
+    "rb_band_reference": {
+      "mirror": 0.513,
+      "simpleheuristics": 0.523,
+      "maxbasepower": 0.107,
+      "random": 0.007,
+      "offrl_green": 0.43
+    },
+    "band_width": {
+      "ou": 0.6166666666666667,
+      "rb": 0.516,
+      "wider_than_rb": true
+    }
+  }
+}

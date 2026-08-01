@@ -1,0 +1,68 @@
+=== offrl | battle-gen9ou-101918 | won=False turns=61 | preview=/team 435612
+team packed: landorustherian,gholdengo,kingambit,ironvaliant,tinglu,greattusk | live: landorustherian,gholdengo,kingambit,ironvaliant,tinglu,greattusk | ORDER MATCH
+T1   ironvaliant 100% vs kingambit 100% | legal=13 | -> tera0 '/choose move calmmind terastallize' p=0.50 | alt: tera2 0.30, tera3 0.17
+T1   ironvaliant 0% vs kingambit 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.27 | alt: switch1 0.26, switch2 0.16 | FORCED
+T2   tinglu 100% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.45 | alt: switch5 0.21, switch2 0.18
+T3   gholdengo 100% vs landorustherian 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.44 | alt: switch5 0.26, switch2 0.16
+T4   tinglu 100% vs landorustherian 100% | legal=6 | -> switch1 '/choose switch Gholdengo' p=0.47 | alt: switch5 0.25, switch2 0.17
+T5   gholdengo 100% vs greattusk 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.26, switch2 0.15
+T6   tinglu 100% vs slowkinggalar 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.44 | alt: switch5 0.20, switch2 0.17
+T7   gholdengo 100% vs ogerponwellspring 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.44 | alt: switch5 0.26, switch2 0.14
+T8   tinglu 41% vs ogerponwellspring 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.46 | alt: switch5 0.25, switch2 0.16
+T9   gholdengo 100% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.42 | alt: switch5 0.25, switch2 0.16
+T10  tinglu 47% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.43 | alt: switch5 0.24, switch2 0.17
+T11  gholdengo 100% vs landorustherian 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.26, switch2 0.14
+T12  tinglu 53% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.44 | alt: switch5 0.22, switch2 0.17
+T13  gholdengo 100% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.42 | alt: switch5 0.24, switch2 0.16
+T14  tinglu 60% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.43 | alt: switch5 0.22, switch2 0.17
+T15  gholdengo 100% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.40 | alt: switch5 0.23, switch2 0.17
+T16  tinglu 66% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.20, switch2 0.18
+T17  gholdengo 100% vs kingambit 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.23, switch0 0.15
+T18  tinglu 72% vs greattusk 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.44 | alt: switch5 0.25, switch2 0.16
+T19  gholdengo 100% vs ogerponwellspring 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.26, switch2 0.14
+T20  tinglu 61% vs ogerponwellspring 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.26, switch2 0.17
+T21  gholdengo 100% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.43 | alt: switch5 0.24, switch2 0.15
+T22  tinglu 53% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.23, switch2 0.18
+T23  gholdengo 64% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.43 | alt: switch5 0.23, switch2 0.15
+T24  tinglu 53% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.21, switch2 0.18
+T25  gholdengo 64% vs slowkinggalar 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.42 | alt: switch5 0.23, switch0 0.16
+T26  tinglu 53% vs slowkinggalar 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.40 | alt: switch5 0.20, switch2 0.18
+T27  gholdengo 64% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.43 | alt: switch5 0.23, switch2 0.15
+T28  tinglu 27% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.42 | alt: switch5 0.21, switch2 0.18
+T29  gholdengo 64% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.44 | alt: switch5 0.23, switch2 0.15
+T30  tinglu 27% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.24, switch2 0.17
+T31  gholdengo 64% vs slowkinggalar 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.42 | alt: switch5 0.22, switch0 0.16
+T32  tinglu 20% vs slowkinggalar 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.20, switch2 0.18
+T33  gholdengo 64% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.43 | alt: switch5 0.23, switch2 0.15
+T34  tinglu 20% vs ogerponwellspring 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.42 | alt: switch5 0.26, switch2 0.16
+T35  gholdengo 4% vs ogerponwellspring 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.25, switch2 0.14
+T36  tinglu 20% vs slowkinggalar 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.41 | alt: switch5 0.20, switch2 0.18
+T37  gholdengo 4% vs gholdengo 100% | legal=8 | -> switch4 '/choose switch Ting-Lu' p=0.43 | alt: switch5 0.23, switch2 0.16
+T38  tinglu 20% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Gholdengo' p=0.42 | alt: switch5 0.21, switch2 0.18
+T38  gholdengo 0% vs gholdengo 100% | legal=4 | -> switch4 '/choose switch Ting-Lu' p=0.45 | alt: switch5 0.24, switch0 0.16 | FORCED
+T39  tinglu 20% vs gholdengo 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.37 | alt: switch2 0.31, switch0 0.25
+T40  greattusk 100% vs slowkinggalar 100% | legal=7 | -> switch4 '/choose switch Ting-Lu' p=0.40 | alt: move3 0.30, switch2 0.17
+T41  tinglu 20% vs landorustherian 100% | legal=7 | -> switch5 '/choose switch Great Tusk' p=0.47 | alt: switch2 0.27, switch0 0.20
+T42  greattusk 100% vs landorustherian 100% | legal=7 | -> move3 '/choose move rapidspin' p=0.46 | alt: switch4 0.29, switch2 0.14
+T43  greattusk 100% vs slowkinggalar 80% | legal=7 | -> move3 '/choose move rapidspin' p=0.92 | alt: switch4 0.05, switch2 0.02
+T44  greattusk 62% vs slowkinggalar 61% | legal=7 | -> move3 '/choose move rapidspin' p=0.95 | alt: switch4 0.02, switch2 0.01
+T45  greattusk 62% vs gholdengo 100% | legal=7 | -> move3 '/choose move rapidspin' p=0.92 | alt: switch4 0.04, switch2 0.02
+T46  greattusk 3% vs gholdengo 100% | legal=7 | -> move3 '/choose move rapidspin' p=0.92 | alt: switch4 0.04, switch2 0.02
+T47  greattusk 3% vs gholdengo 100% | legal=7 | -> move3 '/choose move rapidspin' p=0.94 | alt: switch4 0.03, switch2 0.02
+T48  greattusk 3% vs landorustherian 89% | legal=7 | -> move3 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch2 0.03
+T49  greattusk 3% vs gholdengo 100% | legal=7 | -> move3 '/choose move rapidspin' p=0.89 | alt: switch4 0.05, switch2 0.03
+T50  greattusk 3% vs landorustherian 88% | legal=7 | -> move3 '/choose move rapidspin' p=0.91 | alt: switch4 0.04, switch2 0.03
+T51  greattusk 3% vs greattusk 99% | legal=7 | -> move3 '/choose move rapidspin' p=0.93 | alt: switch4 0.04, switch2 0.02
+T51  greattusk 0% vs greattusk 99% | legal=3 | -> switch4 '/choose switch Ting-Lu' p=0.52 | alt: switch2 0.31, switch0 0.18 | FORCED
+T52  tinglu 20% vs greattusk 99% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch0 0.37, move2 0.06
+T52  kingambit 0% vs greattusk 100% | legal=2 | -> switch4 '/choose switch Ting-Lu' p=0.80 | alt: switch0 0.20 | FORCED
+T53  tinglu 20% vs greattusk 100% | legal=5 | -> switch0 '/choose switch Landorus' p=0.70 | alt: move2 0.16, move3 0.12
+T54  landorustherian 91% vs greattusk 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.95 | alt: move2 0.03, move0 0.01
+T55  tinglu 20% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Landorus' p=0.70 | alt: move2 0.18, move3 0.10
+T56  landorustherian 42% vs ogerponwellspring 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.94 | alt: move2 0.03, move0 0.01
+T57  tinglu 20% vs gholdengo 100% | legal=5 | -> switch0 '/choose switch Landorus' p=0.60 | alt: move3 0.26, move2 0.10
+T58  landorustherian 48% vs gholdengo 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.94 | alt: move2 0.03, move0 0.02
+T59  tinglu 1% vs gholdengo 100% | legal=5 | -> switch0 '/choose switch Landorus' p=0.60 | alt: move3 0.25, move2 0.11
+T60  landorustherian 54% vs gholdengo 100% | legal=5 | -> switch4 '/choose switch Ting-Lu' p=0.94 | alt: move2 0.03, move0 0.02
+T60  tinglu 0% vs gholdengo 100% | legal=1 | -> switch0 '/choose switch Landorus' p=1.00 | FORCED
+T61  landorustherian 54% vs gholdengo 100% | legal=4 | -> move0 '/choose move earthquake' p=0.44 | alt: move2 0.40, move3 0.09
