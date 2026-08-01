@@ -1,0 +1,91 @@
+=== offrl | battle-gen9ou-101935 | won=False turns=84 | preview=/team 623415
+team packed: dragonite,greattusk,kingambit,gholdengo,slowkinggalar,landorustherian | live: dragonite,greattusk,kingambit,gholdengo,slowkinggalar,landorustherian | ORDER MATCH
+T1   landorustherian 100% vs landorustherian 100% | legal=13 | -> tera0 '/choose move earthquake terastallize' p=0.92 | alt: tera2 0.03, tera3 0.03
+T2   landorustherian 100% vs greattusk 84% | legal=9 | -> move0 '/choose move earthquake' p=0.50 | alt: switch4 0.16, switch1 0.13
+T3   landorustherian 10% vs greattusk 54% | legal=9 | -> move0 '/choose move earthquake' p=0.47 | alt: switch4 0.18, switch1 0.14
+T3   landorustherian 0% vs greattusk 61% | legal=5 | -> switch4 '/choose switch Slowking' p=0.31 | alt: switch1 0.25, switch3 0.15 | FORCED
+T4   slowkinggalar 100% vs greattusk 61% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.49 | alt: switch3 0.28, switch2 0.13
+T5   greattusk 100% vs ogerponwellspring 100% | legal=8 | -> switch4 '/choose switch Slowking' p=0.51 | alt: switch3 0.23, switch2 0.11
+T6   slowkinggalar 100% vs gholdengo 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.47 | alt: switch3 0.28, switch2 0.13
+T7   greattusk 100% vs slowkinggalar 100% | legal=8 | -> switch4 '/choose switch Slowking' p=0.39 | alt: switch3 0.27, switch2 0.14
+T8   slowkinggalar 100% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.47 | alt: switch3 0.28, switch2 0.13
+T9   greattusk 100% vs landorustherian 100% | legal=8 | -> switch4 '/choose switch Slowking' p=0.50 | alt: switch3 0.24, switch2 0.12
+T10  slowkinggalar 100% vs ogerponwellspring 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.45 | alt: switch3 0.27, switch2 0.16
+T10  greattusk 0% vs ogerponwellspring 100% | legal=4 | -> switch4 '/choose switch Slowking' p=0.56 | alt: switch3 0.24, switch2 0.12 | FORCED
+T11  slowkinggalar 100% vs ogerponwellspring 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.50 | alt: switch2 0.28, switch0 0.20
+T12  gholdengo 100% vs slowkinggalar 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.60 | alt: switch2 0.19, switch0 0.18
+T13  slowkinggalar 100% vs landorustherian 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.44 | alt: switch2 0.30, switch0 0.23
+T14  gholdengo 100% vs slowkinggalar 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.51 | alt: switch2 0.23, switch0 0.22
+T15  slowkinggalar 100% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.46 | alt: switch2 0.28, switch0 0.23
+T16  gholdengo 100% vs gholdengo 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.54 | alt: switch0 0.21, switch2 0.21
+T17  slowkinggalar 50% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.53 | alt: switch2 0.25, switch0 0.19
+T18  gholdengo 100% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.67 | alt: switch2 0.17, switch0 0.15
+T19  slowkinggalar 75% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.25, switch0 0.20
+T20  gholdengo 100% vs greattusk 67% | legal=7 | -> switch4 '/choose switch Slowking' p=0.65 | alt: switch2 0.17, switch0 0.16
+T21  slowkinggalar 100% vs slowkinggalar 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.26, switch0 0.19
+T22  gholdengo 100% vs slowkinggalar 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.62 | alt: switch2 0.19, switch0 0.17
+T23  slowkinggalar 100% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.25, switch0 0.20
+T24  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.67 | alt: switch2 0.16, switch0 0.15
+T25  slowkinggalar 100% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.53 | alt: switch2 0.25, switch0 0.19
+T26  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.68 | alt: switch2 0.16, switch0 0.15
+T27  slowkinggalar 100% vs slowkinggalar 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.53 | alt: switch2 0.25, switch0 0.19
+T28  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.68 | alt: switch2 0.16, switch0 0.14
+T29  slowkinggalar 52% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.53 | alt: switch2 0.24, switch0 0.19
+T30  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.68 | alt: switch2 0.16, switch0 0.14
+T31  slowkinggalar 85% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.53 | alt: switch2 0.25, switch0 0.19
+T32  gholdengo 46% vs greattusk 73% | legal=7 | -> switch4 '/choose switch Slowking' p=0.67 | alt: switch2 0.16, switch0 0.15
+T33  slowkinggalar 100% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.24, switch0 0.20
+T34  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.64 | alt: switch2 0.17, switch0 0.15
+T35  slowkinggalar 100% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.24, switch0 0.19
+T36  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.64 | alt: switch2 0.17, switch0 0.15
+T37  slowkinggalar 100% vs kingambit 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.52 | alt: switch2 0.24, switch0 0.19
+T38  gholdengo 46% vs kingambit 100% | legal=7 | -> switch4 '/choose switch Slowking' p=0.58 | alt: switch2 0.18, switch0 0.16
+T38  slowkinggalar 0% vs kingambit 100% | legal=3 | -> switch3 '/choose switch Gholdengo' p=0.55 | alt: switch2 0.26, switch0 0.19 | FORCED
+T39  gholdengo 46% vs kingambit 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.45 | alt: switch0 0.34, move0 0.13
+T40  kingambit 100% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T41  gholdengo 46% vs landorustherian 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.53 | alt: switch0 0.41, move0 0.03
+T42  kingambit 100% vs kingambit 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T43  gholdengo 46% vs slowkinggalar 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.50 | alt: switch0 0.41, move0 0.03
+T44  kingambit 100% vs slowkinggalar 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T45  gholdengo 46% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch0 0.42, move0 0.03
+T46  kingambit 84% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T47  gholdengo 10% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch0 0.41, move0 0.02
+T48  kingambit 90% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.66 | alt: switch0 0.31, move2 0.01
+T49  gholdengo 10% vs slowkinggalar 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.50 | alt: switch0 0.40, move0 0.03
+T50  kingambit 96% vs kingambit 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T51  gholdengo 10% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch0 0.41, move0 0.02
+T52  kingambit 100% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.66 | alt: switch0 0.31, move2 0.01
+T53  gholdengo 10% vs greattusk 79% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch0 0.41, move0 0.04
+T54  kingambit 100% vs kingambit 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T55  gholdengo 10% vs ogerponwellspring 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch0 0.41, move0 0.04
+T56  kingambit 100% vs landorustherian 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.66 | alt: switch0 0.32, move2 0.01
+T57  gholdengo 10% vs landorustherian 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.53 | alt: switch0 0.41, move0 0.03
+T58  kingambit 88% vs ogerponwellspring 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.65 | alt: switch0 0.32, move2 0.01
+T59  gholdengo 10% vs ogerponwellspring 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch0 0.40, move0 0.06
+T60  kingambit 53% vs ogerponwellspring 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.62 | alt: switch0 0.34, move2 0.01
+T60  gholdengo 0% vs ogerponwellspring 100% | legal=2 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch0 0.49 | FORCED
+T61  kingambit 53% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.91 | alt: move2 0.04, move0 0.03
+T62  dragonite 100% vs ogerponwellspring 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.79 | alt: move0 0.18, move3 0.02
+T63  kingambit 33% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.90 | alt: move2 0.04, move0 0.03
+T64  dragonite 54% vs ogerponwellspring 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.76 | alt: move0 0.19, move3 0.03
+T65  kingambit 33% vs greattusk 85% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.04, move1 0.03
+T66  dragonite 54% vs gholdengo 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.63 | alt: move0 0.29, move3 0.06
+T67  kingambit 33% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.05, move1 0.03
+T68  dragonite 54% vs slowkinggalar 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.61 | alt: move0 0.25, move3 0.11
+T69  kingambit 33% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.04, move1 0.03
+T70  dragonite 34% vs ogerponwellspring 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.60 | alt: move0 0.36, move3 0.03
+T71  kingambit 33% vs gholdengo 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.87 | alt: move2 0.05, move1 0.03
+T72  dragonite 34% vs kingambit 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.76 | alt: move0 0.16, move3 0.05
+T73  kingambit 33% vs kingambit 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.88 | alt: move2 0.05, move1 0.03
+T74  dragonite 34% vs ogerponwellspring 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.61 | alt: move0 0.34, move3 0.03
+T75  kingambit 23% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.05, move1 0.03
+T76  dragonite 34% vs landorustherian 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.68 | alt: move0 0.27, move3 0.03
+T77  kingambit 23% vs greattusk 92% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.05, move1 0.03
+T78  dragonite 34% vs landorustherian 100% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.68 | alt: move0 0.27, move3 0.03
+T79  kingambit 23% vs ogerponwellspring 100% | legal=5 | -> switch0 '/choose switch Dragonite' p=0.89 | alt: move2 0.05, move1 0.03
+T80  dragonite 34% vs greattusk 98% | legal=5 | -> switch2 '/choose switch Kingambit' p=0.70 | alt: move0 0.21, move3 0.06
+T80  kingambit 0% vs greattusk 100% | legal=1 | -> switch0 '/choose switch Dragonite' p=1.00 | FORCED
+T81  dragonite 34% vs greattusk 100% | legal=4 | -> move0 '/choose move dragondance' p=0.77 | alt: move3 0.18, move2 0.04
+T82  dragonite 34% vs landorustherian 100% | legal=4 | -> move0 '/choose move dragondance' p=1.00 | alt: move3 0.00, move2 0.00
+T83  dragonite 34% vs slowkinggalar 100% | legal=4 | -> move0 '/choose move dragondance' p=0.99 | alt: move3 0.00, move2 0.00
+T84  dragonite 34% vs greattusk 100% | legal=4 | -> move0 '/choose move dragondance' p=1.00 | alt: move2 0.00, move3 0.00

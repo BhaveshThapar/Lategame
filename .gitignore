@@ -1,0 +1,50 @@
+# Local Showdown server (cloned, not vendored)
+third_party/
+
+# Self-bootstrapped conda (scripts/cluster/setup_umiacs.sh, only created when the
+# cluster has no conda module/install of its own -- e.g. UMIACS Nexus login nodes)
+/.miniforge3/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Data / artifacts (later milestones). Anchored to the repo root: an unanchored
+# `data/` also matches the `lategame/data/` source package and silently un-tracks it.
+/replays/
+/data/
+/checkpoints/
+*.log
+slurm-*.out
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code personal/local settings
+.claude/settings.local.json
+
+# Build-6 behavioral probe bulk artifacts (JSON summary + transcripts are committed)
+/results/behavior_probe_decisions.jsonl
+/results/behavior_probe_replays/
+# Build-8 obs/mask capture sidecar (large, regenerable from the probe run)
+/results/behavior_probe_obs.npz
+/results/behavior_probe8_decisions.jsonl
+/results/behavior_probe8_transcripts/
+/results/behavior_probe8_replays/
+# Bulk probe sidecars, any build (only the JSON summaries are committed)
+/results/behavior_probe*_decisions.jsonl
+/results/behavior_probe_decisions*.jsonl
+/results/behavior_probe*_transcripts/
+/results/behavior_probe_transcripts*/
+/results/behavior_probe*_replays/
+/results/behavior_probe_obs*.npz

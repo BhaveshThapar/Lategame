@@ -1,0 +1,21 @@
+{
+  "gate": "rpredict_gate_b",
+  "init": "checkpoints/offrl_scale_et_prior_s0.pt",
+  "n": 120,
+  "config": {
+    "determinizations": 1,
+    "opp_agg": "min",
+    "opp_cap": 6,
+    "blend": 0.0,
+    "shaped_coef": 3.0,
+    "seed": 0
+  },
+  "results": {
+    "search_vs_random": 0.8333333333333334,
+    "base_vs_heuristic": 0.44166666666666665,
+    "search_vs_heuristic": 0.4083333333333333,
+    "search_vs_base": 0.3416666666666667
+  },
+  "delta_vs_base_at_heuristic": -0.0333,
+  "verdict": "RED"
+}

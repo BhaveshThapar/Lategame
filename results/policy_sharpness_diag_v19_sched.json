@@ -1,0 +1,39 @@
+{
+  "policy": "checkpoints/ppo_ou_sched_s2/iter_49.pt",
+  "states": "results/behavior_probe_obs_v19.npz",
+  "n_rows": 1266,
+  "sharpness": {
+    "checkpoints/ppo_ou_x50_s0/iter_41.pt": {
+      "mean_entropy": 0.8175,
+      "mean_max_prob": 0.682,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.4647,
+      "frac_near_deterministic": 0.2701
+    },
+    "checkpoints/ppo_ou_sched_s2/iter_49.pt": {
+      "mean_entropy": 0.5793,
+      "mean_max_prob": 0.7878,
+      "mean_n_legal": 6.39,
+      "uniform_entropy": 1.7592,
+      "h_ratio": 0.3293,
+      "frac_near_deterministic": 0.4439
+    }
+  },
+  "win_rates": {
+    "greedy": 0.4333,
+    "sampled": 0.4367,
+    "greedy_minus_sampled": -0.0034
+  },
+  "opponent": "heuristic",
+  "n_battles": 300,
+  "loop_penalty": 4.0,
+  "thresholds": {
+    "soft_h_ratio": 0.4,
+    "sharp_h_ratio": 0.15,
+    "sampled_gap": 0.05
+  },
+  "verdict": "AMBIGUOUS",
+  "why": "h_ratio 0.329 sits between 0.15 and 0.4 and greedy - sampled -0.003 < 0.05: no pre-registered call -- decide on the trend across warm-start -> iter_01 -> best",
+  "note": "h_ratio = mean policy entropy / mean uniform-over-legal entropy. Eval is greedy (argmax) while rollout samples, so entropy can only hurt INDIRECTLY -- by keeping the distribution soft so the argmax lags. LIVE => run the ent/lr schedule."
+}

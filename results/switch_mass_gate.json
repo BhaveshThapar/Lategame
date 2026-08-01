@@ -1,0 +1,985 @@
+{
+  "thresholds": {
+    "run_k": 10,
+    "min_run_frac": 0.15,
+    "pair_min_count": 25,
+    "min_hp": 0.5,
+    "dex_wall_min": 1.0,
+    "dex_attacker_max": -1.0,
+    "min_rows_primary": 1000,
+    "min_rows_pair": 200,
+    "human_heavy": 0.4,
+    "match_tol": 0.1,
+    "amplify_delta": 0.2,
+    "amplify_ratio": 1.75,
+    "in_dist_high": 0.6,
+    "argmax_amp": 0.5,
+    "attacker_low": 0.3,
+    "bc_vs_awr_delta": 0.15,
+    "uniform_harness_tol": 1e-05,
+    "random_init_band": [
+      0.25,
+      0.65
+    ],
+    "seed_agreement": 2
+  },
+  "provenance": {
+    "bc_shard": {
+      "path": "data/gen9ou_v5_bc.npz",
+      "rows": 61723,
+      "obs_version": "v3-09831e17c378"
+    },
+    "rl_shard": {
+      "path": "data/gen9ou_v5_rl.npz",
+      "rows": 119996,
+      "obs_version": "v3-09831e17c378"
+    },
+    "loop_species": [
+      "corviknight",
+      "dragonite",
+      "gholdengo",
+      "greattusk",
+      "kingambit",
+      "slowkinggalar",
+      "tinglu",
+      "zamazenta"
+    ],
+    "loop_pairs": [
+      [
+        "corviknight",
+        "gholdengo"
+      ],
+      [
+        "corviknight",
+        "greattusk"
+      ],
+      [
+        "corviknight",
+        "kingambit"
+      ],
+      [
+        "corviknight",
+        "slowkinggalar"
+      ],
+      [
+        "gholdengo",
+        "corviknight"
+      ],
+      [
+        "gholdengo",
+        "gholdengo"
+      ],
+      [
+        "gholdengo",
+        "greattusk"
+      ],
+      [
+        "gholdengo",
+        "kingambit"
+      ],
+      [
+        "gholdengo",
+        "slowkinggalar"
+      ],
+      [
+        "greattusk",
+        "corviknight"
+      ],
+      [
+        "greattusk",
+        "gholdengo"
+      ],
+      [
+        "greattusk",
+        "greattusk"
+      ],
+      [
+        "greattusk",
+        "kingambit"
+      ],
+      [
+        "kingambit",
+        "corviknight"
+      ],
+      [
+        "kingambit",
+        "gholdengo"
+      ],
+      [
+        "kingambit",
+        "greattusk"
+      ],
+      [
+        "kingambit",
+        "kingambit"
+      ],
+      [
+        "kingambit",
+        "ragingbolt"
+      ],
+      [
+        "slowkinggalar",
+        "corviknight"
+      ],
+      [
+        "slowkinggalar",
+        "gholdengo"
+      ],
+      [
+        "slowkinggalar",
+        "greattusk"
+      ],
+      [
+        "slowkinggalar",
+        "kingambit"
+      ],
+      [
+        "slowkinggalar",
+        "ragingbolt"
+      ],
+      [
+        "slowkinggalar",
+        "slowkinggalar"
+      ],
+      [
+        "tinglu",
+        "gholdengo"
+      ],
+      [
+        "tinglu",
+        "kingambit"
+      ],
+      [
+        "zamazenta",
+        "gholdengo"
+      ]
+    ],
+    "loop_source": "decisions_jsonl",
+    "decisions_rows": 3753,
+    "limit": 0,
+    "device": "mps",
+    "note_mask": "shard masks are permissive synthesize_action_mask; shard-mask P is a floor on live-mask P"
+  },
+  "human": {
+    "bc_shard": {
+      "overall": {
+        "n": 61723,
+        "human_rate": 0.18359444615459392,
+        "uniform_mass": 0.46852801649149844
+      },
+      "loop_species": {
+        "n": 9728,
+        "human_rate": 0.205078125,
+        "uniform_mass": 0.45259090923924394
+      },
+      "loop_species_any_hp": {
+        "n": 13216,
+        "human_rate": 0.1977905569007264,
+        "uniform_mass": 0.44773644980591104
+      },
+      "dex_wall": {
+        "n": 10951,
+        "human_rate": 0.21039174504611452,
+        "uniform_mass": 0.48339924744134405
+      },
+      "dex_attacker": {
+        "n": 7998,
+        "human_rate": 0.1660415103775944,
+        "uniform_mass": 0.4712750112131207
+      },
+      "loop_pair": {
+        "n": 1534,
+        "human_rate": 0.18904823989569752,
+        "uniform_mass": 0.4378432772500569
+      },
+      "decode": {
+        "one_own_active_frac": 1.0,
+        "opp_active_missing_frac": 0.0,
+        "force_switch_frac": 0.0
+      }
+    },
+    "rl_shard": {
+      "overall": {
+        "n": 119996,
+        "human_rate": 0.18905630187672923,
+        "uniform_mass": 0.454137178249857
+      },
+      "loop_species": {
+        "n": 19077,
+        "human_rate": 0.21046286103685066,
+        "uniform_mass": 0.4402168405234925
+      },
+      "loop_species_any_hp": {
+        "n": 26430,
+        "human_rate": 0.20007567158531972,
+        "uniform_mass": 0.4318905434541076
+      },
+      "dex_wall": {
+        "n": 21347,
+        "human_rate": 0.21862556799550287,
+        "uniform_mass": 0.4732869419218789
+      },
+      "dex_attacker": {
+        "n": 15116,
+        "human_rate": 0.17630325482931994,
+        "uniform_mass": 0.4575090464429575
+      },
+      "loop_pair": {
+        "n": 3055,
+        "human_rate": 0.20621931260229132,
+        "uniform_mass": 0.4284139973501676
+      },
+      "decode": {
+        "one_own_active_frac": 1.0,
+        "opp_active_missing_frac": 0.0,
+        "force_switch_frac": 0.0
+      }
+    }
+  },
+  "replay_log_rate": {
+    "n_replays": 2760,
+    "n_decisions": 123347,
+    "voluntary_switch_rate": 0.2113549579641175,
+    "first_reveal_share": 0.430686612965094,
+    "loop_species_switch_rate": 0.21894892672094746,
+    "excluded": {
+      "excluded_forced": 17976,
+      "excluded_from": 6750,
+      "excluded_drag": 894
+    },
+    "shard_rate_for_comparison": 0.18905630187672923
+  },
+  "arms": {
+    "bc_s0": {
+      "checkpoint": "checkpoints/bc_gen9ou_v5_s0.pt",
+      "train_shard": "bc_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.21254709681118827,
+            "top1_switch_rate": 0.042739335417915525
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.22921616619317903,
+            "top1_switch_rate": 0.05643503289473684
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.22318590435068447,
+            "top1_switch_rate": 0.04766949152542373
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.22938489399988943,
+            "top1_switch_rate": 0.052689252123093784
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.20238704033485538,
+            "top1_switch_rate": 0.03400850212553138
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.23366764140898308,
+            "top1_switch_rate": 0.04302477183833116
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.20430370039951268,
+            "top1_switch_rate": 0.04259308643621454
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.21958865123424112,
+            "top1_switch_rate": 0.054358651779629924
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.21032759306972246,
+            "top1_switch_rate": 0.045062429057888764
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.2222947979258562,
+            "top1_switch_rate": 0.05106103902187661
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.19865378222041716,
+            "top1_switch_rate": 0.037840698597512566
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.22479160636366033,
+            "top1_switch_rate": 0.04091653027823241
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.205078125,
+          "P": 0.22921616619317903,
+          "T": 0.05643503289473684,
+          "P_pair": 0.23366764140898308,
+          "attacker_mass": 0.20238704033485538,
+          "P_minus_H": 0.024138041193179027
+        }
+      }
+    },
+    "bc_s1": {
+      "checkpoint": "checkpoints/bc_gen9ou_v5_s1.pt",
+      "train_shard": "bc_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.1506444397089816,
+            "top1_switch_rate": 0.031009510231194207
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.1650108677563711,
+            "top1_switch_rate": 0.04296875
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.15756081540183084,
+            "top1_switch_rate": 0.03526029055690073
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.16656887090738612,
+            "top1_switch_rate": 0.045018719751620855
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.1377840139344253,
+            "top1_switch_rate": 0.020630157539384845
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.16844523797796154,
+            "top1_switch_rate": 0.03455019556714472
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.14452895529063356,
+            "top1_switch_rate": 0.03095936531217707
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.15864726249751743,
+            "top1_switch_rate": 0.04204015306389894
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.14868303093757423,
+            "top1_switch_rate": 0.034203556564510025
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.162645626114799,
+            "top1_switch_rate": 0.04206680095563779
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.13548977255211334,
+            "top1_switch_rate": 0.02474199523683514
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.16183355441244082,
+            "top1_switch_rate": 0.03436988543371522
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.205078125,
+          "P": 0.1650108677563711,
+          "T": 0.04296875,
+          "P_pair": 0.16844523797796154,
+          "attacker_mass": 0.1377840139344253,
+          "P_minus_H": -0.04006725724362889
+        }
+      }
+    },
+    "bc_s2": {
+      "checkpoint": "checkpoints/bc_gen9ou_v5_s2.pt",
+      "train_shard": "bc_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.16337895369744673,
+            "top1_switch_rate": 0.0321112065194498
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.18643819894093394,
+            "top1_switch_rate": 0.04368832236842105
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.18039813299159296,
+            "top1_switch_rate": 0.036395278450363194
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.19224797533589205,
+            "top1_switch_rate": 0.046571089398228474
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.14176686537170635,
+            "top1_switch_rate": 0.02188047011752938
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.19639698173382975,
+            "top1_switch_rate": 0.03455019556714472
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.1557397142885649,
+            "top1_switch_rate": 0.03260942031401047
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.17585072180914185,
+            "top1_switch_rate": 0.04256434449861089
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.1673390492269666,
+            "top1_switch_rate": 0.035262958758986
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.1856360001512974,
+            "top1_switch_rate": 0.045908090129760624
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.1389954051147684,
+            "top1_switch_rate": 0.026329716856311195
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.18840269677909824,
+            "top1_switch_rate": 0.03404255319148936
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.205078125,
+          "P": 0.18643819894093394,
+          "T": 0.04368832236842105,
+          "P_pair": 0.19639698173382975,
+          "attacker_mass": 0.14176686537170635,
+          "P_minus_H": -0.01863992605906606
+        }
+      }
+    },
+    "offrl_s0": {
+      "checkpoint": "checkpoints/offrl_gen9ou_v5_s0.pt",
+      "train_shard": "rl_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.1731428705496385,
+            "top1_switch_rate": 0.02916254880676571
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.1845190931968946,
+            "top1_switch_rate": 0.040501644736842105
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.17810696950579857,
+            "top1_switch_rate": 0.03336864406779661
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.19592833836805124,
+            "top1_switch_rate": 0.0389918728883207
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.1602081842943614,
+            "top1_switch_rate": 0.022380595148787197
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.18337674958781436,
+            "top1_switch_rate": 0.03129074315514994
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.16728514466493632,
+            "top1_switch_rate": 0.030742691423047436
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.1783650550051608,
+            "top1_switch_rate": 0.040939351051003825
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.16902192341331462,
+            "top1_switch_rate": 0.03352251229663261
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.1919116080466006,
+            "top1_switch_rate": 0.040052466388719725
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.15792372925438258,
+            "top1_switch_rate": 0.027454353003440065
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.18156351493173986,
+            "top1_switch_rate": 0.03011456628477905
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.21046286103685066,
+          "P": 0.1783650550051608,
+          "T": 0.040939351051003825,
+          "P_pair": 0.18156351493173986,
+          "attacker_mass": 0.15792372925438258,
+          "P_minus_H": -0.03209780603168985
+        }
+      }
+    },
+    "offrl_s1": {
+      "checkpoint": "checkpoints/offrl_gen9ou_v5_s1.pt",
+      "train_shard": "rl_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.15141618701918796,
+            "top1_switch_rate": 0.024707159405732062
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.16921576257255455,
+            "top1_switch_rate": 0.034642269736842105
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.16280981185684493,
+            "top1_switch_rate": 0.028374697336561745
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.1706322326129654,
+            "top1_switch_rate": 0.03205186740936901
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.13446603690439743,
+            "top1_switch_rate": 0.019504876219054765
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.16897507196608888,
+            "top1_switch_rate": 0.024771838331160364
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.1455391175370952,
+            "top1_switch_rate": 0.02578419280642688
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.16116025845848458,
+            "top1_switch_rate": 0.03370550925197882
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.1522693821155798,
+            "top1_switch_rate": 0.027430949678395763
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.16764238756574215,
+            "top1_switch_rate": 0.03354101278868225
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.13189778557767534,
+            "top1_switch_rate": 0.02308811854988092
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.1649407776119381,
+            "top1_switch_rate": 0.025204582651391163
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.21046286103685066,
+          "P": 0.16116025845848458,
+          "T": 0.03370550925197882,
+          "P_pair": 0.1649407776119381,
+          "attacker_mass": 0.13189778557767534,
+          "P_minus_H": -0.04930260257836608
+        }
+      }
+    },
+    "offrl_s2": {
+      "checkpoint": "checkpoints/offrl_gen9ou_v5_s2.pt",
+      "train_shard": "rl_shard",
+      "per_shard": {
+        "bc_shard": {
+          "overall": {
+            "n": 61723,
+            "human_rate": 0.18359444615459392,
+            "uniform_mass": 0.46852801649149844,
+            "policy_mass": 0.1720504261792921,
+            "top1_switch_rate": 0.030734086159130307
+          },
+          "loop_species": {
+            "n": 9728,
+            "human_rate": 0.205078125,
+            "uniform_mass": 0.45259090923924394,
+            "policy_mass": 0.19528658168435847,
+            "top1_switch_rate": 0.043791118421052634
+          },
+          "loop_species_any_hp": {
+            "n": 13216,
+            "human_rate": 0.1977905569007264,
+            "uniform_mass": 0.44773644980591104,
+            "policy_mass": 0.18756359324695254,
+            "top1_switch_rate": 0.03624394673123486
+          },
+          "dex_wall": {
+            "n": 10951,
+            "human_rate": 0.21039174504611452,
+            "uniform_mass": 0.48339924744134405,
+            "policy_mass": 0.19799392854625564,
+            "top1_switch_rate": 0.04127476942744955
+          },
+          "dex_attacker": {
+            "n": 7998,
+            "human_rate": 0.1660415103775944,
+            "uniform_mass": 0.4712750112131207,
+            "policy_mass": 0.16265924928888068,
+            "top1_switch_rate": 0.022005501375343836
+          },
+          "loop_pair": {
+            "n": 1534,
+            "human_rate": 0.18904823989569752,
+            "uniform_mass": 0.4378432772500569,
+            "policy_mass": 0.20168364695863877,
+            "top1_switch_rate": 0.038461538461538464
+          }
+        },
+        "rl_shard": {
+          "overall": {
+            "n": 119996,
+            "human_rate": 0.18905630187672923,
+            "uniform_mass": 0.454137178249857,
+            "policy_mass": 0.1669998868801731,
+            "top1_switch_rate": 0.03205106836894563
+          },
+          "loop_species": {
+            "n": 19077,
+            "human_rate": 0.21046286103685066,
+            "uniform_mass": 0.4402168405234925,
+            "policy_mass": 0.18931067188280107,
+            "top1_switch_rate": 0.04361272736803481
+          },
+          "loop_species_any_hp": {
+            "n": 26430,
+            "human_rate": 0.20007567158531972,
+            "uniform_mass": 0.4318905434541076,
+            "policy_mass": 0.17933632043629064,
+            "top1_switch_rate": 0.03556564510026485
+          },
+          "dex_wall": {
+            "n": 21347,
+            "human_rate": 0.21862556799550287,
+            "uniform_mass": 0.4732869419218789,
+            "policy_mass": 0.19588217514057993,
+            "top1_switch_rate": 0.04267578582470605
+          },
+          "dex_attacker": {
+            "n": 15116,
+            "human_rate": 0.17630325482931994,
+            "uniform_mass": 0.4575090464429575,
+            "policy_mass": 0.15921534054193207,
+            "top1_switch_rate": 0.026858957396136543
+          },
+          "loop_pair": {
+            "n": 3055,
+            "human_rate": 0.20621931260229132,
+            "uniform_mass": 0.4284139973501676,
+            "policy_mass": 0.19503618399808742,
+            "top1_switch_rate": 0.03666121112929623
+          }
+        }
+      },
+      "classification": {
+        "verdict": "H2",
+        "argmax_amp": false,
+        "attacker_ok": true,
+        "flags": {
+          "amplified": false,
+          "matched": true,
+          "human_heavy": false,
+          "in_dist_live": false
+        },
+        "margins": {
+          "H": 0.21046286103685066,
+          "P": 0.18931067188280107,
+          "T": 0.04361272736803481,
+          "P_pair": 0.19503618399808742,
+          "attacker_mass": 0.15921534054193207,
+          "P_minus_H": -0.021152189154049594
+        }
+      }
+    }
+  },
+  "controls": {
+    "random_init_mass": {
+      "bc_shard": 0.542257369118423,
+      "rl_shard": 0.5267957658108465
+    },
+    "attacker": {
+      "bc": [
+        0.20238704033485538,
+        0.1377840139344253,
+        0.14176686537170635
+      ],
+      "offrl": [
+        0.15792372925438258,
+        0.13189778557767534,
+        0.15921534054193207
+      ]
+    },
+    "harness_identity_max_err": 1.1102230246251565e-16
+  },
+  "families": {
+    "bc": {
+      "verdict": "H2",
+      "seed_disagreement": false,
+      "seeds": [
+        "H2",
+        "H2",
+        "H2"
+      ]
+    },
+    "offrl": {
+      "verdict": "H2",
+      "seed_disagreement": false,
+      "seeds": [
+        "H2",
+        "H2",
+        "H2"
+      ]
+    }
+  },
+  "bc_vs_awr": {
+    "shard": "rl_shard",
+    "delta_primary_mass": -0.008416883398151331,
+    "awr_side": false
+  },
+  "checks": {
+    "mask_invariant_bc_shard": true,
+    "sample_floor_bc_shard": true,
+    "mask_invariant_rl_shard": true,
+    "sample_floor_rl_shard": true,
+    "control_harness": true,
+    "control_random_init": true
+  },
+  "verdict": "bc=H2; offrl=H2"
+}

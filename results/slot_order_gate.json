@@ -1,0 +1,95 @@
+{
+  "n_replays": 200,
+  "train": {
+    "n_move_decisions": 7340.0,
+    "n_kept": 7340.0,
+    "move_label_scramble_rate": 0.25899182561307904,
+    "mon_order_scramble_rate": 0.3070844686648501,
+    "out_of_insertion4_rate": 0.0,
+    "out_of_canonical4_rate": 0.0,
+    "povs": 400.0,
+    "parse_rate": 1.0
+  },
+  "live_pool": {
+    "n_teams": 12.0,
+    "n_mons": 72.0,
+    "mon_scramble_rate": 0.9166666666666666,
+    "mean_displacement": 0.9652777777777778
+  },
+  "new_drop_delta": 0.0,
+  "thresholds": {
+    "min_label_scramble": 0.1,
+    "min_live_scramble": 0.5,
+    "max_new_drop_delta": 0.005,
+    "min_decisions": 1000
+  },
+  "checks": {
+    "scramble_exists": true,
+    "canonical_drop_delta_ok": true,
+    "sample_ok": true
+  },
+  "verdict": "PASS",
+  "b1": {
+    "bc_val_acc": {
+      "s0": 0.647,
+      "s1": 0.6455,
+      "s2": 0.6494
+    },
+    "mean": 0.6473,
+    "v4_baseline_single_seed": 0.636,
+    "bc_samples": 61723,
+    "rl_turns": 119996,
+    "v4_reference": {
+      "bc_samples": 61729,
+      "rl_turns": 120001
+    },
+    "thresholds": {
+      "kill_below": 0.61,
+      "pass_at": 0.63
+    },
+    "verdict": "PASS"
+  },
+  "b2": {
+    "vs_random": {
+      "s0": 0.02,
+      "s1": 0.11,
+      "s2": 0.06
+    },
+    "vs_random_mean": 0.063,
+    "vs_heuristic_best_seed_n300": 0.01,
+    "awr_value_mae": {
+      "s0": 0.476,
+      "s1": 0.554,
+      "s2": 0.452
+    },
+    "harness": {
+      "mirror": 0.493,
+      "random": 0.03,
+      "maxbasepower": 0.06,
+      "simpleheuristics": 0.643
+    },
+    "posthoc_bc_vs_random": {
+      "s0": 0.06,
+      "s1": 0.03,
+      "n": 100,
+      "note": "pure BC craters identically -> failure is upstream of AWR"
+    },
+    "references": {
+      "v1_vs_random": 0.495,
+      "v3_vs_random": [
+        0.13,
+        0.45
+      ],
+      "v4_vs_random": [
+        0.05,
+        0.27
+      ],
+      "v4_vs_heuristic": 0.003
+    },
+    "thresholds": {
+      "functionality_red_below": 0.55,
+      "strength_red_below": 0.05
+    },
+    "verdict": "RED"
+  }
+}

@@ -1,0 +1,137 @@
+=== offrl | battle-gen9ou-101929 | won=False turns=130 | preview=/team 126543
+team packed: ironmoth,greattusk,kingambit,gholdengo,corviknight,dragapult | live: ironmoth,greattusk,kingambit,gholdengo,corviknight,dragapult | ORDER MATCH
+T1   ironmoth 100% vs greattusk 100% | legal=13 | -> tera0 '/choose move energyball terastallize' p=0.67 | alt: tera2 0.17, tera3 0.11
+T2   ironmoth 100% vs gholdengo 73% | legal=9 | -> move0 '/choose move energyball' p=0.53 | alt: switch4 0.13, switch1 0.10
+T3   ironmoth 34% vs gholdengo 47% | legal=9 | -> move0 '/choose move energyball' p=0.47 | alt: switch4 0.15, switch1 0.12
+T4   ironmoth 34% vs dragonite 95% | legal=9 | -> move0 '/choose move energyball' p=0.58 | alt: switch4 0.11, switch1 0.09
+T4   ironmoth 0% vs dragonite 95% | legal=5 | -> switch4 '/choose switch Corviknight' p=0.24 | alt: switch2 0.23, switch3 0.20 | FORCED
+T5   corviknight 100% vs dragonite 95% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.29, switch2 0.20
+T6   greattusk 100% vs greattusk 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.34 | alt: switch3 0.23, switch5 0.20
+T7   corviknight 100% vs zamazenta 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.27, switch5 0.22
+T8   greattusk 99% vs zamazenta 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.22, switch5 0.20
+T9   corviknight 77% vs zamazenta 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.27, switch5 0.23
+T10  greattusk 96% vs zamazenta 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.22, switch5 0.20
+T11  corviknight 83% vs zamazenta 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.29 | alt: switch3 0.27, switch5 0.23
+T12  greattusk 94% vs zamazenta 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.22, switch5 0.20
+T13  corviknight 85% vs zamazenta 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.29 | alt: switch3 0.27, switch5 0.23
+T14  greattusk 92% vs zamazenta 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.22, switch5 0.20
+T15  corviknight 91% vs gholdengo 47% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.32 | alt: switch5 0.25, switch3 0.25
+T16  greattusk 30% vs gholdengo 47% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.29 | alt: switch5 0.19, switch3 0.19
+T17  corviknight 97% vs kingambit 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.26, switch2 0.23
+T18  greattusk 36% vs greattusk 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.22, switch5 0.20
+T19  corviknight 69% vs greattusk 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.30 | alt: switch3 0.26, switch5 0.23
+T20  greattusk 43% vs rotomwash 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.30 | alt: switch3 0.22, switch5 0.18
+T21  corviknight 75% vs greattusk 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.29 | alt: switch3 0.27, switch5 0.24
+T22  greattusk 49% vs greattusk 100% | legal=8 | -> switch4 '/choose switch Corviknight' p=0.35 | alt: switch3 0.20, switch5 0.19
+T23  corviknight 69% vs zamazenta 100% | legal=8 | -> switch1 '/choose switch Great Tusk' p=0.28 | alt: switch3 0.27, switch5 0.25
+T24  greattusk 52% vs kingambit 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.34 | alt: switch4 0.22, switch3 0.17
+T25  greattusk 58% vs dragonite 76% | legal=8 | -> move2 '/choose move rapidspin' p=0.90 | alt: switch4 0.04, switch3 0.03
+T26  greattusk 64% vs gholdengo 47% | legal=8 | -> move2 '/choose move rapidspin' p=0.80 | alt: switch4 0.08, switch3 0.05
+T27  greattusk 71% vs zamazenta 92% | legal=8 | -> move2 '/choose move rapidspin' p=0.86 | alt: switch4 0.06, switch3 0.03
+T28  greattusk 77% vs greattusk 93% | legal=8 | -> move2 '/choose move rapidspin' p=0.87 | alt: switch4 0.05, switch3 0.03
+T29  greattusk 83% vs kingambit 99% | legal=8 | -> move2 '/choose move rapidspin' p=0.89 | alt: switch4 0.03, switch3 0.03
+T30  greattusk 89% vs greattusk 87% | legal=8 | -> move2 '/choose move rapidspin' p=0.90 | alt: switch4 0.04, switch3 0.02
+T31  greattusk 95% vs kingambit 98% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch3 0.02
+T32  greattusk 100% vs gholdengo 47% | legal=8 | -> move2 '/choose move rapidspin' p=0.88 | alt: switch4 0.04, switch3 0.03
+T33  greattusk 8% vs gholdengo 47% | legal=8 | -> move2 '/choose move rapidspin' p=0.88 | alt: switch4 0.04, switch5 0.03
+T34  greattusk 15% vs rotomwash 88% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch5 0.02
+T35  greattusk 21% vs gholdengo 47% | legal=8 | -> move2 '/choose move rapidspin' p=0.89 | alt: switch4 0.04, switch5 0.03
+T36  greattusk 27% vs rotomwash 75% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.03, switch5 0.02
+T37  greattusk 33% vs dragonite 57% | legal=8 | -> move2 '/choose move rapidspin' p=0.95 | alt: switch4 0.02, switch3 0.01
+T38  greattusk 39% vs dragonite 88% | legal=8 | -> move2 '/choose move rapidspin' p=0.96 | alt: switch4 0.01, switch3 0.01
+T39  greattusk 46% vs gholdengo 47% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T40  greattusk 52% vs gholdengo 98% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T41  greattusk 58% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T42  greattusk 64% vs kingambit 98% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch4 0.02, switch3 0.02
+T43  greattusk 70% vs greattusk 81% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch5 0.02
+T44  greattusk 65% vs greattusk 74% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch4 0.02, switch5 0.02
+T45  greattusk 71% vs zamazenta 85% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch5 0.02
+T46  greattusk 77% vs greattusk 68% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch5 0.02
+T47  greattusk 83% vs rotomwash 63% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch4 0.02, switch5 0.02
+T48  greattusk 89% vs zamazenta 78% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch5 0.02
+T49  greattusk 96% vs greattusk 61% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch5 0.02
+T50  greattusk 100% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch5 0.02
+T51  greattusk 100% vs dragonite 67% | legal=8 | -> move2 '/choose move rapidspin' p=0.95 | alt: switch4 0.01, switch3 0.01
+T52  greattusk 100% vs dragonite 90% | legal=8 | -> move2 '/choose move rapidspin' p=0.96 | alt: switch4 0.01, switch3 0.01
+T53  greattusk 100% vs zamazenta 70% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.02, switch3 0.02
+T54  greattusk 100% vs kingambit 97% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch3 0.02, switch4 0.02
+T55  greattusk 100% vs dragonite 69% | legal=8 | -> move2 '/choose move rapidspin' p=0.95 | alt: switch4 0.01, switch3 0.01
+T56  greattusk 76% vs dragonite 50% | legal=8 | -> move2 '/choose move rapidspin' p=0.95 | alt: switch4 0.02, switch3 0.01
+T57  greattusk 51% vs dragonite 31% | legal=8 | -> move2 '/choose move rapidspin' p=0.95 | alt: switch4 0.02, switch3 0.01
+T58  greattusk 57% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T59  greattusk 63% vs greattusk 55% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.03, switch3 0.02
+T60  greattusk 70% vs zamazenta 55% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch3 0.02
+T61  greattusk 76% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T62  greattusk 82% vs greattusk 49% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch3 0.02
+T63  greattusk 88% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch5 0.02
+T64  greattusk 94% vs kingambit 95% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch3 0.02, switch4 0.02
+T65  greattusk 67% vs kingambit 94% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch3 0.02, switch4 0.02
+T66  greattusk 40% vs kingambit 93% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch3 0.02, switch4 0.02
+T67  greattusk 46% vs dragonite 11% | legal=8 | -> move2 '/choose move rapidspin' p=0.94 | alt: switch4 0.02, switch3 0.02
+T68  greattusk 53% vs rotomwash 50% | legal=8 | -> move2 '/choose move rapidspin' p=0.93 | alt: switch4 0.03, switch3 0.02
+T69  greattusk 59% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.91 | alt: switch4 0.03, switch3 0.02
+T70  greattusk 65% vs rotomwash 37% | legal=8 | -> move2 '/choose move rapidspin' p=0.92 | alt: switch4 0.03, switch3 0.02
+T71  greattusk 71% vs gholdengo 100% | legal=8 | -> move2 '/choose move rapidspin' p=0.90 | alt: switch4 0.04, switch5 0.02
+T71  greattusk 0% vs gholdengo 100% | legal=4 | -> switch4 '/choose switch Corviknight' p=0.36 | alt: switch3 0.24, switch5 0.23 | FORCED
+T72  corviknight 69% vs gholdengo 100% | legal=7 | -> switch5 '/choose switch Dragapult' p=0.38 | alt: switch3 0.35, switch2 0.26
+T73  dragapult 100% vs greattusk 55% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.51 | alt: switch3 0.27, switch2 0.21
+T74  corviknight 75% vs gholdengo 100% | legal=7 | -> switch5 '/choose switch Dragapult' p=0.38 | alt: switch3 0.35, switch2 0.26
+T75  dragapult 12% vs gholdengo 100% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.37 | alt: switch3 0.31, switch2 0.29
+T76  corviknight 81% vs greattusk 61% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.37 | alt: switch5 0.31, switch2 0.29
+T77  gholdengo 100% vs zamazenta 62% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.49 | alt: switch2 0.25, switch5 0.24
+T78  corviknight 88% vs greattusk 68% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.37 | alt: switch5 0.31, switch2 0.29
+T79  gholdengo 100% vs gholdengo 100% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.46 | alt: switch2 0.29, switch5 0.23
+T80  corviknight 50% vs gholdengo 100% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.36 | alt: switch5 0.35, switch2 0.27
+T81  gholdengo 100% vs rotomwash 43% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.47 | alt: switch2 0.26, switch5 0.25
+T82  corviknight 56% vs rotomwash 50% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.36 | alt: switch5 0.34, switch2 0.28
+T83  gholdengo 100% vs rotomwash 56% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.47 | alt: switch2 0.26, switch5 0.25
+T84  corviknight 22% vs rotomwash 62% | legal=7 | -> switch3 '/choose switch Gholdengo' p=0.36 | alt: switch5 0.34, switch2 0.28
+T85  gholdengo 68% vs gholdengo 100% | legal=7 | -> switch4 '/choose switch Corviknight' p=0.46 | alt: switch2 0.29, switch5 0.23
+T85  corviknight 0% vs gholdengo 100% | legal=3 | -> switch3 '/choose switch Gholdengo' p=0.37 | alt: switch5 0.35, switch2 0.28 | FORCED
+T86  gholdengo 68% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.55 | alt: switch5 0.41, move2 0.02
+T87  kingambit 90% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.41, move2 0.01
+T88  gholdengo 68% vs rotomwash 68% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.45, move0 0.02
+T89  kingambit 96% vs kingambit 99% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.40, move2 0.01
+T90  gholdengo 68% vs zamazenta 68% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.46, move2 0.01
+T91  kingambit 100% vs greattusk 74% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T92  gholdengo 68% vs greattusk 80% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.46, move2 0.01
+T93  kingambit 100% vs greattusk 86% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T94  gholdengo 62% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.55 | alt: switch5 0.41, move0 0.02
+T95  kingambit 100% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.41, move2 0.01
+T96  gholdengo 56% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.55 | alt: switch5 0.41, move0 0.02
+T97  kingambit 100% vs kingambit 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T98  gholdengo 50% vs kingambit 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.45, move2 0.02
+T99  kingambit 100% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.41, move2 0.01
+T100 gholdengo 44% vs kingambit 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.50 | alt: switch5 0.47, move2 0.01
+T101 kingambit 100% vs zamazenta 74% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T102 gholdengo 21% vs zamazenta 80% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.46, move2 0.02
+T103 kingambit 91% vs zamazenta 86% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T104 gholdengo 15% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.55 | alt: switch5 0.41, move2 0.02
+T105 kingambit 91% vs zamazenta 93% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.58 | alt: switch5 0.40, move2 0.01
+T106 gholdengo 9% vs greattusk 92% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.51 | alt: switch5 0.46, move2 0.02
+T107 kingambit 91% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.41, move2 0.01
+T108 gholdengo 3% vs gholdengo 100% | legal=6 | -> switch2 '/choose switch Kingambit' p=0.55 | alt: switch5 0.40, move2 0.02
+T109 kingambit 67% vs gholdengo 100% | legal=6 | -> switch3 '/choose switch Gholdengo' p=0.57 | alt: switch5 0.41, move2 0.01
+T109 gholdengo 0% vs kingambit 100% | legal=2 | -> switch2 '/choose switch Kingambit' p=0.52 | alt: switch5 0.48 | FORCED
+T110 kingambit 61% vs kingambit 100% | legal=5 | -> switch5 '/choose switch Dragapult' p=0.94 | alt: move2 0.03, move1 0.02
+T110 dragapult 0% vs kingambit 100% | legal=1 | -> switch2 '/choose switch Kingambit' p=1.00 | FORCED
+T111 kingambit 55% vs kingambit 100% | legal=4 | -> move2 '/choose move suckerpunch' p=0.50 | alt: move1 0.22, move0 0.18
+T112 kingambit 43% vs kingambit 100% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move1 0.00, move0 0.00
+T113 kingambit 29% vs kingambit 82% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T114 kingambit 35% vs zamazenta 99% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T115 kingambit 41% vs gholdengo 100% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T116 kingambit 47% vs gholdengo 100% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T117 kingambit 53% vs greattusk 99% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T118 kingambit 60% vs gholdengo 100% | legal=4 | -> move2 '/choose move suckerpunch' p=1.00 | alt: move0 0.00, move1 0.00
+T119 kingambit 66% vs gholdengo 100% | legal=3 | -> move0 '/choose move ironhead' p=0.69 | alt: move1 0.17, move3 0.14
+T120 kingambit 46% vs gholdengo 63% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.01
+T121 kingambit 52% vs gholdengo 24% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T122 kingambit 59% vs gholdengo 36% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T123 kingambit 65% vs gholdengo 48% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T124 kingambit 71% vs greattusk 56% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T125 kingambit 69% vs greattusk 15% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.00, move3 0.00
+T126 kingambit 75% vs rotomwash 55% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T127 kingambit 75% vs rotomwash 53% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move1 0.01, move3 0.00
+T128 kingambit 75% vs zamazenta 99% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move3 0.00, move1 0.00
+T129 kingambit 66% vs zamazenta 77% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move3 0.00, move1 0.00
+T130 kingambit 57% vs zamazenta 54% | legal=3 | -> move0 '/choose move ironhead' p=0.99 | alt: move3 0.00, move1 0.00
