@@ -87,10 +87,22 @@ class PPOConfig:
     value_coef: float = 0.5
     max_grad_norm: float = 0.5
     target_kl: float = 0.03  # early-stop the epoch loop past 1.5x this
+    # Build 24: the anneal HORIZON, decoupled from ``iters``. ``None`` == ``iters``, which is the
+    # Build 19-23 behavior. This exists because raising ``iters`` alone silently rescales BOTH
+    # schedules: at iteration 40, v22 (50-budget) ran lr 9.08e-05 / ent 0.0020 while v23b
+    # (80-budget) ran lr 1.51e-04 / ent 0.0051, and at iteration 50 v22 was frozen at its finals
+    # while v23b was still at lr 1.26e-04. So "more iters" is really three changes at once, and
+    # a strength difference between budgets cannot be attributed without pinning this.
+    anneal_iters: int | None = None
     hl_gauss_sigma_bins: float = 0.75
     device: str = "auto"
     seed: int = 0
     weights: RewardWeights = field(default_factory=RewardWeights)
+
+    @property
+    def anneal_horizon(self) -> int:
+        """Iterations the lr/ent schedules span -- ``anneal_iters`` if pinned, else ``iters``."""
+        return self.anneal_iters or self.iters
 
 
 def anneal(start: float, final: float | None, iteration: int, iters: int) -> float:
@@ -385,10 +397,14 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
         # Build 19: linear ent_coef / lr schedules. Both default to None (constant), so an
         # unscheduled run is identical to Build 18. ``replace`` keeps ppo_update pure -- it
         # reads config.ent_coef, so hand it a config that already carries this iteration's value.
+        # Build 24: horizon defaults to ``iters`` (Build 19-23 behavior). Pinning it SHORTER holds
+        # both schedules at their finals past that point -- ``anneal`` clamps the iteration -- which
+        # is what separates "more updates" from "a slower anneal".
+        horizon = config.anneal_horizon
         for group in optimizer.param_groups:
-            group["lr"] = anneal(config.lr, config.lr_final, k, config.iters)
+            group["lr"] = anneal(config.lr, config.lr_final, k, horizon)
         iter_config = replace(
-            config, ent_coef=anneal(config.ent_coef, config.ent_coef_final, k, config.iters)
+            config, ent_coef=anneal(config.ent_coef, config.ent_coef_final, k, horizon)
         )
         stats = ppo_update(
             model, optimizer, buffer, advantages, returns, centers, sigma, iter_config, device

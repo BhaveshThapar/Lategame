@@ -54,6 +54,9 @@ ARM_FIELDS = (
     # Build 23: absent from v20-v22 gate files, so those still pool (None == None). Present from
     # here on, because two seeds run at different KL budgets are two experiments, not one arm.
     "target_kl",
+    # Build 24: two seeds annealed over different horizons are two experiments, even at equal
+    # `iters`. Absent from v20-v23 gate files, so those still pool (None == None).
+    "anneal_iters",
     "iters",
     "games_per_opp",
     "eval_n",
