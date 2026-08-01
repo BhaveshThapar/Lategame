@@ -1978,6 +1978,104 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     `offrl_gen9ou_wide_s0`, scored against `v23b` in one gate. That resolves which half of the raise
     did the work, or whether it needs both.
 
+- **Build 24 — PRE-REGISTERED (written 2026-08-01, BEFORE running). WHICH HALF OF THE BUDGET RAISE
+  DID THE WORK?**
+  - **Lever: the budget raise Build 23 made accidentally**, decomposed. Build 23 moved `target_kl`
+    0.03 → 0.06 **and** `iters` 50 → 80 together, and `v23b` came out at **0.5578**, +0.059 over the
+    best prior scoring and the first thing in five builds to clear the ±0.027 cross-run noise floor.
+    That total is not attributable — two levers, and a cross-run comparison. Build 24 makes it
+    attributable and splits it.
+  - **DESIGN — a 2×2 factorial plus a decomposition arm, all five scored in ONE gate run.** Every
+    arm warm-starts from `offrl_gen9ou_wide_s0` (converged wide), seeds 0/1/2, everything else at
+    the v17–v23 values. `v23b` is reused as-is; the other four are trained fresh.
+
+    | arm | `target_kl` | `iters` | `anneal_iters` | role |
+    |---|---|---|---|---|
+    | `v23b` | 0.06 | 80 | — (= 80) | the accidental finding, reused |
+    | `v24a` | 0.06 | 50 | — (= 50) | 2×2 cell |
+    | `v24b` | 0.03 | 80 | — (= 80) | 2×2 cell |
+    | `v24c` | 0.03 | 50 | — (= 50) | 2×2 cell — v21's configuration, retrained fresh |
+    | `v24d` | 0.06 | 80 | **50** | splits the `iters` effect |
+
+    **`v24c` is trained fresh rather than read off v21**, both because v21's checkpoints are no
+    longer on disk and because Build 23's own rule requires it: comparing against staged
+    old-budget checkpoints is the two-variable ambiguity that cost Build 22 its verdict.
+  - **WHY `anneal_iters` HAD TO EXIST FIRST.** `iters` silently doubled as the lr/ent anneal
+    horizon, so "50 → 80" was never one change. At iteration 40, v22 (50-budget) ran lr 9.08e-05 /
+    ent 0.0020 while v23b (80-budget) ran lr 1.51e-04 / ent 0.0051; at iteration 50 v22 was frozen
+    at its finals while v23b was still at 1.26e-04. `v24d` pins the horizon to 50 at `iters` 80, so
+    it holds both schedules at their finals past 50. **`config.iters` is used in exactly two places**
+    — the loop range (`ppo.py:373`) and `anneal_horizon` (`ppo.py:103-105`) — so with the horizon
+    pinned, `v24d`'s iterations 1–50 run the *identical code path* to `v24a`. `v24d` − `v24a`
+    therefore differs in **nothing but whether the loop kept going past 50**.
+  - **PRE-REGISTERED CONTRASTS — four, at α = 0.0125 (Bonferroni).**
+
+    | # | contrast | isolates |
+    |---|---|---|
+    | 1 | `v24c` → `v23b` | the **total** — does +0.059 reproduce *inside one scoring run*? |
+    | 2 | `v24b` → `v23b` | the **KL half**, holding `iters` 80 |
+    | 3 | `v24a` → `v24d` | pure **update count** |
+    | 4 | `v24d` → `v23b` | pure **anneal horizon** — both 80 updates, horizons 50 vs 80 |
+
+    Contrasts 3 + 4 sum to the `iters` half (`v24a` → `v23b`) **by construction**; that sum is
+    reported as a descriptive consistency check, not a fifth test. The gate prints all
+    5·4/2 = **10** pairs — **the other six are NOT pre-registered** and are descriptive only.
+  - **PRE-REGISTERED GATE.**
+
+    | total (#1) | KL half (#2) | `iters` half (#3+#4) | verdict |
+    |---|---|---|---|
+    | not significant | — | — | **NOT REPLICATED** — the +0.059 was cross-run noise. Do not decompose a total that is not there; the budget axis returns to the pool |
+    | sig, > 0 | sig, > 0 | not sig | **KL DID THE WORK** |
+    | sig, > 0 | not sig | sig, > 0 | **ITERS DID THE WORK** → read #3 against #4 |
+    | sig, > 0 | both sig | both sig | **BOTH HALVES CONTRIBUTE** |
+    | sig, > 0 | neither sig | neither sig | **UNDERPOWERED SPLIT** — the total is real but each half sits under the MDE. This is *not* a finding that neither matters, and must not be reported as one |
+    | sig, < 0 | — | — | **REVERSAL** — book it outside the anticipated rows, as Build 23's outcome was booked |
+    | entropy → 0, or `vs_iter0` < 0.5 late | any | any | **COLLAPSE** — report as collapse, never as a NULL |
+
+  - **TRUST-REGION BINDING IN `v24b`/`v24c` IS THE TREATMENT, NOT A DEFECT — a deliberate departure
+    from Build 23's rule.** Build 23 pre-registered an INCONCLUSIVE row that voided the comparison if
+    the trust region bound, because there it was a *nuisance* throttling the lever under test. Here
+    `target_kl` **is** the lever, so binding in the 0.03 arms is the mechanism being measured. The
+    certificate is still recorded, to characterise the dose rather than to invalidate the arm.
+    Expect it to be modest: v21, the same init at the same config, bound 4/150.
+  - **SCOPE OF EVERY VERDICT: THESE CHECKPOINTS, NOT THE TRAINING PROCEDURE.** The pooled z-test
+    treats 900+ battles as iid and **the seeds are not**. Build 23's per-seed rates were 0.597 /
+    0.470 / 0.607 (`v23b`) against a within-seed binomial sd of 0.0287 at n=300 — so the
+    **between-seed sd is ~0.0706, 2.5× the within-seed noise**. Read at seed level, Build 23's own
+    p = 0.0003 is a paired **t = 2.04** (3/3 seeds positive, sign-test p = 0.25). The direction
+    replicates; the *procedure-level* evidence is far weaker than the pooled p reads. This is the
+    inference model the protocol has used since Build 20, not a defect in Build 23's execution, and
+    **no feasible seed count fixes it** — detecting +0.059 at 80% power at seed level needs ~24
+    seeds/arm ≈ 150 task-hours/arm. So: the pooled test stays the pre-registered verdict, every
+    contrast now also carries a `seed_level` block (`seed_strength_gate.py`), and every Build 24
+    claim is scoped to the checkpoints it scored.
+  - **WHY N=1800 AND NOT THE USUAL 300.** Under the checkpoint-level model, battles are the cheapest
+    power in the build — Build 23 ran 1800 battles in 9:14. The halves are ~0.030 if the total
+    splits evenly:
+
+    | N per checkpoint | SE(diff) | MDE @ 80%, α=0.0125 | power at a 0.030 half |
+    |---|---|---|---|
+    | 300 | 0.0236 | 0.079 | ~7% |
+    | 900 | 0.0136 | 0.045 | ~24% |
+    | **1800** | **0.0096** | **0.032** | **~73%** |
+
+    At N=900 the overwhelmingly likely outcome is "total significant, both halves NULL" — the
+    UNDERPOWERED SPLIT row, which answers nothing. N=1800 is 27,000 battles ≈ 2.3 h against the
+    gate's 8 h limit. Note this buys power for the **pooled** test only: the seed-level SE moves
+    0.0622 → 0.0584 across the same range, because that variance is *between* seeds.
+  - **Selection bias, checked and cleared.** Comparing 50-iter against 80-iter arms means the longer
+    arm gets more draws at the noisy `argmax` that picks each seed's best checkpoint. Simulated at
+    `eval_n`=100, that is worth **+0.0014** — negligible against a 0.030 effect. Not a confound.
+  - **Cost, and the QOS fact that sets it.** `tron` carries `MaxTRESPU cpu=32,mem=256G` and each
+    task asks 8 CPU / 64 GB, so **exactly 4 tasks run concurrently** — measured on Build 23's own
+    `sacct`, where task `7181042_1` started at 00:51:10 against `7181042_0`'s 00:51:09 end, and
+    `7181042_2` at 03:00:38 against `7181039_1`'s 03:00:38 end. Slurm backfills perfectly, so all 12
+    tasks are submitted at once and no manual wave staging is needed — but the estimate must be
+    built from **task-hours, not "arms run concurrently"**: ~60 task-hours ÷ 4 ≈ **15–18 h**
+    wall-clock (v23b measured 4.65 min/iter). Plus **13.3 GB** of checkpoints (77 GB free) and a
+    ~2.3 h gate. Four concurrent 3-task arrays would *not* have run; assuming they would was the
+    open operational question, and the answer is no.
+
 ---
 
 ## 14. Risks & mitigations
