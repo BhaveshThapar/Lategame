@@ -519,6 +519,35 @@ that converts this NULL into an attributable result; extending past 50 iteration
 arms must be re-run at the new budget* — comparing a raised-budget arm against v21's old-budget checkpoints would differ in
 init **and** budget, reproducing exactly the ambiguity that cost Build 22 its verdict.
 
+**OU pivot Build 23 — OPEN THE TRUST REGION: H22 is REFUTED, and the refutation is ATTRIBUTABLE. Weakening the offline fit
+does not merely fail to help — it HURTS.** `target_kl` 0.03 → 0.06 (`kl_bar` 0.045 → 0.090) and `iters` 50 → 80, raised
+**identically in both arms** so offline convergence stays the only changed variable. Two fresh 3-seed sweeps: `v23a` from
+the reduced-epoch `e10` init, `v23b` from the converged wide init.
+*The throttle is gone.* `v23a` bound **6/240** iterations (96–99% full-epoch), `v23b` **0/240** (100%), against v22's
+**59/150** at 56–64%. `approx_kl_max` 0.0785/0.0797 under the 0.090 bar; no collapse (final entropy 0.63–0.68, `vs_iter0`
+0.99–1.00). The pre-registered precondition for attribution is met.
+*The verdict.* One run, both arms, 1800 battles: `v23b` **0.5578** [0.525, 0.590] vs `v23a` **0.4733** [0.441, 0.506] —
+**diff −0.084, z −3.58, p = 0.0003, CIs disjoint.** H22 predicted a *positive* diff. The measured effect is negative and
+significant: the strongest signal this project has produced on the strength axis, pointing the opposite way from the
+hypothesis. **Booked honestly: this fell outside the pre-registered rows**, which anticipated CONFIRMED or an attributable
+NULL, not a significant *reversal*.
+*Why the mechanism evidence was right and the inference wrong.* Everything Build 22 banked replicates: unthrottled, the
+e10 init's `approx_kl_mean_late` is **0.056–0.058 against 0.032–0.038** — ~1.6× larger steps, exactly as the cosine
+(0.31 vs 0.185) and the 20×-more-binding trust region predicted. **It takes bigger steps, and they go somewhere worse.**
+`|G|²`-style "is there gradient here" reasoning cannot separate a *useful* gradient from a merely *large* one —
+**real gradient ≠ useful gradient** — which demotes Build 21's pre-filter from sufficient to merely necessary.
+*Tooling defect, recorded not buried:* `seed_strength_gate.py` computes `verdict = "WIN" if significant and diff > 0 else
+"NULL"`, so it stamped this p = 0.0003 reversal **`NULL`**, identically to a p = 0.67 nothing. Read `diff`/`z`/`p`, not
+`verdict`; a three-way WIN/NULL/REGRESSION is owed.
+*The accidental finding, confounded and therefore NOT claimed:* **`v23b` = 0.5578 is the highest pooled rate in the
+project's history**, against a previous best of 0.4989 and a v19–v22 band of 0.448–0.499. But it differs from v21 in *both*
+`target_kl` and `iters`, and the comparison is cross-run (±0.027 per the calibration finding). +0.059 clears that noise
+floor and is the first thing in five builds to move this far — so it is the **next thing to test**, not a result.
+`results/{ppo_ou_gate_v23a,ppo_ou_gate_v23b,ppo_ou_telemetry_v23a,ppo_ou_telemetry_v23b,seed_strength_gate_v23}.json`.
+**Open next (Build 24) — SEPARATE THE BUDGET LEVERS**, on the converged init: `target_kl` 0.06 @ 50 iters and 0.03 @ 80
+iters, both scored against `v23b` in one gate, to resolve which half of the raise did the work. The init-quality axis is
+**closed** (refuted, sign against it), as are capacity (21) and optimization/sampling (19–20).
+
 ## Setup
 
 ```bash

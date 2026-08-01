@@ -1913,6 +1913,71 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   - **Cost:** ~9–11 h wall-clock with the arms concurrent; 6 seeds × 80 × 17.4 MiB = **8.4 GB** of
     new checkpoints (85 GB free). The two-arm strength gate is ~11 min.
 
+  - **RESULT (ran on UMIACS 2026-08-01, jobs 7181039 + 7181042 + 7182357). H22 is REFUTED — and the
+    refutation is ATTRIBUTABLE. Weakening the offline fit does not fail to help; it actively HURTS.**
+    - **TRUST REGION CERTIFIED CLEAN, both arms.** `v23a` bound **6/240** iters (s0 `[21]`,
+      s1 `[42,48]`, s2 `[51,52,53]`) at 96–99% full-epoch; `v23b` bound **0/240**, 100% full-epoch.
+      Against v22's **59/150** at 56–64%. `approx_kl_max` 0.0785 / 0.0797 against the 0.090 bar.
+      **The throttle that cost Build 22 its verdict is gone**, and the pre-registered precondition for
+      attribution is met. No collapse: final entropy 0.63–0.68, `vs_iter0` 0.99–1.00.
+
+      | build | bound | full-epoch | `approx_kl_mean_late` |
+      |---|---|---|---|
+      | **v23a** (e10) | **6/240** | 96–99% | **0.056–0.058** |
+      | **v23b** (converged) | **0/240** | 100% | **0.032–0.038** |
+      | v22 (e10, old budget) | 59/150 | 56–64% | 0.031 |
+      | v21 (converged, old budget) | 4/150 | 96–98% | 0.023 |
+
+    - **STRENGTH — one run, both arms, 1800 battles (`results/seed_strength_gate_v23.json`).**
+
+      | arm | init | pooled | CI95 | per-checkpoint |
+      |---|---|---|---|---|
+      | **v23b** (control) | converged wide | **0.5578** (502/900) | [0.525, 0.590] | s0 `iter_71` 0.597, s1 `iter_80` 0.470, s2 `iter_75` 0.607 |
+      | **v23a** (treatment) | reduced-epoch e10 | **0.4733** (426/900) | [0.441, 0.506] | s0 `iter_66` 0.433, s1 `iter_78` 0.447, s2 `iter_78` 0.540 |
+
+      **diff −0.0844, z −3.58, p = 0.0003, CIs DISJOINT.** By the pre-registered table both arms
+      bound < 10%, so this is attributable. H22 predicted diff **> 0**; the measured effect is
+      **negative and significant at p = 0.0003** — the strongest signal this project has produced on
+      the strength axis, pointing the opposite way from the hypothesis.
+    - **THE OUTCOME FELL OUTSIDE THE PRE-REGISTERED ROWS, and that is recorded rather than
+      smoothed over.** The table anticipated `diff > 0, p < 0.05` (CONFIRMED) or `p ≥ 0.05`
+      (REFUTED, an attributable NULL). It did **not** anticipate a *significant reversal*. The honest
+      reading is that H22 is refuted **more strongly** than the "attributable NULL" row contemplated:
+      not "the mechanism is real but does not reach strength," but "the mechanism is real and reaches
+      strength **with the wrong sign**."
+    - **THE MECHANISM EVIDENCE WAS RIGHT; THE INFERENCE FROM IT WAS WRONG.** Every measurement Build
+      22 banked replicates here. The e10 init *does* carry more gradient: unthrottled, its
+      `approx_kl_mean_late` is **0.056–0.058 against v23b's 0.032–0.038** — ~1.6× larger steps, from
+      the run itself, exactly as the cosine (0.31 vs 0.185) and the 20×-more-binding trust region
+      predicted. **It takes bigger steps, and they go somewhere worse.** `|G|²`-style "is there
+      gradient here" reasoning cannot distinguish a *useful* gradient from a merely *large* one, and
+      this build is the counterexample: **real gradient ≠ useful gradient.** That retires the
+      pre-filter Build 21 pre-registered ("a candidate that fixes the plateau must show `|G|²`
+      recovering") as *necessary but nowhere near sufficient*.
+    - **TOOLING DEFECT, recorded not buried.** `seed_strength_gate.py:164-176` computes
+      `verdict = "WIN" if significant and diff > 0 else "NULL"`, so it stamped this result **`NULL`**
+      — a significant, CI-disjoint, p = 0.0003 reversal labelled identically to a p = 0.67 nothing.
+      The verdict field is **not trustworthy for negative effects**; read `diff`/`z`/`p`. A three-way
+      verdict (WIN / NULL / REGRESSION) is owed.
+    - **UNEXPECTED, CONFOUNDED, AND THE MOST INTERESTING NUMBER HERE: `v23b` = 0.5578 is the highest
+      pooled rate in the project's history**, against a previous best of v20's 0.4989 and a v19–v22
+      band of 0.448–0.499. Its CI [0.525, 0.590] barely overlaps that of the best prior build. This
+      is **NOT attributable** and must not be reported as a win: `v23b` differs from v21 in **both**
+      `target_kl` (0.03 → 0.06) **and** `iters` (50 → 80), *and* the comparison is cross-run, which
+      §13.1's own calibration finding puts at ±0.027. But +0.059 over the best prior scoring is
+      **above** that noise floor, and it is the first thing in five builds to move this far. **This is
+      the lever Build 24 should test**, one variable at a time.
+    - **The iteration budget may STILL bind.** `v23b`'s seed 1 peaked at `iter_80` — the cap, again —
+      and is also that arm's weakest checkpoint (0.470). Two of three v22 seeds peaked at or beside
+      the 50-cap; one of three does so at 80.
+  - **Open next (Build 24) — SEPARATE THE BUDGET LEVERS, on the converged init.** The init-quality
+    axis is **closed**: weakening the offline fit is refuted with the sign against it, and Build 21
+    closed capacity, 19–20 closed optimization/sampling. What is left standing is the accidental
+    finding — that the raised budget moved strength further than any deliberate lever since Build 16.
+    Run `target_kl` 0.06 at `iters` 50, and `target_kl` 0.03 at `iters` 80, both from
+    `offrl_gen9ou_wide_s0`, scored against `v23b` in one gate. That resolves which half of the raise
+    did the work, or whether it needs both.
+
 ---
 
 ## 14. Risks & mitigations
