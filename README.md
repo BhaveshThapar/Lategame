@@ -613,6 +613,32 @@ init quality (23), capacity (21), optimization/sampling (19–20), trust region 
 at its `iter_50` cap and `v23b` s1 at its `iter_80` cap. Run `iters` 80 → 120 → 160 at `target_kl` 0.06, **anneal horizon
 pinned across arms** so the contrast stays on update count.
 
+**OU pivot Build 25 — PRE-REGISTERED (written 2026-08-02, before running): WHERE DOES THE UPDATE-COUNT RETURN FLATTEN?**
+Four arms scored in one gate, all warm-started from `offrl_gen9ou_wide_s0` at seeds 0/1/2, `target_kl` 0.06 throughout:
+`v23b` (80 iters, reused anchor), `v25a` (120, **anneal pinned to 80**), `v25b` (160, **anneal pinned to 80**), and `v25c`
+(160, anneal 160).
+*Why the horizon pins at 80 and not 50.* With `anneal_iters` 80, the new arms run `v23b`'s exact schedule over iterations
+1–80 and then continue at the finals — so the anchor is a legitimate cell rather than a fourth configuration, and
+`v23b`→`v25a` inherits the pairing that bought Build 24 a 7× better seed-level statistic.
+*Why `v25c` exists.* Past iteration 80 the pinned arms run at lr 5e-5 / ent 0, so a flat `v25a`→`v25b` would be ambiguous
+between "updates saturate" and "the schedule froze" — the same shape of confound the KL story had. `v25c` separates them.
+*Four contrasts at α = 0.0125:* 80→120, 120→160, the **total** 80→160, and the anneal horizon at 160. The first two sum to
+the third by construction, reported as a consistency check.
+*The one methodological departure from Build 24 — the selection bias no longer cancels.* Each seed's checkpoint is an
+`argmax` over ~`iters` noisy evals, and these arms differ in length by **2×**. Simulated at σ_b = 0.0428 (estimated from
+the Build 23/24 curves themselves), the differential bias is **+0.0045 / +0.0028 / +0.0073** — against Build 24's
+negligible +0.0014, and ~30% of the smallest dose worth calling real. So the bias is **subtracted before a dose is
+declared**, and a second **selection-free** gate scores each arm's *terminal* checkpoint via a new
+`scripts/pin_gate_checkpoint.py` (it rewrites a merged gate JSON's `best_checkpoint`; the authoritative gate is untouched).
+**A sign disagreement between the two reads is itself the finding.**
+*Pre-registered rows:* STILL CLIMBING / KNEE BETWEEN 120 AND 160 / ALREADY SATURATED AT 80 / **FROZEN-SCHEDULE ARTIFACT**
+(#2 null but the anneal contrast positive — no saturation claim may be made from such a build) / REVERSAL / COLLAPSE. A
+second saturation read comes from `best_iter` itself, and is pre-registered *because* it can contradict the gate.
+*`N=3000`, not 1800:* the per-step doses here are plausibly ~0.02–0.04, where N=1800 has ~48% power; N=3000 gives MDE
+**0.025** at ~80%, and 36,000 battles is ~2:52 against the gate's 8 h limit (Build 24 measured ~209 battles/min).
+*Cost:* 9 tasks ≈ **107 task-hours**, 4 concurrent ⇒ ~32 h wall-clock. **Disk, not time, is the binding constraint** —
+~23 GB against 64 GB free.
+
 ## Setup
 
 ```bash

@@ -2155,6 +2155,115 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     throughput at 4 tasks, so budget in task-hours ÷ 4 (§ above): a 3-arm × 3-seed sweep at 120/160
     is ~100 task-hours ≈ 25 h.
 
+- **Build 25 — PRE-REGISTERED (written 2026-08-02, BEFORE running). WHERE DOES THE UPDATE-COUNT
+  RETURN FLATTEN?**
+  - **Lever: the one axis Build 24 left open.** Update count is the only lever in this project that
+    is significant, replicated, seed-robust (`v24a`→`v24d` +0.075, seed-level t = +9.76, 3/3 seeds)
+    *and* mechanistically identified. It is also not saturated: `v24c` s0 peaked at its `iter_50`
+    cap, `v23b` s1 at its `iter_80` cap, and `v24d` — schedule frozen at its finals past iteration
+    50 — still peaked at 73/75/54. Build 25 extends the dose 80 → 120 → 160 and finds the knee.
+  - **DESIGN — three fresh arms against the reused `v23b` anchor, `target_kl` 0.06 throughout,
+    warm-started from `offrl_gen9ou_wide_s0`, seeds 0/1/2.**
+
+    | arm | `iters` | `anneal_iters` | role |
+    |---|---|---|---|
+    | `v23b` | 80 | — (= 80) | anchor, reused; its schedule over 1–80 is identical to every new arm's |
+    | `v25a` | 120 | **80** | update-count dose 1 |
+    | `v25b` | 160 | **80** | update-count dose 2 |
+    | `v25c` | 160 | — (= 160) | schedule scaled to the long budget |
+
+    Pinning the horizon at **80** — not 50 — is what makes `v23b` a legitimate anchor rather than a
+    fourth configuration: with `anneal_iters` 80, arms `v25a`/`v25b` run `v23b`'s exact schedule
+    over iterations 1–80 and then continue at the finals, so `v23b` → `v25a` inherits Build 24's
+    pairing (shared init, shared seed, identical code path over the whole anchor's length).
+  - **WHY `v25c` EXISTS.** With the horizon pinned at 80, iterations 81+ run at lr 5e-5 / ent 0.
+    A flat `v25a` → `v25b` would then be ambiguous in exactly the way Build 23's KL story was:
+    "updates saturate" and "the schedule froze" predict the same null. `v25c` (160 updates, horizon
+    160) separates them, and doubles as a re-test of Build 24's anneal contribution (+0.031, but
+    seed-level t = +0.72 on 2/3 seeds — booked as **not** seed-robust) at a budget with more room.
+  - **PRE-REGISTERED CONTRASTS — four, at α = 0.0125 (Bonferroni).**
+
+    | # | contrast | isolates |
+    |---|---|---|
+    | 1 | `v23b` → `v25a` | update count, 80 → 120 |
+    | 2 | `v25a` → `v25b` | update count, 120 → 160 |
+    | 3 | `v23b` → `v25b` | **total** update count, 80 → 160 |
+    | 4 | `v25b` → `v25c` | anneal horizon at the 160 budget |
+
+    #1 + #2 = #3 by construction — a descriptive consistency check, not a fifth test. The gate
+    prints all 4·3/2 = 6 pairs; the other two are **not** pre-registered.
+  - **THE SELECTION BIAS DOES *NOT* CANCEL HERE, AND IT IS NOT NEGLIGIBLE — the one methodological
+    departure from Build 24.** Each seed's reported checkpoint is the `argmax` of ~`iters` noisy
+    `eval_n`=100 points. Re-scoring at N kills the winner's curse on the curve *value*, but not the
+    *selection*: more draws over checkpoints of genuinely different strength land on a truly better
+    one more often, and Build 25's arms differ in length by **2×** where Build 24's differed by 1.6×.
+    Simulated (true late-window p ~ N(µ, σ_b), observed ~ Bin(100, p)/100, select `argmax`, 200k
+    trials), with **σ_b = 0.0428 estimated from the Build 23/24 curves themselves** (observed
+    late-window variance minus the binomial component):
+
+    | contrast | differential selection bias |
+    |---|---|
+    | #1 `v23b` → `v25a` | **+0.0045** |
+    | #2 `v25a` → `v25b` | **+0.0028** |
+    | #3 `v23b` → `v25b` | **+0.0073** |
+
+    Build 24 measured +0.0014 for its 50-vs-80 comparison and cleared it as negligible. **+0.0073
+    against an MDE of 0.025 is not negligible** — it is ~30% of the smallest dose worth calling
+    real. Two pre-registered consequences: (a) the biases above are **subtracted before a dose is
+    declared**, i.e. a contrast must clear both `p < α` *and* `diff − bias > 0`; (b) a second,
+    **selection-free** gate scores each arm's **terminal** checkpoint (`iter_80` / `iter_120` /
+    `iter_160` / `iter_160`) via `scripts/pin_gate_checkpoint.py`, which rewrites a merged gate
+    JSON's `best_checkpoint` to a pinned iteration and hands it to the *unmodified* authoritative
+    gate. The terminal read carries zero selection bias and is reported as a descriptive check on
+    the same four contrasts — **not** α-corrected, because it is not a second family of tests.
+    **A sign disagreement between the seed-best and terminal reads is itself the finding**, and is
+    to be booked as one rather than resolved in favour of whichever agrees with the hypothesis.
+  - **PRE-REGISTERED GATE.**
+
+    | #1 (80→120) | #2 (120→160) | #4 (anneal) | verdict |
+    |---|---|---|---|
+    | sig, > 0 | sig, > 0 | — | **STILL CLIMBING** — the axis is not saturated; Build 26 extends again and this becomes a dose-response curve |
+    | sig, > 0 | not sig | not sig | **KNEE BETWEEN 120 AND 160** — book the saturation point and stop extending |
+    | not sig | not sig | not sig | **ALREADY SATURATED AT 80** — the update-count axis closes with every other PPO-side axis |
+    | — | not sig | **sig, > 0** | **FROZEN-SCHEDULE ARTIFACT** — the flattening was the schedule, not the updates; the dose-response must be re-run with the anneal scaled, and no saturation claim may be made from this build |
+    | sig, < 0 | — | — | **REVERSAL** — more updates cost strength; book outside the anticipated rows, as Build 23's outcome was |
+    | entropy → 0, or `vs_iter0` < 0.5 late | any | any | **COLLAPSE** — report as collapse, never as a NULL |
+
+  - **A SECOND, INDEPENDENT SATURATION READ — from the curves, not the gate.** `best_iter` per seed.
+    If `v25b`'s `best_iter` lands ≤ 120 for ≥2/3 seeds, that is saturation evidence that does not
+    depend on the gate at all, and it is pre-registered *because* it can contradict the gate: a
+    significant #2 with every `best_iter` below 120 would mean the contrast is being carried by
+    something other than the extra iterations.
+  - **WHY N = 3000 FOR THE PRIMARY GATE.** Battles remain the cheapest power in a build whose
+    training is ~107 task-hours (Build 24's gate: 27,000 battles in 2:09:31, i.e. ~209/min).
+    Build 24's update-count dose was +0.075 across a 1.6× budget raise; the per-step doses here are
+    plausibly ~0.02–0.04, which N = 1800 cannot resolve:
+
+    | N per checkpoint | pooled/arm | SE(diff) | MDE @ 80%, α=0.0125 | power at a 0.025 dose |
+    |---|---|---|---|---|
+    | 1800 | 5400 | 0.0096 | 0.032 | ~48% |
+    | **3000** | **9000** | **0.0075** | **0.025** | **~80%** |
+
+    4 arms × 3 seeds × 3000 = **36,000 battles ≈ 2:52** against the gate's 8 h limit. The terminal
+    (selection-free) gate runs separately at N = 1800 — 21,600 battles ≈ 1:44 — because it is a
+    descriptive check, and because two self-contained invocations keep each comparison internally
+    calibrated. **Arms are never compared across the two gates.** As in Build 24, raising N buys
+    power for the **pooled** test only; the seed-level SE is between-seed variance and barely moves.
+  - **SCOPE, UNCHANGED FROM BUILD 24: every verdict is scoped to the checkpoints it scored.** The
+    pooled z-test treats 9000 battles as iid and the seeds are not. Every contrast carries its
+    `seed_level` block, and a pooled-significant / seed-null result is reported as what it is — the
+    outcome Build 24's anneal half produced (+0.031 pooled, t = +0.72, 2/3 seeds) and booked as not
+    seed-robust. Expect #1 to be the strong seed-level statistic, for the same pairing reason
+    `v24a`→`v24d` was.
+  - **COST.** 9 tasks — 3 × 120 iters (~9.7 h) + 6 × 160 iters (~13 h) ≈ **107 task-hours**. The
+    `tron` QOS caps a user at `cpu=32,mem=256G` against 8 CPU / 64 GB per task, so **4 run
+    concurrently** ⇒ ≈ **32 h wall-clock**, plus ~2:52 + ~1:44 of gate. Per-iteration cost measured
+    on Build 24's `sacct`: 50 iters 4:08–4:44, 80 iters 6:21–6:41 ⇒ ~4.8–5.3 min/iter. **Disk is the
+    binding operational constraint, not time**: ~17.5 MB/checkpoint ⇒ 3 × 2.1 GB + 6 × 2.8 GB ≈
+    **23 GB**, against 64 GB free with 25 GB already in `checkpoints/`. The 160-iter arms are
+    submitted with `--time=24:00:00` (the script's 20 h default leaves only 7 h of margin at 13 h
+    expected; `medium` allows 2 days and headroom is free).
+
 ---
 
 ## 14. Risks & mitigations
