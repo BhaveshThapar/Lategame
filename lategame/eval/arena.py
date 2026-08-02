@@ -1,8 +1,11 @@
-"""R-EVAL seed: run battles between two agents and report win rates.
+"""R-EVAL: run battles between two agents and report win rate, Glicko-1 and GXE.
 
-Wraps poke-env's ``cross_evaluate`` against the local server. Win rate is the
-right phase-1 signal; bias-robust metrics (GXE / Glicko-1) come later -- see
-plan.md, requirement R-EVAL.
+Wraps poke-env's ``cross_evaluate`` against the local server. Win rate remains the phase-1
+signal and the authoritative build-vs-build statistic (``scripts/seed_strength_gate.py``);
+the bias-robust metrics from ``lategame.eval.rating`` ride alongside it. Against the fixed
+baselines used here they are a reparameterisation of the win rate and carry no extra
+information -- they exist for M5 ladder play, where matchmaking pushes win rate toward 50%.
+See plan.md 12, requirement R-EVAL.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from lategame.agents.offline_rl_agent import OfflineRLAgent
 from lategame.agents.ppo_agent import PPORecordingAgent
 from lategame.agents.search_agent import SearchAgent
 from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
+from lategame.eval.rating import gxe, rate_win_rate
 
 # BCAgent / OfflineRLAgent / PPORecordingAgent are torch-free to import (torch loads
 # lazily on instantiation), so registering them here does not pull torch into M0/M1.
@@ -56,6 +60,13 @@ class EvalResult:
     n_battles: int
     battle_format: str
     p1_win_rate: float
+    # R-EVAL's bias-robust metrics. Against ONE fixed opponent these are a reparameterisation of
+    # `p1_win_rate` and carry nothing new -- they exist for M5 ladder play, where the opponent
+    # field varies and win rate is pushed toward 50% by matchmaking. See lategame/eval/rating.py.
+    # Optional so every existing caller and gate is unchanged.
+    p1_glicko: float | None = None
+    p1_glicko_rd: float | None = None
+    p1_gxe: float | None = None
 
 
 def _unique_username(name: str) -> str:
@@ -121,10 +132,17 @@ async def evaluate(
     p1 = build_player(p1_name, battle_format)
     p2 = build_player(p2_name, battle_format)
     win_rate = await evaluate_built(p1, p2, n_battles)
+    # p2 is pinned at the reference rating rather than rated itself: with a single fixed opponent
+    # there is nothing in the record to separate "p1 is strong" from "p2 is weak". That is a
+    # convention, not a measurement -- rating.py's docstring says so at length.
+    rated = rate_win_rate(win_rate, n_battles)
     return EvalResult(
         p1_name=p1_name,
         p2_name=p2_name,
         n_battles=n_battles,
         battle_format=battle_format,
         p1_win_rate=win_rate,
+        p1_glicko=round(rated.rating, 1),
+        p1_glicko_rd=round(rated.rd, 1),
+        p1_gxe=round(gxe(rated), 4),
     )
