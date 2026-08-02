@@ -2076,6 +2076,85 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     ~2.3 h gate. Four concurrent 3-task arrays would *not* have run; assuming they would was the
     open operational question, and the answer is no.
 
+  - **RESULT (ran on UMIACS 2026-08-01/02, jobs 7183404–7183407 + 7186606). ITERS DID THE WORK —
+    the pre-registered row, hit exactly. The KL raise Build 23 built all its plumbing for did
+    essentially NOTHING; the iteration budget did all of it, and ~70% of that is raw update count.**
+    - **CERTIFICATES, all four arms, written before the comparison.** No collapse anywhere
+      (`vs_iter0` 1.00 on all 12 seeds; final entropy 0.56–0.80).
+
+      | arm | `kl_bar` | bound | full-epoch | `approx_kl_mean_late` |
+      |---|---|---|---|---|
+      | `v24a` (0.06/50) | 0.09 | **0/150** | 100% | 0.0242–0.0262 |
+      | `v24b` (0.03/80) | 0.045 | **56/240** | 70–86% | 0.0298–0.0305 |
+      | `v24c` (0.03/50) | 0.045 | **2/150** | 96–100% | 0.0201–0.0247 |
+      | `v24d` (0.06/80, pinned) | 0.09 | **2/240** | 99–100% | 0.0187–0.0210 |
+
+      The KL lever therefore had a **real dose** — `v24b` bound 56/240 against `v24a`'s 0/150 — so
+      the null on it below is a null on a treatment that was actually administered. Note the
+      asymmetry inside the 0.03 row: `v24b` bound 56/240 but `v24c` only 2/150, concentrated in
+      `v24b`'s iters ~22–45, where its lr is still high because its anneal spans 80. **The KL
+      contrast has more bite at 80 iters than at 50** — a property of the 2×2 as designed
+      (anneal = iters in every cell), recorded because it bears on how the interaction reads.
+    - **THE 2×2 (one run, N=1800/checkpoint, 5400/arm, 27,000 battles).**
+
+      | | `iters` 50 | `iters` 80 | **iters effect** |
+      |---|---|---|---|
+      | `target_kl` 0.03 | `v24c` **0.449** | `v24b` **0.533** | **+0.084** |
+      | `target_kl` 0.06 | `v24a` **0.444** | `v23b` **0.550** | **+0.106** |
+      | **KL effect** | **−0.005** | **+0.017** | |
+
+      **Both KL contrasts are null; both `iters` contrasts are large and significant.** The
+      interaction is +0.022, small.
+    - **THE FOUR PRE-REGISTERED CONTRASTS at α = 0.0125.**
+
+      | # | contrast | isolates | diff | p | sig | seed-level `t` | seeds agreeing |
+      |---|---|---|---|---|---|---|---|
+      | 1 | `v24c`→`v23b` | **total** | **+0.102** | <0.0001 | ✔ | +2.11 | 3/3 |
+      | 2 | `v24b`→`v23b` | **KL half** | +0.017 | 0.0725 | ✘ | +0.89 | 2/3 |
+      | 3 | `v24a`→`v24d` | **update count** | **+0.075** | <0.0001 | ✔ | **+9.76** | **3/3** |
+      | 4 | `v24d`→`v23b` | **anneal** | **+0.031** | 0.0011 | ✔ | +0.72 | 2/3 |
+
+      Consistency check passes: #3 + #4 = **+0.107** against the `iters` half (`v24a`→`v23b`) of
+      **+0.106**, as it must by construction.
+    - **BY THE PRE-REGISTERED TABLE: total significant and positive, KL half not significant,
+      `iters` half significant and positive ⇒ ITERS DID THE WORK.** Unlike Build 23, this outcome
+      fell *inside* the anticipated rows.
+    - **THE ACCIDENTAL FINDING REPLICATES, AND IS NOW ATTRIBUTABLE.** Build 23's +0.059 was
+      cross-run and confounded across two levers. Measured within one run against a freshly trained
+      v21-configuration baseline it is **+0.102** — larger, not smaller. And `v23b` itself scored
+      **0.550** here against **0.5578** in the Build 23 gate: 0.008 apart, comfortably inside the
+      §13.1 calibration band of ±0.027. **The highest pooled rate in the project's history is
+      confirmed, and its cause is identified.**
+    - **READING #3 AGAINST #4 — update count is the driver, and it is the FIRST LEVER IN THIS
+      PROJECT THAT IS ROBUST AT BOTH INFERENCE LEVELS.** Raw update count carries +0.075 of the
+      +0.106, with per-seed diffs +0.068 / +0.067 / +0.091 — **3/3 seeds, sd 0.0136, seed-level
+      t = +9.76.** Every previous "significant" result in this project has been checkpoint-level
+      only (Build 23's p = 0.0003 is a seed-level t of 2.04). This one is not.
+      **Why the paired design earned that:** `v24a` and `v24d` share init, seed, and — because
+      `config.iters` is used *only* at the loop range and in `anneal_horizon` — the identical code
+      path over iterations 1–50. The between-seed variance that swamps every other contrast here
+      largely cancels in this one. Pinning the horizon did not merely disambiguate the lever; it
+      bought a **7× better seed-level statistic** than any unpaired contrast in the same run.
+    - **The anneal contribution is real but NOT seed-robust, and must not be reported as though it
+      were.** +0.031 at p = 0.0011 pooled, but seed-level t = +0.72 with only **2/3** seeds agreeing.
+      This is exactly the checkpoint-vs-procedure divergence the pre-registration scoped for, showing
+      up on the very first build that instrumented it.
+    - **THE TRUST REGION WAS NEVER THE CONSTRAINT.** `v24b` spent 56/240 iterations throttled and
+      still scored 0.533 against `v23b`'s 0.550 — a −0.017 cost that does not clear α. Build 23
+      spent an entire build's plumbing making `target_kl` reachable on the theory that the trust
+      region was binding the lever. It was binding; **it just did not matter.** Booked as plainly
+      as Build 23's own reversal was: the KL axis is now **closed**.
+  - **Open next (Build 25) — PUSH THE ITERATION BUDGET UNTIL THE RETURN FLATTENS.** For the first
+    time since Build 16 there is a lever that is significant, replicated, seed-robust, and
+    *mechanistically identified*: **more updates**. Every other axis is closed — init quality (23),
+    capacity (21), optimization/sampling (19–20), and now the trust region (24). The budget is not
+    saturated: `v24c` s0 peaked at `iter_50` (its cap) and Build 23's `v23b` s1 peaked at `iter_80`
+    (its cap). Run `iters` 80 → 120 → 160 at `target_kl` 0.06 from `offrl_gen9ou_wide_s0`, scored
+    against `v23b` in one gate, and **pin the anneal horizon across arms** so the contrast stays on
+    update count — the one thing measured to carry the effect. Cost scales linearly and the QOS caps
+    throughput at 4 tasks, so budget in task-hours ÷ 4 (§ above): a 3-arm × 3-seed sweep at 120/160
+    is ~100 task-hours ≈ 25 h.
+
 ---
 
 ## 14. Risks & mitigations

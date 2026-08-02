@@ -1,0 +1,568 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "n_per_checkpoint": 1800,
+  "format": "gen9ou",
+  "loop_penalty": 4.0,
+  "builds": {
+    "v23b": {
+      "wins": 2972,
+      "n": 5400,
+      "rate": 0.5504,
+      "ci95": [
+        0.5370709645317185,
+        0.5635981594485254
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v23b_s0/iter_71.pt",
+          "wins": 1021,
+          "n": 1800,
+          "rate": 0.5672,
+          "ci95": [
+            0.5442138882317953,
+            0.5899442329690905
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v23b_s1/iter_80.pt",
+          "wins": 893,
+          "n": 1800,
+          "rate": 0.4961,
+          "ci95": [
+            0.47304587774178447,
+            0.5191929086350238
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v23b_s2/iter_75.pt",
+          "wins": 1058,
+          "n": 1800,
+          "rate": 0.5878,
+          "ci95": [
+            0.5648742118396335,
+            0.6103074670838373
+          ]
+        }
+      ]
+    },
+    "v24a": {
+      "wins": 2397,
+      "n": 5400,
+      "rate": 0.4439,
+      "ci95": [
+        0.43068156112898115,
+        0.45717599561361466
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v24a_s0/iter_42.pt",
+          "wins": 780,
+          "n": 1800,
+          "rate": 0.4333,
+          "ci95": [
+            0.41060668304380277,
+            0.4563439405586245
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24a_s1/iter_49.pt",
+          "wins": 871,
+          "n": 1800,
+          "rate": 0.4839,
+          "ci95": [
+            0.46086094469399075,
+            0.5069854560099291
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24a_s2/iter_44.pt",
+          "wins": 746,
+          "n": 1800,
+          "rate": 0.4144,
+          "ci95": [
+            0.3918920126166354,
+            0.4373612876731461
+          ]
+        }
+      ]
+    },
+    "v24b": {
+      "wins": 2879,
+      "n": 5400,
+      "rate": 0.5331,
+      "ci95": [
+        0.5198225218269541,
+        0.5464266443218093
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v24b_s0/iter_72.pt",
+          "wins": 962,
+          "n": 1800,
+          "rate": 0.5344,
+          "ci95": [
+            0.5113515766423572,
+            0.5573906011630555
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24b_s1/iter_69.pt",
+          "wins": 931,
+          "n": 1800,
+          "rate": 0.5172,
+          "ci95": [
+            0.49412499530157566,
+            0.5402460936011309
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24b_s2/iter_60.pt",
+          "wins": 986,
+          "n": 1800,
+          "rate": 0.5478,
+          "ci95": [
+            0.5247071745912801,
+            0.5706448784936471
+          ]
+        }
+      ]
+    },
+    "v24c": {
+      "wins": 2423,
+      "n": 5400,
+      "rate": 0.4487,
+      "ci95": [
+        0.43547909405716345,
+        0.4620012465953086
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v24c_s0/iter_50.pt",
+          "wins": 865,
+          "n": 1800,
+          "rate": 0.4806,
+          "ci95": [
+            0.4575401715548554,
+            0.503653760329186
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24c_s1/iter_48.pt",
+          "wins": 845,
+          "n": 1800,
+          "rate": 0.4694,
+          "ci95": [
+            0.44647834049112206,
+            0.49254069532665706
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24c_s2/iter_34.pt",
+          "wins": 713,
+          "n": 1800,
+          "rate": 0.3961,
+          "ci95": [
+            0.3737606349416687,
+            0.4189040868387804
+          ]
+        }
+      ]
+    },
+    "v24d": {
+      "wins": 2803,
+      "n": 5400,
+      "rate": 0.5191,
+      "ci95": [
+        0.5057388417122483,
+        0.5323821868538
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v24d_s0/iter_73.pt",
+          "wins": 902,
+          "n": 1800,
+          "rate": 0.5011,
+          "ci95": [
+            0.47803458976093977,
+            0.5241828998456863
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24d_s1/iter_75.pt",
+          "wins": 992,
+          "n": 1800,
+          "rate": 0.5511,
+          "ci95": [
+            0.528048663187525,
+            0.5739558587172808
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v24d_s2/iter_54.pt",
+          "wins": 909,
+          "n": 1800,
+          "rate": 0.505,
+          "ci95": [
+            0.4819162910027231,
+            0.5280624122270948
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too. TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' is the same contrast paired by seed, and is the claim about the TRAINING PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise, so procedure-level evidence is far weaker than the pooled p reads, and raising --n does not fix it (only more SEEDS would). Report both; the verdict field reflects the pooled test alone.",
+  "alpha": 0.0125,
+  "comparisons": [
+    {
+      "baseline": "v23b",
+      "candidate": "v24a",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": -0.1065,
+      "z": -11.066,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "REGRESSION",
+      "seed_level": {
+        "baseline_rates": [
+          0.5672,
+          0.4961,
+          0.5878
+        ],
+        "candidate_rates": [
+          0.4333,
+          0.4839,
+          0.4144
+        ],
+        "paired_diffs": [
+          -0.1339,
+          -0.0122,
+          -0.1734
+        ],
+        "mean_paired_diff": -0.1065,
+        "sd_paired_diff": 0.084,
+        "t": -2.195,
+        "seeds": 3,
+        "n_positive": 0,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v23b",
+      "candidate": "v24b",
+      "disjoint_ci": false,
+      "alpha": 0.0125,
+      "significant": false,
+      "diff": -0.0172,
+      "z": -1.796,
+      "p_value": 0.0725,
+      "se": 0.0096,
+      "verdict": "NULL",
+      "seed_level": {
+        "baseline_rates": [
+          0.5672,
+          0.4961,
+          0.5878
+        ],
+        "candidate_rates": [
+          0.5344,
+          0.5172,
+          0.5478
+        ],
+        "paired_diffs": [
+          -0.0328,
+          0.0211,
+          -0.04
+        ],
+        "mean_paired_diff": -0.0172,
+        "sd_paired_diff": 0.0334,
+        "t": -0.894,
+        "seeds": 3,
+        "n_positive": 1,
+        "sign_test_p": 1.0
+      }
+    },
+    {
+      "baseline": "v23b",
+      "candidate": "v24c",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": -0.1017,
+      "z": -10.566,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "REGRESSION",
+      "seed_level": {
+        "baseline_rates": [
+          0.5672,
+          0.4961,
+          0.5878
+        ],
+        "candidate_rates": [
+          0.4806,
+          0.4694,
+          0.3961
+        ],
+        "paired_diffs": [
+          -0.0866,
+          -0.0267,
+          -0.1917
+        ],
+        "mean_paired_diff": -0.1017,
+        "sd_paired_diff": 0.0835,
+        "t": -2.108,
+        "seeds": 3,
+        "n_positive": 0,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v23b",
+      "candidate": "v24d",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": -0.0313,
+      "z": -3.26,
+      "p_value": 0.0011,
+      "se": 0.0096,
+      "verdict": "REGRESSION",
+      "seed_level": {
+        "baseline_rates": [
+          0.5672,
+          0.4961,
+          0.5878
+        ],
+        "candidate_rates": [
+          0.5011,
+          0.5511,
+          0.505
+        ],
+        "paired_diffs": [
+          -0.0661,
+          0.055,
+          -0.0828
+        ],
+        "mean_paired_diff": -0.0313,
+        "sd_paired_diff": 0.0752,
+        "t": -0.721,
+        "seeds": 3,
+        "n_positive": 1,
+        "sign_test_p": 1.0
+      }
+    },
+    {
+      "baseline": "v24a",
+      "candidate": "v24b",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": 0.0893,
+      "z": 9.279,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.4333,
+          0.4839,
+          0.4144
+        ],
+        "candidate_rates": [
+          0.5344,
+          0.5172,
+          0.5478
+        ],
+        "paired_diffs": [
+          0.1011,
+          0.0333,
+          0.1334
+        ],
+        "mean_paired_diff": 0.0893,
+        "sd_paired_diff": 0.0511,
+        "t": 3.026,
+        "seeds": 3,
+        "n_positive": 3,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v24a",
+      "candidate": "v24c",
+      "disjoint_ci": false,
+      "alpha": 0.0125,
+      "significant": false,
+      "diff": 0.0048,
+      "z": 0.503,
+      "p_value": 0.6148,
+      "se": 0.0096,
+      "verdict": "NULL",
+      "seed_level": {
+        "baseline_rates": [
+          0.4333,
+          0.4839,
+          0.4144
+        ],
+        "candidate_rates": [
+          0.4806,
+          0.4694,
+          0.3961
+        ],
+        "paired_diffs": [
+          0.0473,
+          -0.0145,
+          -0.0183
+        ],
+        "mean_paired_diff": 0.0048,
+        "sd_paired_diff": 0.0368,
+        "t": 0.227,
+        "seeds": 3,
+        "n_positive": 1,
+        "sign_test_p": 1.0
+      }
+    },
+    {
+      "baseline": "v24a",
+      "candidate": "v24d",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": 0.0752,
+      "z": 7.819,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.4333,
+          0.4839,
+          0.4144
+        ],
+        "candidate_rates": [
+          0.5011,
+          0.5511,
+          0.505
+        ],
+        "paired_diffs": [
+          0.0678,
+          0.0672,
+          0.0906
+        ],
+        "mean_paired_diff": 0.0752,
+        "sd_paired_diff": 0.0133,
+        "t": 9.764,
+        "seeds": 3,
+        "n_positive": 3,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v24b",
+      "candidate": "v24c",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": -0.0844,
+      "z": -8.777,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "REGRESSION",
+      "seed_level": {
+        "baseline_rates": [
+          0.5344,
+          0.5172,
+          0.5478
+        ],
+        "candidate_rates": [
+          0.4806,
+          0.4694,
+          0.3961
+        ],
+        "paired_diffs": [
+          -0.0538,
+          -0.0478,
+          -0.1517
+        ],
+        "mean_paired_diff": -0.0844,
+        "sd_paired_diff": 0.0583,
+        "t": -2.507,
+        "seeds": 3,
+        "n_positive": 0,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v24b",
+      "candidate": "v24d",
+      "disjoint_ci": false,
+      "alpha": 0.0125,
+      "significant": false,
+      "diff": -0.0141,
+      "z": -1.465,
+      "p_value": 0.143,
+      "se": 0.0096,
+      "verdict": "NULL",
+      "seed_level": {
+        "baseline_rates": [
+          0.5344,
+          0.5172,
+          0.5478
+        ],
+        "candidate_rates": [
+          0.5011,
+          0.5511,
+          0.505
+        ],
+        "paired_diffs": [
+          -0.0333,
+          0.0339,
+          -0.0428
+        ],
+        "mean_paired_diff": -0.0141,
+        "sd_paired_diff": 0.0418,
+        "t": -0.583,
+        "seeds": 3,
+        "n_positive": 1,
+        "sign_test_p": 1.0
+      }
+    },
+    {
+      "baseline": "v24c",
+      "candidate": "v24d",
+      "disjoint_ci": true,
+      "alpha": 0.0125,
+      "significant": true,
+      "diff": 0.0704,
+      "z": 7.317,
+      "p_value": 0.0,
+      "se": 0.0096,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.4806,
+          0.4694,
+          0.3961
+        ],
+        "candidate_rates": [
+          0.5011,
+          0.5511,
+          0.505
+        ],
+        "paired_diffs": [
+          0.0205,
+          0.0817,
+          0.1089
+        ],
+        "mean_paired_diff": 0.0704,
+        "sd_paired_diff": 0.0453,
+        "t": 2.692,
+        "seeds": 3,
+        "n_positive": 3,
+        "sign_test_p": 0.25
+      }
+    }
+  ]
+}
