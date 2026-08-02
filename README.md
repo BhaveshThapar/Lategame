@@ -578,6 +578,41 @@ time** (measured on Build 23's `sacct`: queued tasks started the second a slot f
 submitted at once — but the estimate is **~60 task-hours ÷ 4 ≈ 15–18 h**, not "the arms run concurrently." Plus 13.3 GB of
 checkpoints and a ~2.3 h gate.
 
+**OU pivot Build 24 — SEPARATE THE BUDGET LEVERS: ITERS DID THE WORK. The KL raise did essentially nothing.** Ran 17.4 h
+(12 tasks, 4 concurrent, exactly as the QoS predicted) plus a 2:09 gate. **The outcome landed inside the pre-registered
+rows** — unlike Build 23.
+*The 2×2*, one run, N=1800/checkpoint (5400/arm, 27,000 battles):
+
+| | `iters` 50 | `iters` 80 | **iters effect** |
+|---|---|---|---|
+| `target_kl` 0.03 | `v24c` **0.449** | `v24b` **0.533** | **+0.084** |
+| `target_kl` 0.06 | `v24a` **0.444** | `v23b` **0.550** | **+0.106** |
+| **KL effect** | **−0.005** | **+0.017** | |
+
+*The four pre-registered contrasts (α = 0.0125):* **total** `v24c`→`v23b` **+0.102** (p < 0.0001) ✔ · **KL half** +0.017
+(p = 0.0725) ✘ · **update count** `v24a`→`v24d` **+0.075** (p < 0.0001) ✔ · **anneal** `v24d`→`v23b` **+0.031**
+(p = 0.0011) ✔. The last two sum to +0.107 against the `iters` half's +0.106, as they must by construction.
+*The accidental finding replicates and is now attributable.* Build 23's +0.059 was cross-run and confounded across two
+levers; measured within one run against a freshly trained v21-configuration baseline it is **+0.102**. `v23b` itself
+re-scored **0.550** against 0.5578 in the Build 23 gate — 0.008 apart, well inside the ±0.027 calibration band. **The
+highest pooled rate in the project's history is confirmed, and its cause is identified.**
+*Update count is the driver — and the FIRST LEVER IN THIS PROJECT ROBUST AT BOTH INFERENCE LEVELS.* It carries +0.075 of
+the +0.106, per-seed diffs +0.068 / +0.067 / +0.091 — **3/3 seeds, seed-level t = +9.76**, against Build 23's headline
+t = 2.04. `v24a` and `v24d` share init, seed, and (because `config.iters` is used only at the loop range and in
+`anneal_horizon`) the **identical code path over iterations 1–50**, so the between-seed variance that swamps every other
+contrast largely cancels here. Pinning the horizon did not just disambiguate the lever — it bought a ~7× better
+seed-level statistic. **The anneal contribution is real but NOT seed-robust** (+0.031 pooled, seed-level t = +0.72, only
+2/3 seeds agreeing) and is not reported as though it were.
+*The trust region was never the constraint.* `v24b` spent **56/240** iterations throttled and still scored 0.533 against
+0.550 — a −0.017 cost that does not clear α. Build 23 spent a build's plumbing making `target_kl` reachable on the theory
+that the trust region was binding the lever. It was binding; **it just did not matter.** The KL axis is now **closed**.
+`results/{ppo_ou_gate_v24a..d,ppo_ou_telemetry_v24a..d,seed_strength_gate_v24}.json`.
+**Open next (Build 25) — PUSH THE ITERATION BUDGET UNTIL THE RETURN FLATTENS.** First lever since Build 16 that is
+significant, replicated, seed-robust *and* mechanistically identified: **more updates**. Every other axis is closed —
+init quality (23), capacity (21), optimization/sampling (19–20), trust region (24). Not saturated either: `v24c` s0 peaked
+at its `iter_50` cap and `v23b` s1 at its `iter_80` cap. Run `iters` 80 → 120 → 160 at `target_kl` 0.06, **anneal horizon
+pinned across arms** so the contrast stays on update count.
+
 ## Setup
 
 ```bash
