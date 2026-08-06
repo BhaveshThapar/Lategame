@@ -11,20 +11,17 @@ end-to-end when the vendored simulator + node are available.
 from __future__ import annotations
 
 import json
-import shutil
-from pathlib import Path
 
 import numpy as np
-import pytest
 
 from lategame.data.resim import (
-    _DEFAULT_SHOWDOWN,
     _parse_inputlog_meta,
     _reconstruct_pov_resim,
     resim_replays,
 )
 from lategame.data.reward import RewardWeights
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from tests.conftest import GEN9_INPUTLOG, requires_showdown
 
 _WEIGHTS = RewardWeights()
 
@@ -161,31 +158,9 @@ def test_parse_inputlog_meta() -> None:
 # Environment-gated end-to-end test through the real node driver + simulator.
 # --------------------------------------------------------------------------- #
 
-_START = (
-    '>start {"formatid":"gen9randombattle",'
-    '"seed":"sodium,b8493732a42936a1fd687ddf7988dbbc","rated":"Rated battle"}'
-)
-_INPUTLOG = "\n".join([
-    _START,
-    ">player p1 {\"name\":\"gummiworm\",\"seed\":\"sodium,a3572989c38af097ba39a7fa38627767\"}",
-    ">player p2 {\"name\":\"Qwuartz\",\"seed\":\"sodium,d9f6a625ddf93230a09fa7bc6f0239d0\"}",
-    ">p1 move psyblade", ">p2 switch 3", ">p1 move psyblade", ">p2 move fireblast",
-    ">p2 switch 4", ">p1 switch 5", ">p2 move tripleaxel", ">p1 move raindance",
-    ">p2 switch 3", ">p1 move liquidation", ">p2 move thunderbolt", ">p1 move closecombat",
-    ">p2 move taunt", ">p1 switch 3", ">p2 switch 3", ">p1 move seedflare",
-    ">p2 move tripleaxel", ">p1 move airslash", ">p2 move knockoff", ">p1 switch 6",
-    ">p1 move calmmind", ">p2 switch 5", ">p1 move moonblast", ">p2 move dragondance",
-    ">p1 switch 5", ">p2 move earthquake", ">p1 move psyblade", ">p2 move stoneedge",
-    ">p1 switch 4", ">p1 move shoreup terastallize", ">p2 move dragondance", ">forcelose p1",
-])
-
-_HAS_NODE = shutil.which("node") is not None
-_HAS_SIM = (Path(_DEFAULT_SHOWDOWN) / "dist").is_dir()
-
-
-@pytest.mark.skipif(not (_HAS_NODE and _HAS_SIM), reason="needs node + a built vendored simulator")
+@requires_showdown
 def test_resim_end_to_end_through_driver() -> None:
-    replay = {"id": "sample", "inputlog": _INPUTLOG}
+    replay = {"id": "sample", "inputlog": GEN9_INPUTLOG}
     rl, bc, stats = resim_replays([replay], weights=_WEIGHTS)
 
     assert stats.parsed == 1 and stats.skipped_replays == 0
