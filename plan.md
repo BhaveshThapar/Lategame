@@ -2264,6 +2264,82 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     submitted with `--time=24:00:00` (the script's 20 h default leaves only 7 h of margin at 13 h
     expected; `medium` allows 2 days and headroom is free).
 
+- **Build 25 — STILL CLIMBING: the update-count axis is NOT saturated at 160, and scaling the
+  anneal to match COSTS strength.** 9 training runs (`v25a`/`v25b`/`v25c` × 3 seeds, 2026-08-03/04),
+  then both pre-registered gates on 2026-08-06: primary N = 3000 (36,000 battles, 2:28:51) and the
+  selection-free terminal read at N = 1800 (21,600 battles, 1:54:09). Both `COMPLETED 0:0`.
+  - **POOLED RATES vs the heuristic (n = 9000/arm, seed-best).**
+
+    | arm | `iters` | `anneal_iters` | rate | CI95 |
+    |---|---|---|---|---|
+    | `v23b` | 80 | — (= 80) | 0.5450 | [0.5347, 0.5553] |
+    | `v25a` | 120 | 80 | 0.6144 | [0.6043, 0.6244] |
+    | **`v25b`** | **160** | **80** | **0.6534** | **[0.6435, 0.6632]** |
+    | `v25c` | 160 | — (= 160) | 0.5604 | [0.5502, 0.5707] |
+
+    **0.6534 is the highest pooled rate in the project's history**, against `v23b`'s 0.550 — the
+    previous record, set by Build 24. The anchor re-calibrates: `v23b` scored **0.5504** in Build
+    24's gate and **0.5450** here, **0.0054** apart, comfortably inside the §13.1 band of ±0.027.
+  - **THE FOUR PRE-REGISTERED CONTRASTS at α = 0.0125, with the bias subtracted before any dose is
+    declared.**
+
+    | # | contrast | isolates | diff | − bias | = adj | p | sig | seed `t` | seeds |
+    |---|---|---|---|---|---|---|---|---|---|
+    | 1 | `v23b`→`v25a` | 80 → 120 | +0.0694 | 0.0045 | **+0.0649** | <0.0001 | ✔ | +2.12 | **3/3** |
+    | 2 | `v25a`→`v25b` | 120 → 160 | +0.0390 | 0.0028 | **+0.0362** | <0.0001 | ✔ | +1.03 | 2/3 |
+    | 3 | `v23b`→`v25b` | **total** 80 → 160 | +0.1084 | 0.0073 | **+0.1011** | <0.0001 | ✔ | **+5.36** | **3/3** |
+    | 4 | `v25b`→`v25c` | anneal horizon @ 160 | **−0.0930** | — | — | <0.0001 | ✔ | −2.17 | **0/3** |
+
+    Consistency check passes: #1 + #2 = **+0.1084** against #3's **+0.1084**, as it must by
+    construction. #4 carries no bias: both its arms run 160 iterations, so the draws at the `argmax`
+    are equal in number and the selection cancels exactly as it did through Build 24.
+  - **BY THE PRE-REGISTERED TABLE: #1 significant and positive, #2 significant and positive ⇒
+    STILL CLIMBING.** The axis is not saturated; Build 26 extends again and this becomes a
+    dose-response curve. The outcome fell inside the anticipated rows.
+  - **THE SELECTION-BIAS CORRECTION WAS APPLIED AND DID NOT BIND.** All three doses clear their
+    bias by an order of magnitude (+0.0649 / +0.0362 / +0.1011 against 0.0045 / 0.0028 / 0.0073).
+    Booked explicitly because the pre-registration committed to it before the sign was known: it is
+    reported as *applied and immaterial*, not quietly dropped because it did not change a verdict.
+  - **THE SECOND, SELECTION-FREE READ AGREES IN SIGN ON ALL FOUR CONTRASTS** (terminal, n = 5400/arm:
+    #1 **+0.0411**, #2 **+0.0694**, #3 **+0.1106**, #4 **−0.0907**). There is **no sign disagreement
+    to book.** #3 is near-identical across the two reads (+0.1084 vs +0.1106), which is the strongest
+    evidence in this build that the total effect is not a selection artifact.
+  - **#2 IS POOLED-SIGNIFICANT BUT NOT SEED-ROBUST ON THE SEED-BEST READ, AND THIS MUST NOT BE
+    REPORTED AS THOUGH IT WERE.** Its per-seed diffs are **+0.003 / −0.001 / +0.115** — t = +1.03,
+    2/3 agreeing, i.e. the 120 → 160 dose is carried almost entirely by seed 2. **The terminal read
+    is the stronger one here** (+0.0694, t = +2.34, **3/3** seeds), which is the reverse of the usual
+    direction and is itself worth carrying into Build 26: the 120 → 160 dose is real at the
+    procedure level but the seed-best estimate of it is noisy. #1 and #3 are 3/3 on both reads, and
+    #3's t = +5.36 makes the **total** 80 → 160 dose the second lever in this project robust at both
+    inference levels.
+  - **#4 IS A SEED-ROBUST REGRESSION, AND IT IS NOT THE ROW THE PRE-REGISTRATION ANTICIPATED.** The
+    FROZEN-SCHEDULE ARTIFACT row required #4 **significant and positive** — the story where the
+    flattening was the schedule rather than the updates. #4 came back **significant and negative**:
+    −0.093 pooled, **0/3** seeds positive, t = −2.17 seed-best and **−4.54** terminal. So the frozen
+    schedule is not hiding the effect; **the frozen schedule is actively better.** Holding lr at
+    5e-5 / ent at 0 from iteration 81 to 160 beats annealing across the full 160 by ~9 points. This
+    also settles Build 24's anneal half — booked there as +0.031 pooled but **not** seed-robust
+    (t = +0.72, 2/3) — in the opposite direction and with authority at the longer budget.
+  - **THE CURVE-SIDE SATURATION READ, PRE-REGISTERED AS ABLE TO CONTRADICT THE GATE, DOES NOT.**
+    `v25b`'s `best_iter` is **132 / 125 / 159** — **0/3** seeds at or below 120, where ≥2/3 was the
+    saturation signal. Curve and gate agree that 160 is not the ceiling.
+  - **THE TRUST REGION DID NOT BIND, SO THE VERDICT IS ATTRIBUTABLE.** `v25a` bound in 1/360 iters,
+    `v25b` in **0/480** (100% full-epoch on all three seeds), `v25c` in 19/480 (95–98% full-epoch,
+    the only arm where a live schedule engaged it at all). `approx_kl_max` 0.0868 / 0.0551 / 0.0816
+    all under the 0.09 bar. Nowhere near Build 22's verdict-costing 59/150. No collapse: `vs_iter0`
+    0.99–1.00 on all nine runs, final entropy 0.52–0.60.
+  - **Open next (Build 26) — EXTEND THE DOSE AGAIN, AND PIN THE HORIZON AT 80.** Two arms are now
+    specified by the data rather than guessed: `iters` **240** and **320** at `anneal_iters` **80**,
+    `target_kl` 0.06, from `offrl_gen9ou_wide_s0`, scored against `v25b` in one gate. The horizon
+    question is **closed by #4** — scaling it is worse, seed-robustly — so Build 26 spends no arm on
+    it and the contrast stays purely on update count. Two open risks to pre-register against:
+    (a) the differential selection bias grows with the length ratio and must be re-simulated for
+    240/320 vs 160, not reused from this build; (b) #2's seed-best/terminal split says the per-step
+    dose is now near the resolution of the seed-best read, so Build 26 should treat the **terminal**
+    read as co-primary rather than descriptive. Cost scales linearly: 6 tasks at ~4.8–5.3 min/iter is
+    ~150 task-hours ÷ 4 concurrent ≈ **38 h wall-clock**, and ~29 GB of checkpoints against 146 GB
+    free — disk is no longer the binding constraint it was in Build 25.
+
 ---
 
 ## 14. Risks & mitigations
