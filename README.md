@@ -665,11 +665,34 @@ terminal read). The frozen schedule is not hiding the effect — **it is activel
 0/3 seeds at or below 120. *Attributable:* the trust region bound 1/360 (`v25a`), **0/480** (`v25b`), 19/480 (`v25c`),
 `approx_kl_max` all under the 0.09 bar; no collapse (`vs_iter0` 0.99–1.00, final entropy 0.52–0.60).
 
-**Open next (Build 26) — EXTEND THE DOSE AGAIN, HORIZON PINNED AT 80.** `iters` **240** and **320** at `anneal_iters` 80,
-scored against `v25b`. The horizon question is **closed by #4**, so no arm is spent on it. Two things to pre-register:
-the differential selection bias must be **re-simulated** for 240/320 vs 160 (it grows with the length ratio — do not reuse
-Build 25's numbers), and the terminal read should be **co-primary** rather than descriptive, since #2 shows the per-step
-dose is near the resolution of the seed-best read. ~150 task-hours ÷ 4 ⇒ ~38 h wall-clock; ~29 GB against 146 GB free.
+### Build 26 — PRE-REGISTERED (written 2026-08-06, before running): EXTEND THE DOSE AGAIN, HORIZON PINNED AT 80
+
+Two fresh arms — `v26a` (`iters` **240**) and `v26b` (**320**), both at `anneal_iters` **80**, `target_kl` 0.06, from
+`offrl_gen9ou_wide_s0`, seeds 0/1/2 — scored against the reused `v25b` anchor in one gate. Three contrasts at
+**α = 0.0167**: #1 160→240, #2 240→320, #3 **total** 160→320, with #1 + #2 = #3 as a consistency check. The horizon
+question is **closed by Build 25's #4** (significant and *negative*, 0/3 seeds), so no arm is spent on it. Full
+pre-registration, including the outcome table, in `plan.md` §13.
+
+*The selection-bias correction is re-simulated, and the simulation is now committed* — `scripts/selection_bias_sim.py`
+plus tests, where Build 25's was ad hoc and unauditable. **σ_b is re-estimated and Build 25's 0.0428 was inflated**: it
+came from arms whose anneal ran their whole length, so their "late window" booked live schedule trend as checkpoint
+dispersion. Measured on the only true frozen plateaus (`v25a`/`v25b`, `iter > 80`, dof 348), the detrended dispersion sits
+**at the binomial floor** — post-anneal the checkpoints are not resolvably different in strength, and all 6 seed-arms are
+still drifting upward (+0.0010 to +0.0029/iter), which is STILL CLIMBING showing up in the curve shape. A point estimate
+of zero must not be pre-registered as "no correction", so the correction is taken at the raw 95% upper bound,
+**σ_b = 0.0328**: **#1 +0.0045, #2 +0.0025, #3 +0.0070**. The length-ratio worry was directionally right — pinning the
+horizon at 80 makes #3 a **3×** draw ratio, not 2× — but the smaller σ_b nearly cancels it, landing #3 at essentially
+Build 25's booked +0.0073. *The terminal read is promoted to co-primary*, since Build 25's #2 was pooled-significant but
+not seed-robust on the seed-best read while the terminal read was stronger (t = +2.34, 3/3); a contrast is called only
+where both reads agree in sign, and a disagreement is booked as the finding.
+
+*Two operational prerequisites, both now in place.* `ppo_seed.slurm`'s `--time` was **20 h**, which the 320-iter arm blows:
+Build 25's `sacct` (7188055) measured 11:03–11:30 for 160 iters ⇒ ~4.15–4.3 min/iter ⇒ `v26a` ~17 h, `v26b` ~23 h. Raised
+to **36 h** (medium QoS allows 48 h); this also closes a drift where Build 25 ran under a 24 h command-line override the
+script never recorded. `ppo_continue_gate.py` has **no resume**, so a walltime kill loses a whole arm. And `v26b` must be
+submitted with `LATEGAME_SHOWDOWN_PORT_BASE=8200`: `_job_common.sh` computes `8100 + TASK_ID`, so two concurrent
+`--array=0-2` arrays claim the same ports and colliding tasks **silently share one server** instead of failing.
+6 tasks ÷ 4 concurrent ⇒ ~**40 h wall-clock**; ~29 GB of checkpoints against **78 GB** free.
 
 ## Setup
 

@@ -1,0 +1,111 @@
+{
+  "mu": 0.65,
+  "eval_n": 100,
+  "anneal_iters": 80,
+  "trials": 200000,
+  "seed": 0,
+  "sweep": [
+    {
+      "sigma_b": 0.0257,
+      "arms": {
+        "v25b": {
+          "iters": 160,
+          "draws": 80,
+          "bias": 0.02948
+        },
+        "v26a": {
+          "iters": 240,
+          "draws": 160,
+          "bias": 0.0324
+        },
+        "v26b": {
+          "iters": 320,
+          "draws": 240,
+          "bias": 0.03381
+        }
+      },
+      "contrasts": [
+        {
+          "contrast": "v25b -> v26a",
+          "differential_bias": 0.00292
+        },
+        {
+          "contrast": "v25b -> v26b",
+          "differential_bias": 0.00433
+        },
+        {
+          "contrast": "v26a -> v26b",
+          "differential_bias": 0.00141
+        }
+      ]
+    },
+    {
+      "sigma_b": 0.0328,
+      "arms": {
+        "v25b": {
+          "iters": 160,
+          "draws": 80,
+          "bias": 0.04527
+        },
+        "v26a": {
+          "iters": 240,
+          "draws": 160,
+          "bias": 0.04981
+        },
+        "v26b": {
+          "iters": 320,
+          "draws": 240,
+          "bias": 0.05231
+        }
+      },
+      "contrasts": [
+        {
+          "contrast": "v25b -> v26a",
+          "differential_bias": 0.00454
+        },
+        {
+          "contrast": "v25b -> v26b",
+          "differential_bias": 0.00704
+        },
+        {
+          "contrast": "v26a -> v26b",
+          "differential_bias": 0.0025
+        }
+      ]
+    },
+    {
+      "sigma_b": 0.0428,
+      "arms": {
+        "v25b": {
+          "iters": 160,
+          "draws": 80,
+          "bias": 0.07042
+        },
+        "v26a": {
+          "iters": 240,
+          "draws": 160,
+          "bias": 0.07768
+        },
+        "v26b": {
+          "iters": 320,
+          "draws": 240,
+          "bias": 0.08174
+        }
+      },
+      "contrasts": [
+        {
+          "contrast": "v25b -> v26a",
+          "differential_bias": 0.00726
+        },
+        {
+          "contrast": "v25b -> v26b",
+          "differential_bias": 0.01132
+        },
+        {
+          "contrast": "v26a -> v26b",
+          "differential_bias": 0.00406
+        }
+      ]
+    }
+  ]
+}

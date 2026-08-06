@@ -2340,6 +2340,120 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     ~150 task-hours ÷ 4 concurrent ≈ **38 h wall-clock**, and ~29 GB of checkpoints against 146 GB
     free — disk is no longer the binding constraint it was in Build 25.
 
+- **Build 26 — PRE-REGISTERED (written 2026-08-06, BEFORE running).**
+  - **Lever: the same axis, extended.** Build 25 returned STILL CLIMBING on the pre-registered
+    table — #1 (80→120) **+0.0649 adj**, #2 (120→160) **+0.0362 adj**, both significant and
+    positive — so the update-count axis is not saturated at 160 and the anticipated row says
+    extend. `v25b`'s `best_iter` was **132 / 125 / 159**, 0/3 seeds at or below 120, so the
+    curve-side read agrees. Build 26 extends 160 → 240 → 320.
+  - **DESIGN — two fresh arms against the reused `v25b` anchor, `anneal_iters` 80 and `target_kl`
+    0.06 throughout, warm-started from `offrl_gen9ou_wide_s0`, seeds 0/1/2.**
+
+    | arm | `iters` | `anneal_iters` | role |
+    |---|---|---|---|
+    | `v25b` | 160 | 80 | anchor, reused; its schedule over 1–160 is identical to every new arm's |
+    | `v26a` | 240 | **80** | update-count dose 1 |
+    | `v26b` | 320 | **80** | update-count dose 2 |
+
+    **The horizon question is CLOSED and gets no arm.** Build 25's #4 came back significant and
+    **negative** (−0.093 pooled, **0/3** seeds, t = −4.54 terminal): scaling the anneal to the full
+    budget *costs* ~9 points, and the frozen schedule is actively better. That also settled Build
+    24's non-seed-robust +0.031 anneal half in the opposite direction. Pinning at 80 keeps `v25b` a
+    legitimate anchor for the same reason it made `v23b` one in Build 25 — shared init, shared
+    seeds, byte-identical schedule over the anchor's whole length.
+  - **PRE-REGISTERED CONTRASTS — three, at α = 0.0167 (Bonferroni over 3).**
+
+    | # | contrast | isolates |
+    |---|---|---|
+    | 1 | `v25b` → `v26a` | update count, 160 → 240 |
+    | 2 | `v26a` → `v26b` | update count, 240 → 320 |
+    | 3 | `v25b` → `v26b` | **total** update count, 160 → 320 |
+
+    #1 + #2 = #3 by construction — a consistency check, not a fourth test. The gate prints all
+    3·2/2 = 3 pairs, so here every printed pair is pre-registered.
+  - **THE SELECTION BIAS IS RE-SIMULATED, AND THE SIMULATION IS NOW COMMITTED CODE.** Build 25
+    committed to re-simulating rather than reusing, because the differential grows with the length
+    ratio. Its own simulation was run ad hoc and never committed, so its table could not be
+    re-derived — the correction a dose is declared against was unauditable. `scripts/
+    selection_bias_sim.py` is that simulation, and `tests/test_selection_bias_sim.py` pins it,
+    including a reproduction of Build 25's published +0.0045 / +0.0028 / +0.0073 to ~5e-4 (the
+    residual is unattributable: Build 25 recorded neither its `mu` nor its exact draw count).
+  - **σ_b IS RE-ESTIMATED, AND BUILD 25's VALUE WAS INFLATED.** Build 25 used **σ_b = 0.0428**,
+    estimated from the Build 23/24 curves — arms whose lr/entropy schedule ran their *whole*
+    length, so their "late window" still contained a live anneal. That books **schedule trend as
+    checkpoint dispersion**. Estimated instead from the only arms with a genuine frozen plateau
+    (`v25a`/`v25b`, window `iter > 80`, 6 seed-arms, dof 348):
+
+    | estimate | σ_b | what it charges |
+    |---|---|---|
+    | detrended point | **0.0000** | at/below the binomial floor `p(1−p)/100` |
+    | detrended 95% upper | **0.0000** | the bound is at the floor too |
+    | raw (drift charged as dispersion) | **0.0257** | conservative |
+    | raw 95% upper | **0.0328** | **pre-registered** |
+    | Build 25's | 0.0428 | inflated by a live schedule |
+
+    **Within the frozen window the checkpoints are not resolvably different in true strength**, and
+    every one of the 6 seed-arms is still drifting *upward* (slope +0.0010 to +0.0029 per iter) —
+    which is STILL CLIMBING showing up in the curve shape rather than in the gate. A point estimate
+    of zero must not be pre-registered as "no correction", so the correction is taken at the **95%
+    upper bound of the raw estimate, σ_b = 0.0328**, which charges the plateau's own residual climb
+    as if it were dispersion.
+  - **THE PRE-REGISTERED BIAS TABLE** (200k trials; draws = `iters − anneal_iters`, because every
+    anneal-pinned Build 25 arm took its `argmax` inside the frozen window — `v25a` 118/105/114,
+    `v25b` 132/125/159 — so the pre-anneal checkpoints never compete):
+
+    | # | contrast | draws | differential bias @ σ_b 0.0328 | @ 0.0428 (Build 25's) |
+    |---|---|---|---|---|
+    | 1 | `v25b` → `v26a` | 80 → 160 | **+0.0045** | +0.0073 |
+    | 2 | `v26a` → `v26b` | 160 → 240 | **+0.0025** | +0.0041 |
+    | 3 | `v25b` → `v26b` | 80 → 240 | **+0.0070** | +0.0113 |
+
+    As in Build 25: a contrast must clear **both** `p < α` **and** `diff − bias > 0`, and the
+    correction is reported as applied whether or not it binds.
+  - **THE LENGTH-RATIO WORRY WAS DIRECTIONALLY RIGHT BUT NEARLY CANCELS.** Because the horizon
+    stays at 80 while the arm triples, the *draw* ratio for #3 is **3×** (80 → 240), not the 2× the
+    iteration counts suggest — so at a fixed σ_b the correction does grow (+0.0113 at 0.0428
+    against Build 25's booked +0.0073). But σ_b in the frozen window is materially smaller than
+    Build 25's, and the two effects very nearly cancel: **+0.0070 for 160→320 against Build 25's
+    +0.0073 for 80→160**. Re-simulating was still the right call — this is now measured rather
+    than assumed.
+  - **THE TERMINAL READ IS CO-PRIMARY, NOT DESCRIPTIVE.** Build 25's #2 was pooled-significant but
+    **not** seed-robust on the seed-best read (per-seed +0.003 / −0.001 / +0.115, t = +1.03, 2/3),
+    while the terminal read was the *stronger* one (t = +2.34, 3/3) — the reverse of the usual
+    direction, and evidence the per-step dose is near the resolution of the seed-best read. So the
+    same pinned-terminal gate (`scripts/pin_gate_checkpoint.py`, pinned to `iter_160` / `iter_240`
+    / `iter_320`) is promoted to **co-primary**: it carries zero selection bias by construction,
+    and a contrast is called only where **both** reads agree in sign. A sign disagreement is
+    **itself the finding** and is to be booked as one, never resolved in favour of whichever read
+    agrees with the hypothesis.
+  - **PRE-REGISTERED GATE.**
+
+    | #1 (160→240) | #2 (240→320) | verdict |
+    |---|---|---|
+    | sig, > 0 | sig, > 0 | **STILL CLIMBING AT 320** — three consecutive doses; the axis still has not saturated and the cost per dose is now the binding question, not the effect |
+    | sig, > 0 | not sig | **KNEE BETWEEN 240 AND 320** — book the saturation point and stop extending; this is the anticipated modal outcome |
+    | not sig | not sig | **SATURATED AT 160** — the axis closes, and `v25b` stands as the project's best configuration |
+    | not sig | sig, > 0 | **NON-MONOTONE** — book outside the anticipated rows; a dose that reappears after a flat step is a red flag for the seed-best read and must be checked against the terminal read before any claim |
+    | sig, < 0 | — | **REVERSAL** — more updates cost strength, as Build 25's #4 did for the horizon |
+    | entropy → 0, or `vs_iter0` < 0.5 late | any | **COLLAPSE** — report as collapse, never as a NULL |
+  - **ATTRIBUTABILITY BAR, unchanged.** The trust region must not bind: `v25b` ran **0/480** and
+    `approx_kl_max` stayed under the 0.09 bar. If a Build 26 arm binds at Build 22's rate (59/150)
+    the verdict is not attributable to update count and must be reported as such.
+  - **COST AND THE TWO OPERATIONAL PREREQUISITES.** Budget off Build 25's *measured* rate, not
+    plan.md's earlier 4.8–5.3 assumption: `sacct` on 7188055 shows `v25b`'s 160 iters took
+    11:03:35 / 11:23:20 / 11:30:31, i.e. **~4.15–4.3 min/iter** ⇒ `v26a` ~17 h, `v26b` ~23 h.
+    6 tasks ÷ 4 concurrent ⇒ ~**40 h wall-clock**.
+    (a) **Walltime.** `ppo_seed.slurm` carried `--time=20:00:00`, which `v26b` blows outright;
+    raised to **36 h** (medium QoS allows 48 h). Build 25 only survived because it was submitted
+    with a 24 h command-line override — `sacct` reports `Timelimit=1-00:00:00` against the file's
+    then-20 h — so the script and the real submission had already drifted apart. There is **no
+    resume** in `ppo_continue_gate.py`, so a walltime kill loses a whole ~23 h arm.
+    (b) **Port base.** `_job_common.sh` computes `8100 + TASK_ID`, so two concurrent `--array=0-2`
+    arrays both claim 8100–8102, and colliding tasks **silently share one Showdown server** rather
+    than failing. `v26b` must be submitted with `LATEGAME_SHOWDOWN_PORT_BASE=8200`.
+    **Disk:** ~29 GB needed (measured: `ppo_v25b_s0` is 2.8 GB / 160 iters ≈ 17.5 MB/iter) against
+    **78 GB** free — not the 146 GB quoted above, which is stale.
+
 ---
 
 ## 14. Risks & mitigations

@@ -32,11 +32,23 @@
 #SBATCH --job-name=lg-ppo
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=20:00:00
+#SBATCH --time=36:00:00
 #SBATCH --output=logs/slurm/slurm-%x-%A_%a.out
 # NOTE: no --gres=gpu (4.56M params). NOTE: set --partition for UMIACS.
-# 20h, not 12: v22 took 4:50-5:24 for 50 iters, and Build 23 runs 80 at a looser KL bar -- fewer
-# early stops means more full 4-epoch updates, so ~9-11h. medium QoS allows 2 days; headroom is free.
+#
+# 36h, raised from 20h for Build 26. Build 25's sacct (7188055) is the measurement to budget off:
+# v25b's 160 iters took 11:03:35 / 11:23:20 / 11:30:31, i.e. ~4.15-4.3 min/iter -- FASTER than the
+# 4.8-5.3 plan.md assumed. That projects 240 iters -> ~17h and 320 iters -> ~23h, so the 320-iter
+# arm blew the old 20h limit outright and 240 was close enough that a slow seed would too.
+#
+# Note that Build 25 only survived because it was submitted with `--time=24:00:00` on the command
+# line: sacct reports Timelimit=1-00:00:00 against this file's then-20h, i.e. the script and the
+# real submission had already drifted apart. Raising it here is what stops that recurring.
+#
+# The headroom matters more than usual because ppo_continue_gate.py has NO RESUME: it runs from
+# --init for `iters` iterations with no restart path, so a walltime kill loses the whole arm --
+# ~23h of it for a 320-iter seed. medium QoS allows 2 days (sacctmgr: medium MaxWall=2-00:00:00),
+# so 36h is free and leaves ~13h of margin on the longest arm planned.
 
 set -euo pipefail
 # sbatch runs a spool COPY of this script, so ${BASH_SOURCE[0]}'s sibling _job_common.sh is NOT
