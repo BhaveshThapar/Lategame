@@ -33,7 +33,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=20:00:00
-#SBATCH --output=slurm-%x-%A_%a.out
+#SBATCH --output=logs/slurm/slurm-%x-%A_%a.out
 # NOTE: no --gres=gpu (4.56M params). NOTE: set --partition for UMIACS.
 # 20h, not 12: v22 took 4:50-5:24 for 50 iters, and Build 23 runs 80 at a looser KL bar -- fewer
 # early stops means more full 4-epoch updates, so ~9-11h. medium QoS allows 2 days; headroom is free.
@@ -59,6 +59,12 @@ ANNEAL_ITERS="${ANNEAL_ITERS:-}"
 # The bar the KL early-stop actually enforces (ppo.py:212). Derived here, ONCE, so the run and its
 # certificate cannot disagree about what the trust region was.
 KL_BAR="$(python -c "print(1.5 * ${TARGET_KL})")"
+
+# The run log, named ONCE. It is the only source of the trust-region certificate (see below), and
+# the `tee` that writes it and the `ppo_telemetry.py` that reads it used to repeat the literal
+# path -- a drift between the two would have silently produced an empty certificate.
+RUN_LOG="logs/ppo/${BUILD}/ppo_${BUILD}_s${SEED}.log"
+mkdir -p "$(dirname "$RUN_LOG")"
 
 # Built as an array, not interpolated: an unset ANNEAL_ITERS must pass NO flag at all, so the
 # default path is byte-identical to v17-v23. `if`, not `&&`, because a false `&&` as a bare
@@ -86,7 +92,7 @@ python -u scripts/ppo_continue_gate.py \
   --lr            2.5e-4 --lr-final 5e-5 \
   --target-kl     "$TARGET_KL" \
   ${ANNEAL_ARGS[@]+"${ANNEAL_ARGS[@]}"} \
-  2>&1 | tee "ppo_${BUILD}_s${SEED}.log"
+  2>&1 | tee "$RUN_LOG"
 
 # The stdout log is gitignored (*.log) and is the ONLY source of the trust-region certificate --
 # ppo_continue_gate's JSON stores just the win-rate curve. Persist it NOW, in-job: a NULL is only
@@ -94,7 +100,7 @@ python -u scripts/ppo_continue_gate.py \
 # --kl-bar tracks TARGET_KL: a certificate that named 0.045 for a run at 0.09 would claim a bar the
 # optimizer never enforced, in the one artifact a NULL's attribution rests on.
 python -u scripts/ppo_telemetry.py \
-  --log "$SEED" "ppo_${BUILD}_s${SEED}.log" \
+  --log "$SEED" "$RUN_LOG" \
   --kl-bar "$KL_BAR" \
   --out "results/ppo_ou_telemetry_${BUILD}_s${SEED}.json"
 

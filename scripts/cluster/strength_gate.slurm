@@ -41,7 +41,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=08:00:00
-#SBATCH --output=slurm-%x-%j.out
+#SBATCH --output=logs/slurm/slurm-%x-%j.out
 # NOTE: no --gres=gpu. NOTE: needs -p tron --qos=medium (default QoS caps CPUs at 4).
 
 set -euo pipefail
