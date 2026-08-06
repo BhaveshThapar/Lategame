@@ -25,6 +25,14 @@ dist/
 *.log
 slurm-*.out
 
+# Job logs live under logs/<type>/<bucket>/ (ppo run logs, Showdown server logs, slurm stdout).
+# The two patterns above are UNANCHORED, so they keep matching in there -- only the two files
+# below are tracked:
+#   logs/slurm/.gitkeep    sbatch does NOT create its --output directory, and git does not track
+#                          empty ones, so a fresh clone without this fails every job at launch.
+#   logs/MANIFEST.tsv      how each historical log was attributed to a build (showdown logs carry
+#                          no build in the name -- it is derived from jobid, else port + mtime).
+
 # OS / editor
 .DS_Store
 .vscode/

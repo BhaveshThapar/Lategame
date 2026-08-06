@@ -1,0 +1,115 @@
+dest	src	jobid	port	bucket	rule
+logs/ppo/v22/ppo_v22_s0.log	ppo_v22_s0.log			v22	ppo:filename
+logs/ppo/v22/ppo_v22_s1.log	ppo_v22_s1.log			v22	ppo:filename
+logs/ppo/v22/ppo_v22_s2.log	ppo_v22_s2.log			v22	ppo:filename
+logs/ppo/v23a/ppo_v23a_s0.log	ppo_v23a_s0.log			v23a	ppo:filename
+logs/ppo/v23a/ppo_v23a_s1.log	ppo_v23a_s1.log			v23a	ppo:filename
+logs/ppo/v23a/ppo_v23a_s2.log	ppo_v23a_s2.log			v23a	ppo:filename
+logs/ppo/v23b/ppo_v23b_s0.log	ppo_v23b_s0.log			v23b	ppo:filename
+logs/ppo/v23b/ppo_v23b_s1.log	ppo_v23b_s1.log			v23b	ppo:filename
+logs/ppo/v23b/ppo_v23b_s2.log	ppo_v23b_s2.log			v23b	ppo:filename
+logs/ppo/v24a/ppo_v24a_s0.log	ppo_v24a_s0.log			v24a	ppo:filename
+logs/ppo/v24a/ppo_v24a_s1.log	ppo_v24a_s1.log			v24a	ppo:filename
+logs/ppo/v24a/ppo_v24a_s2.log	ppo_v24a_s2.log			v24a	ppo:filename
+logs/ppo/v24b/ppo_v24b_s0.log	ppo_v24b_s0.log			v24b	ppo:filename
+logs/ppo/v24b/ppo_v24b_s1.log	ppo_v24b_s1.log			v24b	ppo:filename
+logs/ppo/v24b/ppo_v24b_s2.log	ppo_v24b_s2.log			v24b	ppo:filename
+logs/ppo/v24c/ppo_v24c_s0.log	ppo_v24c_s0.log			v24c	ppo:filename
+logs/ppo/v24c/ppo_v24c_s1.log	ppo_v24c_s1.log			v24c	ppo:filename
+logs/ppo/v24c/ppo_v24c_s2.log	ppo_v24c_s2.log			v24c	ppo:filename
+logs/ppo/v24d/ppo_v24d_s0.log	ppo_v24d_s0.log			v24d	ppo:filename
+logs/ppo/v24d/ppo_v24d_s1.log	ppo_v24d_s1.log			v24d	ppo:filename
+logs/ppo/v24d/ppo_v24d_s2.log	ppo_v24d_s2.log			v24d	ppo:filename
+logs/ppo/v25a/ppo_v25a_s0.log	ppo_v25a_s0.log			v25a	ppo:filename
+logs/ppo/v25a/ppo_v25a_s1.log	ppo_v25a_s1.log			v25a	ppo:filename
+logs/ppo/v25a/ppo_v25a_s2.log	ppo_v25a_s2.log			v25a	ppo:filename
+logs/ppo/v25b/ppo_v25b_s0.log	ppo_v25b_s0.log			v25b	ppo:filename
+logs/ppo/v25b/ppo_v25b_s1.log	ppo_v25b_s1.log			v25b	ppo:filename
+logs/ppo/v25b/ppo_v25b_s2.log	ppo_v25b_s2.log			v25b	ppo:filename
+logs/ppo/v25c/ppo_v25c_s0.log	ppo_v25c_s0.log			v25c	ppo:filename
+logs/ppo/v25c/ppo_v25c_s1.log	ppo_v25c_s1.log			v25c	ppo:filename
+logs/ppo/v25c/ppo_v25c_s2.log	ppo_v25c_s2.log			v25c	ppo:filename
+logs/showdown/b22-stageA/showdown_7114667_1.log	showdown_7114667_1.log	7114667	8101	b22-stageA	showdown:jobid
+logs/showdown/b22-stageA/showdown_7114668_0.log	showdown_7114668_0.log	7114668	8100	b22-stageA	showdown:port+mtime<-slurm-lg-b22-stageA-7114667_0.out
+logs/showdown/b22-stageA/showdown_7114674_1.log	showdown_7114674_1.log	7114674	8101	b22-stageA	showdown:jobid
+logs/showdown/b22-stageA/showdown_7114675_0.log	showdown_7114675_0.log	7114675	8100	b22-stageA	showdown:port+mtime<-slurm-lg-b22-stageA-7114667_0.out
+logs/showdown/b22-stageB0/showdown_7141999_2.log	showdown_7141999_2.log	7141999	8102	b22-stageB0	showdown:jobid
+logs/showdown/b22-stageB0/showdown_7142000_0.log	showdown_7142000_0.log	7142000	8100	b22-stageB0	showdown:port+mtime<-slurm-lg-b22-stageB0-7141999_0.out
+logs/showdown/b22-stageB0/showdown_7142001_1.log	showdown_7142001_1.log	7142001	8101	b22-stageB0	showdown:port+mtime<-slurm-lg-b22-stageB0-7141999_1.out
+logs/showdown/probe-rep/showdown_7172540_0.log	showdown_7172540_0.log	7172540	8200	probe-rep	showdown:jobid
+logs/showdown/strength/showdown_7180385_0.log	showdown_7180385_0.log	7180385	8100	strength	showdown:jobid
+logs/showdown/strength/showdown_7182357_0.log	showdown_7182357_0.log	7182357	8100	strength	showdown:jobid
+logs/showdown/strength/showdown_7186606_0.log	showdown_7186606_0.log	7186606	8100	strength	showdown:jobid
+logs/showdown/v22/showdown_7172508_2.log	showdown_7172508_2.log	7172508	8102	v22	showdown:jobid
+logs/showdown/v22/showdown_7172509_0.log	showdown_7172509_0.log	7172509	8100	v22	showdown:port+mtime<-slurm-lg-ppo-7172508_0.out
+logs/showdown/v22/showdown_7172510_1.log	showdown_7172510_1.log	7172510	8101	v22	showdown:port+mtime<-slurm-lg-ppo-7172508_1.out
+logs/showdown/v23a/showdown_7181039_2.log	showdown_7181039_2.log	7181039	8102	v23a	showdown:jobid
+logs/showdown/v23a/showdown_7181040_0.log	showdown_7181040_0.log	7181040	8100	v23a	showdown:port+mtime<-slurm-lg-ppo-7181039_0.out
+logs/showdown/v23a/showdown_7181041_1.log	showdown_7181041_1.log	7181041	8101	v23a	showdown:port+mtime<-slurm-lg-ppo-7181039_1.out
+logs/showdown/v23b/showdown_7181042_2.log	showdown_7181042_2.log	7181042	8202	v23b	showdown:jobid
+logs/showdown/v23b/showdown_7181043_0.log	showdown_7181043_0.log	7181043	8200	v23b	showdown:port+mtime<-slurm-lg-ppo-7181042_0.out
+logs/showdown/v23b/showdown_7181757_1.log	showdown_7181757_1.log	7181757	8201	v23b	showdown:port+mtime<-slurm-lg-ppo-7181042_1.out
+logs/showdown/v24a/showdown_7183404_2.log	showdown_7183404_2.log	7183404	8202	v24a	showdown:jobid
+logs/showdown/v24a/showdown_7183408_0.log	showdown_7183408_0.log	7183408	8200	v24a	showdown:port+mtime<-slurm-lg-ppo-7183404_0.out
+logs/showdown/v24a/showdown_7183409_1.log	showdown_7183409_1.log	7183409	8201	v24a	showdown:port+mtime<-slurm-lg-ppo-7183404_1.out
+logs/showdown/v24b/showdown_7183405_2.log	showdown_7183405_2.log	7183405	8302	v24b	showdown:jobid
+logs/showdown/v24b/showdown_7183410_0.log	showdown_7183410_0.log	7183410	8300	v24b	showdown:port+mtime<-slurm-lg-ppo-7183405_0.out
+logs/showdown/v24b/showdown_7184561_1.log	showdown_7184561_1.log	7184561	8301	v24b	showdown:port+mtime<-slurm-lg-ppo-7183405_1.out
+logs/showdown/v24c/showdown_7183406_2.log	showdown_7183406_2.log	7183406	8402	v24c	showdown:jobid
+logs/showdown/v24c/showdown_7184583_0.log	showdown_7184583_0.log	7184583	8400	v24c	showdown:port+mtime<-slurm-lg-ppo-7183406_0.out
+logs/showdown/v24c/showdown_7184818_1.log	showdown_7184818_1.log	7184818	8401	v24c	showdown:port+mtime<-slurm-lg-ppo-7183406_1.out
+logs/showdown/v24d/showdown_7183407_2.log	showdown_7183407_2.log	7183407	8502	v24d	showdown:jobid
+logs/showdown/v24d/showdown_7185724_0.log	showdown_7185724_0.log	7185724	8500	v24d	showdown:port+mtime<-slurm-lg-ppo-7183407_0.out
+logs/showdown/v24d/showdown_7185725_1.log	showdown_7185725_1.log	7185725	8501	v24d	showdown:port+mtime<-slurm-lg-ppo-7183407_1.out
+logs/showdown/v25a/showdown_7188054_2.log	showdown_7188054_2.log	7188054	8202	v25a	showdown:jobid
+logs/showdown/v25a/showdown_7188058_0.log	showdown_7188058_0.log	7188058	8200	v25a	showdown:port+mtime<-slurm-lg-ppo-7188054_0.out
+logs/showdown/v25a/showdown_7188059_1.log	showdown_7188059_1.log	7188059	8201	v25a	showdown:port+mtime<-slurm-lg-ppo-7188054_1.out
+logs/showdown/v25b/showdown_7188055_2.log	showdown_7188055_2.log	7188055	8302	v25b	showdown:jobid
+logs/showdown/v25b/showdown_7188060_0.log	showdown_7188060_0.log	7188060	8300	v25b	showdown:port+mtime<-slurm-lg-ppo-7188055_0.out
+logs/showdown/v25b/showdown_7189803_1.log	showdown_7189803_1.log	7189803	8301	v25b	showdown:port+mtime<-slurm-lg-ppo-7188055_1.out
+logs/showdown/v25c/showdown_7188056_2.log	showdown_7188056_2.log	7188056	8402	v25c	showdown:jobid
+logs/showdown/v25c/showdown_7190093_0.log	showdown_7190093_0.log	7190093	8400	v25c	showdown:port+mtime<-slurm-lg-ppo-7188056_0.out
+logs/showdown/v25c/showdown_7190145_1.log	showdown_7190145_1.log	7190145	8401	v25c	showdown:port+mtime<-slurm-lg-ppo-7188056_1.out
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114664_0.out	slurm-lg-b22-stageA-7114664_0.out	7114664		b22-stageA	slurm:job-name
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114664_1.out	slurm-lg-b22-stageA-7114664_1.out	7114664		b22-stageA	slurm:job-name
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114667_0.out	slurm-lg-b22-stageA-7114667_0.out	7114667	8100	b22-stageA	slurm:job-name
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114667_1.out	slurm-lg-b22-stageA-7114667_1.out	7114667	8101	b22-stageA	slurm:job-name
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114674_0.out	slurm-lg-b22-stageA-7114674_0.out	7114674	8100	b22-stageA	slurm:job-name
+logs/slurm/b22-stageA/slurm-lg-b22-stageA-7114674_1.out	slurm-lg-b22-stageA-7114674_1.out	7114674	8101	b22-stageA	slurm:job-name
+logs/slurm/b22-stageB0/slurm-lg-b22-stageB0-7141999_0.out	slurm-lg-b22-stageB0-7141999_0.out	7141999	8100	b22-stageB0	slurm:job-name
+logs/slurm/b22-stageB0/slurm-lg-b22-stageB0-7141999_1.out	slurm-lg-b22-stageB0-7141999_1.out	7141999	8101	b22-stageB0	slurm:job-name
+logs/slurm/b22-stageB0/slurm-lg-b22-stageB0-7141999_2.out	slurm-lg-b22-stageB0-7141999_2.out	7141999		b22-stageB0	slurm:job-name
+logs/slurm/probe-rep/slurm-lg-probe-rep-7172540.out	slurm-lg-probe-rep-7172540.out	7172540	8200	probe-rep	slurm:job-name
+logs/slurm/strength/slurm-lg-strength-7180385.out	slurm-lg-strength-7180385.out	7180385	8100	strength	slurm:job-name
+logs/slurm/strength/slurm-lg-strength-7182357.out	slurm-lg-strength-7182357.out	7182357	8100	strength	slurm:job-name
+logs/slurm/strength/slurm-lg-strength-7186606.out	slurm-lg-strength-7186606.out	7186606	8100	strength	slurm:job-name
+logs/slurm/v22/slurm-lg-ppo-7172508_0.out	slurm-lg-ppo-7172508_0.out	7172508	8100	v22	slurm:ckpt-prefix
+logs/slurm/v22/slurm-lg-ppo-7172508_1.out	slurm-lg-ppo-7172508_1.out	7172508	8101	v22	slurm:ckpt-prefix
+logs/slurm/v22/slurm-lg-ppo-7172508_2.out	slurm-lg-ppo-7172508_2.out	7172508	8102	v22	slurm:ckpt-prefix
+logs/slurm/v23a/slurm-lg-ppo-7181039_0.out	slurm-lg-ppo-7181039_0.out	7181039	8100	v23a	slurm:ckpt-prefix
+logs/slurm/v23a/slurm-lg-ppo-7181039_1.out	slurm-lg-ppo-7181039_1.out	7181039	8101	v23a	slurm:ckpt-prefix
+logs/slurm/v23a/slurm-lg-ppo-7181039_2.out	slurm-lg-ppo-7181039_2.out	7181039	8102	v23a	slurm:ckpt-prefix
+logs/slurm/v23b/slurm-lg-ppo-7181042_0.out	slurm-lg-ppo-7181042_0.out	7181042	8200	v23b	slurm:ckpt-prefix
+logs/slurm/v23b/slurm-lg-ppo-7181042_1.out	slurm-lg-ppo-7181042_1.out	7181042	8201	v23b	slurm:ckpt-prefix
+logs/slurm/v23b/slurm-lg-ppo-7181042_2.out	slurm-lg-ppo-7181042_2.out	7181042	8202	v23b	slurm:ckpt-prefix
+logs/slurm/v24a/slurm-lg-ppo-7183404_0.out	slurm-lg-ppo-7183404_0.out	7183404	8200	v24a	slurm:ckpt-prefix
+logs/slurm/v24a/slurm-lg-ppo-7183404_1.out	slurm-lg-ppo-7183404_1.out	7183404	8201	v24a	slurm:ckpt-prefix
+logs/slurm/v24a/slurm-lg-ppo-7183404_2.out	slurm-lg-ppo-7183404_2.out	7183404	8202	v24a	slurm:ckpt-prefix
+logs/slurm/v24b/slurm-lg-ppo-7183405_0.out	slurm-lg-ppo-7183405_0.out	7183405	8300	v24b	slurm:ckpt-prefix
+logs/slurm/v24b/slurm-lg-ppo-7183405_1.out	slurm-lg-ppo-7183405_1.out	7183405	8301	v24b	slurm:ckpt-prefix
+logs/slurm/v24b/slurm-lg-ppo-7183405_2.out	slurm-lg-ppo-7183405_2.out	7183405	8302	v24b	slurm:ckpt-prefix
+logs/slurm/v24c/slurm-lg-ppo-7183406_0.out	slurm-lg-ppo-7183406_0.out	7183406	8400	v24c	slurm:ckpt-prefix
+logs/slurm/v24c/slurm-lg-ppo-7183406_1.out	slurm-lg-ppo-7183406_1.out	7183406	8401	v24c	slurm:ckpt-prefix
+logs/slurm/v24c/slurm-lg-ppo-7183406_2.out	slurm-lg-ppo-7183406_2.out	7183406	8402	v24c	slurm:ckpt-prefix
+logs/slurm/v24d/slurm-lg-ppo-7183407_0.out	slurm-lg-ppo-7183407_0.out	7183407	8500	v24d	slurm:ckpt-prefix
+logs/slurm/v24d/slurm-lg-ppo-7183407_1.out	slurm-lg-ppo-7183407_1.out	7183407	8501	v24d	slurm:ckpt-prefix
+logs/slurm/v24d/slurm-lg-ppo-7183407_2.out	slurm-lg-ppo-7183407_2.out	7183407	8502	v24d	slurm:ckpt-prefix
+logs/slurm/v25a/slurm-lg-ppo-7188054_0.out	slurm-lg-ppo-7188054_0.out	7188054	8200	v25a	slurm:ckpt-prefix
+logs/slurm/v25a/slurm-lg-ppo-7188054_1.out	slurm-lg-ppo-7188054_1.out	7188054	8201	v25a	slurm:ckpt-prefix
+logs/slurm/v25a/slurm-lg-ppo-7188054_2.out	slurm-lg-ppo-7188054_2.out	7188054	8202	v25a	slurm:ckpt-prefix
+logs/slurm/v25b/slurm-lg-ppo-7188055_0.out	slurm-lg-ppo-7188055_0.out	7188055	8300	v25b	slurm:ckpt-prefix
+logs/slurm/v25b/slurm-lg-ppo-7188055_1.out	slurm-lg-ppo-7188055_1.out	7188055	8301	v25b	slurm:ckpt-prefix
+logs/slurm/v25b/slurm-lg-ppo-7188055_2.out	slurm-lg-ppo-7188055_2.out	7188055	8302	v25b	slurm:ckpt-prefix
+logs/slurm/v25c/slurm-lg-ppo-7188056_0.out	slurm-lg-ppo-7188056_0.out	7188056	8400	v25c	slurm:ckpt-prefix
+logs/slurm/v25c/slurm-lg-ppo-7188056_1.out	slurm-lg-ppo-7188056_1.out	7188056	8401	v25c	slurm:ckpt-prefix
+logs/slurm/v25c/slurm-lg-ppo-7188056_2.out	slurm-lg-ppo-7188056_2.out	7188056	8402	v25c	slurm:ckpt-prefix

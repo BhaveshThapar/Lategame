@@ -46,9 +46,19 @@ echo "[job] python: $(command -v python)  ($(python --version 2>&1))"
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
 export LATEGAME_SHOWDOWN_PORT="${LATEGAME_SHOWDOWN_PORT:-$((${LATEGAME_SHOWDOWN_PORT_BASE:-8100} + TASK_ID))}"
 
-SERVER_LOG="${SERVER_LOG:-showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
+# Server logs live under logs/showdown/<bucket>/, not the repo root. Resolved HERE rather than at
+# source time: callers set BUILD *after* sourcing this file (ppo_seed.slurm does), so a source-time
+# default would always miss it and bucket every arm under the job name instead. LOG_BUCKET wins if
+# set; then BUILD; then the job name with sbatch's `lg-` prefix stripped, which is what the
+# non-ppo jobs (strength, b22-stageA, probe-rep) sort by.
+_resolve_server_log() {
+  local bucket="${LOG_BUCKET:-${BUILD:-${SLURM_JOB_NAME:-local}}}"
+  SERVER_LOG="${SERVER_LOG:-logs/showdown/${bucket#lg-}/showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
+  mkdir -p "$(dirname "$SERVER_LOG")"
+}
 
 start_showdown() {
+  _resolve_server_log
   echo "[job] starting Showdown on port ${LATEGAME_SHOWDOWN_PORT}"
   bash scripts/run_server.sh "$LATEGAME_SHOWDOWN_PORT" > "$SERVER_LOG" 2>&1 &
   SHOWDOWN_PID=$!

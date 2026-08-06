@@ -16,7 +16,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=04:00:00
-#SBATCH --output=slurm-%x-%A_%a.out
+#SBATCH --output=logs/slurm/slurm-%x-%A_%a.out
 # NOTE: no --gres=gpu. The net is 4.56M params; a GPU buys nothing and lengthens the queue.
 # NOTE: --partition is intentionally unset -- fill in whatever UMIACS gives you.
 

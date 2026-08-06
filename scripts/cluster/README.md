@@ -98,6 +98,15 @@ Everything in `plan.md` §13.1 still applies, in particular:
 
 - Run `scripts/ppo_telemetry.py` **first** after a run. The stdout log is gitignored; that JSON is the
   durable copy of the trust-region certificate, and without it a NULL cannot be attributed to the lever.
+  (`ppo_seed.slurm` already runs it in-job, off the same `RUN_LOG` it `tee`s to — the path is named
+  once so the writer and the reader cannot drift apart.)
+- Job logs land under `logs/`, never the repo root: `logs/ppo/<build>/` for run stdout,
+  `logs/slurm/` for `sbatch --output`, `logs/showdown/<bucket>/` for the per-job server, where
+  `<bucket>` is `$BUILD` if set and otherwise the job name minus `lg-`. **`logs/slurm/` must exist
+  before you submit** — sbatch does not create its `--output` directory and the job dies at launch if
+  it is missing, which is why `logs/slurm/.gitkeep` is tracked. When running two gates concurrently,
+  set `LATEGAME_SHOWDOWN_PORT_BASE` on the second: `strength_gate.slurm` is not an array job, so both
+  otherwise compute port 8100 and silently share a server if they land on one node.
 - Pool seeds with `scripts/merge_gate_seeds.py`. A dropped seed silently halves the strength gate's
   power — it still prints a verdict.
 - `grad_noise_diag`'s `NOISE_LIMITED` verdict answers **Build 20's** question. `B_simple` is a ratio,
