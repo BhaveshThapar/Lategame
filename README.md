@@ -639,6 +639,38 @@ second saturation read comes from `best_iter` itself, and is pre-registered *bec
 *Cost:* 9 tasks ≈ **107 task-hours**, 4 concurrent ⇒ ~32 h wall-clock. **Disk, not time, is the binding constraint** —
 ~23 GB against 64 GB free.
 
+**OU pivot Build 25 — STILL CLIMBING: 160 updates is not the ceiling, and scaling the anneal to match COSTS ~9 points.**
+Both gates ran 2026-08-06 and completed clean: primary N=3000 (36,000 battles, 2:28:51) and the selection-free terminal
+read at N=1800 (21,600 battles, 1:54:09). Pooled vs the heuristic, n=9000/arm: `v23b` **0.5450**, `v25a` **0.6144**,
+`v25b` **0.6534** [0.6435, 0.6632], `v25c` **0.5604**. **0.6534 is the highest pooled rate in the project's history**,
+against the 0.550 Build 24 set. The anchor re-calibrates at 0.5450 vs Build 24's 0.5504 — 0.0054 apart, well inside the
+±0.027 band.
+*The four contrasts at α = 0.0125, bias subtracted before any dose is declared:* 80→120 **+0.0694 − 0.0045 = +0.0649**
+(3/3 seeds, t = +2.12); 120→160 **+0.0390 − 0.0028 = +0.0362** (2/3, t = +1.03); the **total** 80→160
+**+0.1084 − 0.0073 = +0.1011** (**3/3**, **t = +5.36**); anneal horizon at 160 **−0.0930** (**0/3**, t = −2.17). All four
+p < 0.0001. #1 + #2 = #3 exactly, as it must. **#1 and #2 both significant and positive ⇒ STILL CLIMBING** — inside the
+anticipated rows, and Build 26 extends again.
+*The bias correction was applied and did not bind* — every dose clears its bias by an order of magnitude. Booked as
+applied-and-immaterial rather than quietly dropped, because the commitment predated the sign.
+*The selection-free read agrees in sign on all four* (+0.0411 / +0.0694 / +0.1106 / −0.0907), so **there is no sign
+disagreement to book**; #3 is near-identical across reads (+0.1084 vs +0.1106), the strongest evidence the total effect is
+not a selection artifact. **But #2 is pooled-significant and NOT seed-robust on the seed-best read** — per-seed diffs
++0.003 / −0.001 / +0.115, carried almost entirely by seed 2 — where the *terminal* read is the stronger one (t = +2.34,
+3/3). That reversal of the usual direction carries into Build 26.
+*#4 is a seed-robust regression, and NOT the row that was anticipated.* FROZEN-SCHEDULE ARTIFACT required the anneal
+contrast to be significant and **positive**; it came back significant and **negative** (0/3 seeds, t = −4.54 on the
+terminal read). The frozen schedule is not hiding the effect — **it is actively better**, and Build 24's non-seed-robust
++0.031 anneal half is settled in the opposite direction at the longer budget.
+*The curve-side read, pre-registered as able to contradict the gate, does not:* `v25b`'s `best_iter` is **132/125/159**,
+0/3 seeds at or below 120. *Attributable:* the trust region bound 1/360 (`v25a`), **0/480** (`v25b`), 19/480 (`v25c`),
+`approx_kl_max` all under the 0.09 bar; no collapse (`vs_iter0` 0.99–1.00, final entropy 0.52–0.60).
+
+**Open next (Build 26) — EXTEND THE DOSE AGAIN, HORIZON PINNED AT 80.** `iters` **240** and **320** at `anneal_iters` 80,
+scored against `v25b`. The horizon question is **closed by #4**, so no arm is spent on it. Two things to pre-register:
+the differential selection bias must be **re-simulated** for 240/320 vs 160 (it grows with the length ratio — do not reuse
+Build 25's numbers), and the terminal read should be **co-primary** rather than descriptive, since #2 shows the per-step
+dose is near the resolution of the seed-best read. ~150 task-hours ÷ 4 ⇒ ~38 h wall-clock; ~29 GB against 146 GB free.
+
 ## Setup
 
 ```bash
@@ -693,8 +725,11 @@ python scripts/rpredict_oppmodel_gate.py --gate b --arms whitebox,learned --conc
 
 # Gen 9 OU PPO builds (19-23) — the build-vs-build toolchain. Run in this order.
 # On the cluster the seeds are an array job (scripts/cluster/ppo_seed.slurm); each writes its own _s{N}.json.
-python scripts/ppo_telemetry.py --log 0 run_s0.log --kl-bar 0.045 --out results/ppo_ou_telemetry_v21.json
+python scripts/ppo_telemetry.py --log 0 logs/ppo/v21/ppo_v21_s0.log --kl-bar 0.045 --out results/ppo_ou_telemetry_v21.json
 #   ^ the TRUST-REGION CERTIFICATE. Run FIRST: the run log is gitignored, this JSON is the durable copy.
+#     Job logs live under logs/ — logs/ppo/<build>/ (run stdout), logs/slurm/ (sbatch --output),
+#     logs/showdown/<bucket>/ (per-job server). ppo_seed.slurm writes its own; only logs/slurm/.gitkeep
+#     and logs/MANIFEST.tsv are tracked. sbatch does NOT create its --output dir, hence the .gitkeep.
 #     A NULL is only attributable to the lever if the trust region did not bind (Build 22: it bound 59/150,
 #     which cost that build its verdict). --kl-bar MUST be 1.5 * the run's --target-kl, or the certificate
 #     names a bar the optimizer never enforced. ppo_seed.slurm derives both from TARGET_KL so they cannot drift.
