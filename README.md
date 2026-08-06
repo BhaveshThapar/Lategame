@@ -681,9 +681,20 @@ conda activate lategame
 # 2. Torch (needed for the learned agents / all training)
 pip install -e ".[ml]"
 
-# 3. Local Showdown server + vendored simulator (clones smogon/pokemon-showdown into
+# 3. Local Showdown server + vendored simulator (fetches smogon/pokemon-showdown into
 #    third_party/ and builds dist/ — dist/ is also used by replay re-simulation)
 bash scripts/setup_server.sh
+```
+
+**The vendored simulator is pinned** (`SHOWDOWN_REV` in `scripts/setup_server.sh`), and bumping the
+pin is a deliberate act. gen9randombattle sets change upstream, so the same PRNG seed rolls
+different teams under a different rev and every recorded inputlog goes illegal partway through —
+which is how the R-PREDICT fidelity and resim end-to-end tests silently broke against a simulator
+that had moved on. Bump the pin and the inputlog fixture in `tests/conftest.py` must be regenerated
+in the same commit:
+
+```bash
+node scripts/gen_inputlog_fixture.js third_party/pokemon-showdown
 ```
 
 ## Run

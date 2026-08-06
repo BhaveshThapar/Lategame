@@ -8,19 +8,11 @@ since the vendored simulator (``third_party/``) is not committed. The full live 
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
-
-import pytest
-
 from lategame.data.resim import _reconstruct_pov_resim
 from lategame.data.reward import RewardWeights
 from lategame.search.determinize import battle_to_spec, pokeenv_digest
-from lategame.search.forward import _DEFAULT_SHOWDOWN
+from tests.conftest import requires_showdown
 from tests.test_resim import _EVENTS
-
-_HAS_NODE = shutil.which("node") is not None
-_HAS_SIM = (Path(_DEFAULT_SHOWDOWN) / "dist").is_dir()
 
 
 def test_determinize_spec_and_digest_shapes() -> None:
@@ -39,7 +31,7 @@ def test_determinize_spec_and_digest_shapes() -> None:
         assert 0.0 <= mon["hp"] <= 1.0
 
 
-@pytest.mark.skipif(not (_HAS_NODE and _HAS_SIM), reason="needs node + a built vendored simulator")
+@requires_showdown
 def test_forward_reconstruct_and_step() -> None:
     from lategame.search.forward import ForwardModel
 
