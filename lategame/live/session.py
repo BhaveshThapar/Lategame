@@ -30,6 +30,7 @@ from typing import Any
 from poke_env.player import Player
 
 from lategame.config import DEFAULT_FORMAT
+from lategame.eval.rating import MAX_RD
 from lategame.live.player import LoginError, LoginWatch, build_live_player, wait_for_login
 from lategame.live.policy import POLICY_NOTE, check_ladder_optin
 from lategame.live.server import live_account, live_server
@@ -71,6 +72,12 @@ class LiveConfig:
     backoff_base: float = 5.0
     ladder_ack: str | None = None
     log_level: int | None = None
+    #: Rate opponents at their OBSERVED Showdown rating rather than pinning the field at the
+    #: reference. Off by default, and a no-op outside rated ladder games -- but without it the
+    #: session's own GXE is a reparameterisation of its score rate no matter what it played, which
+    #: is precisely the number G2 cannot be settled with. See ``telemetry.summarize``.
+    use_live_ratings: bool = False
+    opponent_rd: float = MAX_RD
 
 
 @dataclass
@@ -100,6 +107,9 @@ def _public_config(cfg: LiveConfig, username: str, ws_url: str) -> dict[str, Any
         "server": ws_url,
         "concurrency": cfg.concurrency,
         "requested_battles": cfg.n,
+        # Recorded for the same reason `ladder_ack` is: a published rating has to carry the basis
+        # it was computed on, and "were opponents rated or pinned" is that basis.
+        "use_live_ratings": cfg.use_live_ratings,
     }
     if cfg.mode == "ladder":
         public["policy"] = {"ranked": True, "ack": cfg.ladder_ack, "note": POLICY_NOTE}
@@ -273,9 +283,21 @@ async def run_session(
         sum(1 for r in log.records if r.finished) < cfg.n
     )
     outcome.records = log.records
-    outcome.summary = summarize(log.records)
+    outcome.summary = _summarize(cfg, log)
     _flush(cfg, log, None, outcome)
     return outcome
+
+
+def _summarize(cfg: LiveConfig, log: LiveLog) -> dict[str, Any]:
+    """The ONE place the summary options are applied.
+
+    The incremental per-battle writes and the final summary must not be able to disagree: a run
+    that flushed a pinned-field GXE 50 times and then reported a live-rated one at the end would
+    look like a corrupted file rather than a wiring bug. Both paths come through here.
+    """
+    return summarize(
+        log.records, use_live_ratings=cfg.use_live_ratings, opponent_rd=cfg.opponent_rd
+    )
 
 
 def _flush(cfg: LiveConfig, log: LiveLog, player: Player | None, outcome: SessionOutcome) -> None:
@@ -285,7 +307,7 @@ def _flush(cfg: LiveConfig, log: LiveLog, player: Player | None, outcome: Sessio
     public["restarts"] = outcome.restarts
     public["stopped_early"] = outcome.stopped_early
     with contextlib.suppress(OSError):
-        write_results(cfg.out, public, summarize(log.records), log.records)
+        write_results(cfg.out, public, _summarize(cfg, log), log.records)
 
 
 async def _shutdown(

@@ -19,8 +19,9 @@ from lategame.live.session import LiveConfig, _accept_list, chunk_count, run_ses
 class FakePlayer:
     """Only the surface session.py touches."""
 
-    def __init__(self, *, logged_in=True, hang=False, finish=True):
+    def __init__(self, *, logged_in=True, hang=False, finish=True, opp_rating=None):
         self.battles = {}
+        self._opp_rating = opp_rating
         self.n_finished_battles = 0
         self.username = "lategamebot"
         self.plays: list[tuple] = []  # (mode, k, opponent) -- play calls only
@@ -47,7 +48,8 @@ class FakePlayer:
                 tag = f"battle-{self._n}"
                 self.battles[tag] = SimpleNamespace(
                     battle_tag=tag, finished=True, won=True, turn=15,
-                    opponent_username="rival", rating=None, opponent_rating=None,
+                    opponent_username="rival", rating=None,
+                    opponent_rating=self._opp_rating,
                 )
                 self.n_finished_battles += 1
 
@@ -245,3 +247,54 @@ async def test_credentials_never_reach_the_results_file(tmp_path, monkeypatch):
     await run_session(_cfg(tmp_path, mode="accept", n=1), lambda c: FakePlayer())
     raw = (tmp_path / "live.json").read_bytes()
     assert b"hunter2-do-not-leak" not in raw
+
+
+# --------------------------------------------------------------------------- #
+# The varied-field option: reachable, and applied in BOTH places
+# --------------------------------------------------------------------------- #
+
+
+async def test_use_live_ratings_reaches_the_summary(tmp_path):
+    """`summarize(use_live_ratings=True)` had a test but no way to get there from a LiveConfig, so
+    a real ladder session would capture every opponent rating and then report the pinned-field GXE
+    anyway. This pins the wiring."""
+    cfg = _cfg(tmp_path, mode="accept", n=2, use_live_ratings=True)
+    out = await run_session(cfg, lambda c: FakePlayer(opp_rating=1800))
+
+    assert out.summary["opponent_rating_source"] == "showdown_elo_approximated_as_glicko"
+    assert "units are not identical" in out.summary["gxe_basis"]
+
+
+async def test_default_still_pins_the_field(tmp_path):
+    out = await run_session(
+        _cfg(tmp_path, mode="accept", n=2), lambda c: FakePlayer(opp_rating=1800)
+    )
+    assert "opponent_rating_source" not in out.summary
+    assert "pinned at rating.REFERENCE" in out.summary["gxe_basis"]
+
+
+async def test_incremental_writes_agree_with_the_final_summary(tmp_path):
+    """The per-battle flush and the final summary must apply the SAME options. If only one call
+    site were threaded, a session would flush a pinned-field GXE all the way through and then
+    report a live-rated one -- which reads as a corrupt file, not as a wiring bug."""
+    cfg = _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True)
+    out = await run_session(cfg, lambda c: FakePlayer(opp_rating=1800))
+
+    written = json.loads((tmp_path / "live.json").read_text())
+    assert written["gxe"] == out.summary["gxe"]
+    assert written["gxe_basis"] == out.summary["gxe_basis"]
+    assert written["use_live_ratings"] is True
+
+
+async def test_opponent_rd_is_threaded(tmp_path):
+    """A tighter deviation on the opponent makes its rating count for more, so the same record
+    must not produce the same GXE at both settings."""
+    loose = await run_session(
+        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True, opponent_rd=350.0),
+        lambda c: FakePlayer(opp_rating=1900),
+    )
+    tight = await run_session(
+        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True, opponent_rd=30.0),
+        lambda c: FakePlayer(opp_rating=1900),
+    )
+    assert loose.summary["gxe"] != tight.summary["gxe"]

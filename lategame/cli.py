@@ -9,13 +9,17 @@
     python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
     python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
     python -m lategame.cli live     --agent ppo --mode accept --n 5
+    python -m lategame.cli eval-ladder --format gen9ou --n 150
     python -m lategame.cli fetch-replays --min-rating 1200 --limit 200
     python -m lategame.cli resim-replays --out data/resim_gen9rb_rl.npz
 
 ``collect``/``train`` are the M2 BC pipeline; ``collect-rl``/``train-rl`` are the
 M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop; ``ppo`` is
 the M5 on-policy PPO self-play loop; ``live`` plays a LIVE server (M5 deploy / G1 -- see
-``lategame/live/`` and plan.md 15 before using ``--mode ladder``). ``fetch-replays`` +
+``lategame/live/`` and plan.md 15 before using ``--mode ladder``). ``evaluate`` scores one agent
+against ONE fixed baseline, where win rate is the sufficient statistic; ``eval-ladder`` rates a
+whole FIELD against itself, which is the only condition under which GXE/Glicko-1 say anything a
+win rate did not (see ``lategame/eval/ladder.py``). ``fetch-replays`` +
 ``ingest-replays`` are the M6
 human-replay pipeline (public-log POV); ``resim-replays`` is M6 v2, re-simulating each
 replay's inputlog for a full-fidelity (request-based) POV. Torch is imported lazily inside
@@ -31,6 +35,11 @@ import asyncio
 # is the module imported here: building --help must not pay for poke-env or torch.
 from lategame.config import DEFAULT_FORMAT
 from lategame.eval.arena import AGENTS, EvalResult, evaluate
+
+# `eval.ladder` and `eval.rating` are pure-Python (no poke-env, no torch), so importing the
+# constants that fill in --help text here costs nothing.
+from lategame.eval.ladder import DEFAULT_ANCHOR, DEFAULT_FIELD, DEFAULT_LOOP_PENALTY
+from lategame.eval.rating import MAX_RD
 from lategame.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PASSWORD_ENV, USERNAME_ENV
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
@@ -233,9 +242,94 @@ async def _run_live(args: argparse.Namespace) -> None:
         battle_timeout=args.battle_timeout, stall_timeout=args.stall_timeout,
         login_timeout=args.login_timeout, max_restarts=args.max_restarts,
         ladder_ack=args.ladder_ack, log_level=args.log_level,
+        use_live_ratings=args.use_live_ratings, opponent_rd=args.opponent_rd,
     )
     outcome = await run_session(cfg)
     _print_live_summary(outcome)
+    print(f"\nwrote {args.out}")
+
+
+async def _run_eval_ladder(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from lategame.eval.ladder import (
+        PairResult,
+        format_table,
+        parse_field,
+        rate_field,
+        run_round_robin,
+        summarize_ladder,
+        write_results,
+    )
+
+    entries = parse_field(args.field)
+    labels = [entry.label for entry in entries]
+
+    # PREFLIGHT, in the spirit of scripts/build26_analysis.sh: every reason to refuse is checked
+    # BEFORE any battle is played. A bad anchor or a missing checkpoint discovered after 4,000
+    # battles costs the whole run, and both are one string comparison away from being caught here.
+    if args.anchor not in labels:
+        raise SystemExit(
+            f"--anchor {args.anchor!r} is not in the field ({', '.join(labels)}).\n"
+            "The anchor fixes the additive gauge of the fit, so it must be an agent that plays."
+        )
+    missing = [
+        entry.checkpoint
+        for entry in entries
+        if entry.checkpoint is not None and not Path(entry.checkpoint).exists()
+    ]
+    if missing:
+        raise SystemExit("missing checkpoint(s):\n  " + "\n  ".join(missing))
+
+    pairs_n = len(entries) * (len(entries) - 1) // 2
+    print(
+        f"[{args.battle_format}] eval ladder: {len(entries)} agents, {pairs_n} pairs "
+        f"x {args.n} battles = {pairs_n * args.n} total"
+    )
+    for entry in entries:
+        anchor = "  (anchor)" if entry.label == args.anchor else ""
+        print(f"    {entry.label}{anchor}")
+    print()
+
+    def _progress(pair: PairResult) -> None:
+        print(
+            f"  {pair.a} vs {pair.b}: {pair.wins}-{pair.losses}-{pair.ties} "
+            f"(score {pair.score:.3f})",
+            flush=True,
+        )
+
+    pairs = await run_round_robin(
+        entries,
+        args.battle_format,
+        args.n,
+        team_pool=args.team_pool,
+        concurrency=args.concurrency,
+        sample=args.sample,
+        loop_penalty=args.loop_penalty,
+        on_pair=_progress,
+    )
+    fit = rate_field(pairs, anchor=args.anchor)
+    summary = summarize_ladder(
+        entries, pairs, fit, battle_format=args.battle_format, n_battles=args.n
+    )
+    write_results(
+        args.out,
+        {
+            "field_spec": args.field,
+            "team_pool": args.team_pool,
+            "concurrency": args.concurrency,
+            "sample": args.sample,
+            "loop_penalty": args.loop_penalty,
+        },
+        summary,
+    )
+    print()
+    print(format_table(summary))
+    print(f"\n  basis: {summary['gxe_basis']}")
+    if "warning" in summary:
+        print(f"\n  WARNING: {summary['warning']}")
+    if "unbounded_note" in summary:
+        print(f"\n  NOTE: {summary['unbounded_note']}")
     print(f"\nwrote {args.out}")
 
 
@@ -610,6 +704,65 @@ def build_parser() -> argparse.ArgumentParser:
              "acknowledgement is recorded in --out",
     )
     live.add_argument("--log-level", type=int, default=None, help="poke-env logger level")
+    live.add_argument(
+        "--use-live-ratings", action="store_true",
+        help="Rate each opponent at its OBSERVED Showdown rating instead of pinning the field at "
+             "1500/350. Only rated ladder games report one, so this is a no-op elsewhere. CAVEAT: "
+             "Showdown's ladder line carries ELO and this treats it as a Glicko rating -- the "
+             "units are not identical, and the results file records that it was used",
+    )
+    live.add_argument(
+        "--opponent-rd", type=float, default=MAX_RD,
+        help="Deviation assigned to an opponent's observed rating (default: the 350 ceiling, i.e. "
+             "treat it as barely-known). Only meaningful with --use-live-ratings",
+    )
+
+    ladder = sub.add_parser(
+        "eval-ladder",
+        help="R-EVAL: rate a FIELD of agents against each other on the local server (G2's metric)",
+        description=(
+            "Play a round-robin over a field of agents and fit every rating jointly, so GXE and "
+            "Glicko-1 are measured against a VARIED opponent field rather than one pinned "
+            "baseline -- which is the only condition under which they carry information a win "
+            "rate did not. This is the 'private/agent-only server or eval ladder' plan.md 12 asks "
+            "for. It does NOT replace scripts/seed_strength_gate.py as the build-vs-build "
+            "statistic, and its GXE is not comparable to a Showdown GXE (which is measured "
+            "against humans)."
+        ),
+    )
+    ladder.add_argument(
+        "--field", default=",".join(DEFAULT_FIELD),
+        help="Comma-separated agents as 'name' or 'name@checkpoint'. Default spans the measured "
+             "strength range from random to the best PPO build",
+    )
+    ladder.add_argument("--n", type=int, default=150, help="Battles per pair")
+    ladder.add_argument(
+        "--anchor", default=DEFAULT_ANCHOR,
+        help="Agent pinned at 1500 to fix the fit's additive gauge. A round-robin identifies "
+             "rating DIFFERENCES only, so one agent must be pinned; the default is the project's "
+             "fixed baseline, which makes the ratings commensurable with every published win rate",
+    )
+    ladder.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
+    ladder.add_argument(
+        "--team-pool", default=None,
+        help="Packed team pool, REQUIRED for teambuilt formats such as gen9ou",
+    )
+    ladder.add_argument(
+        "--concurrency", type=int, default=20,
+        help="max_concurrent_battles; the local server is the bottleneck",
+    )
+    ladder.add_argument("--sample", action="store_true", help="Sample instead of arg-max")
+    ladder.add_argument(
+        "--loop-penalty", type=float, default=DEFAULT_LOOP_PENALTY,
+        help="Build-14 LoopGuard. Defaults to the value the AUTHORITATIVE strength gate uses (4), "
+             "not 0, so the ladder scores the same policy the published win rates scored",
+    )
+    ladder.add_argument(
+        "--out", default="results/eval_ladder.json",
+        help="Standings, the full win matrix, and the basis they must be read with",
+    )
 
     fetch = sub.add_parser(
         "fetch-replays", help="Download + cache rated human replays (M6 data plan)"
@@ -710,6 +863,8 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(_run_ppo(args))
     elif args.command == "live":
         asyncio.run(_run_live(args))
+    elif args.command == "eval-ladder":
+        asyncio.run(_run_eval_ladder(args))
     elif args.command == "fetch-replays":
         _run_fetch_replays(args)
     elif args.command == "ingest-replays":
