@@ -694,6 +694,27 @@ submitted with `LATEGAME_SHOWDOWN_PORT_BASE=8200`: `_job_common.sh` computes `81
 `--array=0-2` arrays claim the same ports and colliding tasks **silently share one server** instead of failing.
 6 tasks ÷ 4 concurrent ⇒ ~**40 h wall-clock**; ~29 GB of checkpoints against **78 GB** free.
 
+**Attempt 1 lost 4 of 6 arms, and the post-mortem changed a standing constraint.** Two causes.
+*Disk:* the 200 GB scratch quota is **shared**, not per-project — a neighbouring project grew
+86 → 125 GB mid-run and the quota hit 195/200, so `torch.save` failed outright on one arm and
+slowed two others from 4.0 to 15–18 min/iter until they timed out. The pre-run check compared
+Build 26's own footprint against free space *at submit time*, which is not a claim that survives a
+shared quota over 40 h. *Memory — the real finding:* **arm length is bounded by memory, not
+walltime.** RSS grows ~**0.23 GiB/iter** (40.7 GiB at 160, 59.3 at 240, projecting ~78 at 320),
+while `medium` sets `MaxTRES=mem=64G` **per job** — a larger `--mem` is rejected at submit, not
+queued. `high` has 128 GB but only 24 h against a ~21.2 h run. **No QoS envelope fits a 320-iter
+arm in one process**, so raising walltime could never have fixed it; `v26b` died OOM at exactly
+64 GB, 304/320 in.
+
+So `run_ppo` gains an **opt-in `--resume`**: a fresh process resets RSS, which is what makes an arm
+past ~260 iterations runnable at all. The state file carries Adam's moments and both RNG streams
+(dropping either restarts the optimizer cold and re-draws the league from the top of the stream),
+lives beside rather than inside `iter_NN.pt`, and defaults **off** so Builds ≤25 reproduce
+unchanged. It refuses to run without `--anneal-iters` pinned, since `anneal_horizon` otherwise
+falls back to `iters` and would anneal over a different span per chunk. `v26b` now runs 160 → resume
+→ 320. **Caveat to report with the result:** `v26a` ran uninterrupted and `v26b` is chunked, so #2
+(`v26a` → `v26b`) is the contrast carrying that difference.
+
 ## Setup
 
 ```bash

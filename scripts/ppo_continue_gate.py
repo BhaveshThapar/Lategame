@@ -63,6 +63,7 @@ def _ppo_config(
     lr_final: float | None = None,
     target_kl: float = PPOConfig.target_kl,
     anneal_iters: int | None = None,
+    resume: bool = False,
 ) -> PPOConfig:
     return PPOConfig(
         init=init,
@@ -88,6 +89,8 @@ def _ppo_config(
         target_kl=target_kl,
         # Build 24: None == iters, so an unset run reproduces v17-v23 exactly.
         anneal_iters=anneal_iters,
+        # Build 26: restart from out_dir's last completed iteration. Off == Build 25.
+        resume=resume,
     )
 
 
@@ -193,6 +196,7 @@ async def run_gate(
     lr_final: float | None = None,
     target_kl: float = PPOConfig.target_kl,
     anneal_iters: int | None = None,
+    resume: bool = False,
 ) -> dict:
     if not Path(init).exists():
         raise SystemExit(f"GREEN warm-start checkpoint '{init}' not found.")
@@ -200,6 +204,7 @@ async def run_gate(
         f"init {init} | seeds {seeds} | iters {iters} | "
         f"games_per_opp {games_per_opp} | eval_n {eval_n} | "
         f"team_pool {team_pool} | loop_penalty {loop_penalty} | prefix {ckpt_prefix}"
+        f"{' | RESUME' if resume else ''}"
     )
     # The gate JSON stores only the win-rate curve, so the trust region is reconstructed from the
     # log. Print the bar the run actually used -- ppo_telemetry.py's --kl-bar must match it.
@@ -224,7 +229,7 @@ async def run_gate(
             init, seed, iters, games_per_opp, eval_n, device, fmt,
             team_pool, loop_penalty, ckpt_prefix,
             ent_coef=ent_coef, ent_coef_final=ent_coef_final, lr=lr, lr_final=lr_final,
-            target_kl=target_kl, anneal_iters=anneal_iters,
+            target_kl=target_kl, anneal_iters=anneal_iters, resume=resume,
         )
         curve = await run_ppo(cfg)
         rec = _seed_record(init, seed, curve, ckpt_prefix)
@@ -340,6 +345,17 @@ def main(argv: list[str] | None = None) -> None:
         help="Anneal lr/ent_coef over this many iters instead of --iters; past it both hold at "
         "their finals (omit = anneal over --iters, the Build 19-23 behavior)",
     )
+    # Build 26: arm length is bounded by MEMORY, not walltime -- RSS grows ~0.23 GiB/iter and the
+    # medium QoS caps a job at 64 GB (a per-job MaxTRES: a larger --mem is rejected at submit, not
+    # queued), which is what killed v26b at 304/320. A fresh process resets RSS, so resuming is
+    # how an arm past ~260 iterations runs at all.
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue each seed from its out_dir's last completed iteration instead of starting "
+        "over (omit = start fresh, the Build 25 behavior). Errors rather than silently starting "
+        "fresh if the state is present but unusable.",
+    )
     args = parser.parse_args(argv)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -363,6 +379,7 @@ def main(argv: list[str] | None = None) -> None:
             lr_final=args.lr_final,
             target_kl=args.target_kl,
             anneal_iters=args.anneal_iters,
+            resume=args.resume,
         )
     )
 

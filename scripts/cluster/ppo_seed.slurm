@@ -31,6 +31,15 @@
 #
 #SBATCH --job-name=lg-ppo
 #SBATCH --cpus-per-task=8
+# 64G is a HARD CEILING, not a choice: `sacctmgr show qos medium` sets MaxTRES=cpu=8,mem=64G PER
+# JOB, so `--mem` above 64G is rejected at submit time ("Memory required by task is not available")
+# rather than queued. high allows 128G but caps walltime at 24h; default allows only 4 CPU / 32G.
+#
+# THIS BOUNDS HOW LONG AN ARM CAN BE. RSS scales ~linearly with iters -- sacct MaxRSS is 40.7 GiB
+# at 160 (Build 25, 7188055) and 59.3 GiB at 240 (v26a, 7215446), i.e. ~0.23 GiB/iter, projecting
+# ~78 GiB at 320. So 240 iters fits with ~5 GiB to spare and 320 does NOT: v26b's first attempt was
+# OUT_OF_MEMORY at 304 iters, having reached exactly this cap. Anything past ~260 iters needs the
+# resume path (a fresh process resets RSS), not a bigger --mem.
 #SBATCH --mem=64G
 #SBATCH --time=36:00:00
 #SBATCH --output=logs/slurm/slurm-%x-%A_%a.out
@@ -86,6 +95,19 @@ if [[ -n "$ANNEAL_ITERS" ]]; then
   ANNEAL_ARGS=(--anneal-iters "$ANNEAL_ITERS")
 fi
 
+# Build 26: RESUME=1 continues from checkpoints/<PREFIX>_s<SEED>/'s last completed iteration.
+# Needed because RSS grows ~0.23 GiB/iter against medium's hard 64 GB per-job cap, so an arm past
+# ~260 iters cannot run in ONE process however much walltime it gets -- a fresh process is what
+# resets the memory. Unset == start fresh, byte-identical to Build 25.
+RESUME_ARGS=()
+if [[ -n "${RESUME:-}" ]]; then
+  RESUME_ARGS=(--resume)
+fi
+
+# The run log is append-on-resume: truncating it would throw away the first chunk's trust-region
+# certificate, which ppo_telemetry.py reads and without which a NULL is unattributable.
+TEE_ARGS=(-a)
+
 start_showdown
 
 python -u scripts/ppo_continue_gate.py \
@@ -104,7 +126,8 @@ python -u scripts/ppo_continue_gate.py \
   --lr            2.5e-4 --lr-final 5e-5 \
   --target-kl     "$TARGET_KL" \
   ${ANNEAL_ARGS[@]+"${ANNEAL_ARGS[@]}"} \
-  2>&1 | tee "$RUN_LOG"
+  ${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"} \
+  2>&1 | tee "${TEE_ARGS[@]}" "$RUN_LOG"
 
 # The stdout log is gitignored (*.log) and is the ONLY source of the trust-region certificate --
 # ppo_continue_gate's JSON stores just the win-rate curve. Persist it NOW, in-job: a NULL is only

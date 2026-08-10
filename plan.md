@@ -2453,6 +2453,50 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     than failing. `v26b` must be submitted with `LATEGAME_SHOWDOWN_PORT_BASE=8200`.
     **Disk:** ~29 GB needed (measured: `ppo_v25b_s0` is 2.8 GB / 160 iters ≈ 17.5 MB/iter) against
     **78 GB** free — not the 146 GB quoted above, which is stale.
+  - **ATTEMPT 1 FAILED 4/6 ARMS (2026-08-06 → 08-08). Booked here rather than quietly re-run,
+    because one of the two causes is a standing limit on how long ANY arm can be.**
+
+    | task | outcome | iters | MaxRSS | cause |
+    |---|---|---|---|---|
+    | `v26a` s1 | COMPLETED 15:56 | 240/240 | 59.3 GiB | — |
+    | `v26a` s2 | COMPLETED 15:48 | 240/240 | 61.8 GiB | — |
+    | `v26a` s0 | TIMEOUT 36 h | 140/240 | 37.3 GiB | disk quota |
+    | `v26b` s0 | TIMEOUT 36 h | 119/320 | 32.2 GiB | disk quota |
+    | `v26b` s2 | FAILED 13:12 | 158/320 | 42.2 GiB | `Disk quota exceeded` on `torch.save` |
+    | `v26b` s1 | **OUT_OF_MEMORY** 17:46 | 304/320 | **67.1 GiB** | the 64 GB per-job cap |
+
+    **(a) Disk — a shared 200 GB quota, not a per-project one.** A neighbouring project grew
+    86 → 125 GB while Build 26 was adding 20 GB, and the quota hit 195/200 GB. The two arms that
+    finished did so within ~16 h, *before* the crunch; the ones still running when it hit slowed
+    to 15–18 min/iter (against a measured 3.95–4.0) and one died outright inside `_save_checkpoint`.
+    **The pre-run disk check was wrong in kind:** it compared Build 26's own footprint against free
+    space at submit time and concluded "disk is not a concern", which is not a claim that survives
+    a shared quota over a 40 h run. Freed 49.7 GB by dropping the dead partials and pruning settled
+    builds (`v22`–`v24`, `v25a`, `v25c`) to their referenced `best_checkpoint` + terminal only;
+    `v25b` and the two completed `v26a` arms were left whole.
+  - **(b) THE REAL FINDING: ARM LENGTH IS BOUNDED BY MEMORY, NOT WALLTIME.** RSS grows ~linearly
+    with iterations — **40.7 GiB at 160** (Build 25), **59.3 GiB at 240**, i.e. **~0.23 GiB/iter**,
+    projecting **~78 GiB at 320**. The `medium` QoS sets `MaxTRES=cpu=8,mem=64G` **per job**, so a
+    larger `--mem` is *rejected at submit* rather than queued; `high` allows 128 GB but caps
+    walltime at 24 h against a ~21.2 h run, and `default` allows only 4 CPU / 32 GB. So **no QoS
+    envelope fits a 320-iteration arm in one process**, and raising walltime — Build 26's original
+    fix — could never have worked. `v26b` s1 was killed at exactly the 64 GB cap, 304/320 in.
+  - **CONSEQUENCE: `run_ppo` GAINS AN OPT-IN RESUME, AND `v26b` RUNS IN TWO CHUNKS.** A fresh
+    process resets RSS, so resuming is what makes an arm past ~260 iterations runnable at all. The
+    state file (`resume_state.pt`, written atomically beside the checkpoints) carries Adam's moment
+    estimates and both RNG streams — dropping either would restart the optimizer cold mid-arm and
+    re-draw the league from the top of the stream. It is kept **separate** from `iter_NN.pt`, which
+    every agent and gate reads. `resume` defaults **off**, so Builds ≤25 reproduce unchanged.
+    Resuming **requires `--anneal_iters` pinned**: `anneal_horizon` falls back to `iters`, which a
+    chunked run raises between chunks, so an unpinned schedule would anneal over a different span
+    per chunk — the exact confound Build 24 introduced the flag to remove. `v26b` runs 160, then
+    resumes to 320, both at `anneal_iters` 80.
+  - **ONE COMPARABILITY CAVEAT, TO BE REPORTED WITH THE RESULT.** `v26a` ran uninterrupted while
+    `v26b` runs in two chunks. The schedule is identical (horizon pinned at 80) and optimizer and
+    RNG state carry across, so the intended difference is still update count alone — but the two
+    arms did not traverse byte-identical code paths, and **#2 (`v26a` → `v26b`) is the contrast
+    that carries this**. If #2 comes back near the significance boundary it must be read with that
+    in mind rather than as a clean dose.
 
 ---
 
