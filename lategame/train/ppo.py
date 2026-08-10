@@ -98,6 +98,16 @@ class PPOConfig:
     device: str = "auto"
     seed: int = 0
     weights: RewardWeights = field(default_factory=RewardWeights)
+    # Build 26: restart an interrupted run from ``out_dir``'s last completed iteration. OFF by
+    # default, and when off this file behaves exactly as it did through Build 25 -- no resume
+    # state is written and no existing state is read.
+    #
+    # This exists because arm length is bounded by MEMORY, not by walltime. RSS grows ~0.23
+    # GiB/iter (40.7 GiB at 160 iters, 59.3 at 240), and the medium QoS caps a job at 64 GB --
+    # a per-job MaxTRES, so a larger --mem is rejected at submit rather than queued. v26b's
+    # first attempt was OUT_OF_MEMORY at 304/320. A fresh process resets RSS, so resuming is
+    # what makes an arm past ~260 iters runnable at all; it is not merely crash insurance.
+    resume: bool = False
 
     @property
     def anneal_horizon(self) -> int:
@@ -264,6 +274,68 @@ def _save_checkpoint(
     )
 
 
+#: Written beside the per-iteration checkpoints when ``PPOConfig.resume`` is on. Kept SEPARATE
+#: from ``iter_NN.pt`` on purpose: those are loaded by the agents and by every gate, so widening
+#: their schema to carry optimizer state would change an artifact the whole project reads.
+_RESUME_FILE = "resume_state.pt"
+
+
+def _save_resume_state(
+    path: Path,
+    iteration: int,
+    optimizer: torch.optim.Optimizer,
+    curve: list[CurvePoint],
+    rng: random.Random,
+) -> None:
+    """Persist everything a restart needs that ``iter_NN.pt`` does not carry.
+
+    The model weights are already on disk; what is NOT is Adam's moment estimates and the two
+    RNG streams. Dropping the moments would restart the optimizer cold mid-run -- a real
+    discontinuity in training dynamics, not a bookkeeping detail -- and dropping the RNG state
+    would re-draw the league from the top of the stream. Written atomically: a job killed
+    mid-write must not leave a truncated state that poisons the retry.
+    """
+    tmp = path.with_suffix(".tmp")
+    torch.save(
+        {
+            "iteration": iteration,
+            "optimizer": optimizer.state_dict(),
+            "curve": curve,
+            "py_rng": rng.getstate(),
+            "torch_rng": torch.get_rng_state(),
+        },
+        tmp,
+    )
+    tmp.replace(path)
+
+
+def _load_resume_state(out_dir: Path, iters: int) -> dict | None:
+    """Return the resume state if this ``out_dir`` holds a usable partial run, else None.
+
+    Returns None (start fresh) when there is nothing to resume from, and raises when the state
+    is present but unusable -- a silent fresh start would burn the whole walltime re-running
+    work that already exists.
+    """
+    path = out_dir / _RESUME_FILE
+    if not path.exists():
+        return None
+    state = torch.load(path, map_location="cpu", weights_only=False)
+    done = int(state["iteration"])
+    if done >= iters:
+        raise ValueError(
+            f"{out_dir} already holds {done} iterations against a target of {iters}; nothing to "
+            "resume. Raise --iters or point --ckpt-prefix somewhere else."
+        )
+    ckpt = out_dir / f"iter_{done:02d}.pt"
+    if not ckpt.exists():
+        raise FileNotFoundError(
+            f"resume state says iteration {done} but {ckpt} is missing -- the checkpoint it "
+            "names must exist to restart from."
+        )
+    state["checkpoint"] = str(ckpt)
+    return state
+
+
 def _print_stats(iteration: int, n_turns: int, stats: dict[str, float]) -> None:
     print(
         f"  ppo iter {iteration:>3}  turns {n_turns}  "
@@ -328,6 +400,18 @@ async def _eval_point(
 
 async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
     """Run the on-policy PPO self-play loop; return (and persist) the per-iter curve."""
+    # Validated FIRST, before any checkpoint is read or model built: a config that cannot produce
+    # a coherent arm should fail in milliseconds, not after loading a warm start.
+    if config.resume and config.anneal_iters is None:
+        # ``anneal_horizon`` falls back to ``iters``, and a chunked run raises ``iters`` between
+        # chunks -- so an unpinned schedule would anneal over a DIFFERENT span in each chunk and
+        # the arm would silently stop being one experiment. This is precisely the confound Build
+        # 24 introduced ``anneal_iters`` to remove, so refuse rather than reintroduce it.
+        raise ValueError(
+            "--resume requires --anneal-iters to be pinned: the lr/entropy horizon otherwise "
+            "defaults to --iters, which differs between chunks and silently rescales both "
+            "schedules mid-arm."
+        )
     init_path = Path(config.init)
     if not init_path.exists():
         raise FileNotFoundError(
@@ -366,11 +450,40 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
     latest = str(init_path)  # checkpoint the acting agent reads (iter 0 = init)
     league = [str(init_path)]
 
-    curve: list[CurvePoint] = [await _eval_point(0, latest, config, team)]
-    _print_curve_row(curve[0])
-    _write_curve(out_dir / "curve.json", curve)
+    # ``resume`` off => this whole block is skipped and the run is identical to Build 25's.
+    state = _load_resume_state(out_dir, config.iters) if config.resume else None
+    if state is None:
+        start_iter = 1
+        curve: list[CurvePoint] = [await _eval_point(0, latest, config, team)]
+        _print_curve_row(curve[0])
+        _write_curve(out_dir / "curve.json", curve)
+    else:
+        done = int(state["iteration"])
+        start_iter = done + 1
+        latest = str(state["checkpoint"])
+        # Reload the POLICY from the last completed iteration, and Adam's moments with it.
+        resumed = torch.load(latest, map_location="cpu", weights_only=False)
+        load_actor_critic_weights(model, resumed["state_dict"])
+        model.to(device)
+        optimizer.load_state_dict(state["optimizer"])
+        # Restore both RNG streams so the league draw continues the sequence instead of
+        # replaying it from the seed.
+        rng.setstate(state["py_rng"])
+        torch.set_rng_state(state["torch_rng"].cpu().to(torch.uint8))
+        curve = list(state["curve"])
+        # The league is the init plus every checkpoint written so far -- reconstructed rather
+        # than stored, so it cannot disagree with what is actually on disk.
+        league = [str(init_path)] + [
+            str(out_dir / f"iter_{i:02d}.pt")
+            for i in range(1, done + 1)
+            if (out_dir / f"iter_{i:02d}.pt").exists()
+        ]
+        print(
+            f"RESUMING from iteration {done} ({latest}) | league {len(league)} | "
+            f"curve {len(curve)} points | -> {config.iters}"
+        )
 
-    for k in range(1, config.iters + 1):
+    for k in range(start_iter, config.iters + 1):
         opponents = [
             PlayerSpec("offrl", checkpoint_path=p, sample=True)
             for p in _sample_league(league, config.pop_size, rng)
@@ -420,6 +533,10 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
         curve.append(point)
         _print_curve_row(point)
         _write_curve(out_dir / "curve.json", curve)
+        # Last thing in the iteration, so the state can only ever name a FULLY completed one:
+        # the checkpoint is written, the curve point is scored, and the curve file is on disk.
+        if config.resume:
+            _save_resume_state(out_dir / _RESUME_FILE, k, optimizer, curve, rng)
 
     print(f"wrote curve ({len(curve)} points) to {out_dir / 'curve.json'}")
     return curve
