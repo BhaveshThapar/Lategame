@@ -8,12 +8,15 @@
     python -m lategame.cli train-rl --data data/gen9rb_rl.npz --bc-init checkpoints/bc.pt
     python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
     python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
+    python -m lategame.cli live     --agent ppo --mode accept --n 5
     python -m lategame.cli fetch-replays --min-rating 1200 --limit 200
     python -m lategame.cli resim-replays --out data/resim_gen9rb_rl.npz
 
 ``collect``/``train`` are the M2 BC pipeline; ``collect-rl``/``train-rl`` are the
 M3 offline-RL pipeline; ``selfplay`` is the M4 self-play improvement loop; ``ppo`` is
-the M5 on-policy PPO self-play loop. ``fetch-replays`` + ``ingest-replays`` are the M6
+the M5 on-policy PPO self-play loop; ``live`` plays a LIVE server (M5 deploy / G1 -- see
+``lategame/live/`` and plan.md 15 before using ``--mode ladder``). ``fetch-replays`` +
+``ingest-replays`` are the M6
 human-replay pipeline (public-log POV); ``resim-replays`` is M6 v2, re-simulating each
 replay's inputlog for a full-fidelity (request-based) POV. Torch is imported lazily inside
 the train handlers so the eval/collect/data commands keep running without ``[ml]``.
@@ -24,8 +27,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 
+# NOTE: `live.policy` has NO imports of its own, which is why it -- and not `live.session` --
+# is the module imported here: building --help must not pay for poke-env or torch.
 from lategame.config import DEFAULT_FORMAT
 from lategame.eval.arena import AGENTS, EvalResult, evaluate
+from lategame.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PASSWORD_ENV, USERNAME_ENV
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
 _DEFAULT_BC_INIT = "checkpoints/bc_gen9randombattle.pt"
@@ -185,6 +191,52 @@ async def _run_ppo(args: argparse.Namespace) -> None:
         seed=args.seed,
     )
     await run_ppo(config)
+
+
+def _print_live_summary(outcome: object) -> None:
+    """Mirror of ``_print_result`` for a live session."""
+    summary = outcome.summary  # type: ignore[attr-defined]
+    finished, requested = summary["finished"], summary["requested"]
+    print(f"\nlive session: {finished}/{requested} battles finished", end="")
+    if summary["unfinished"]:
+        print(f" ({summary['unfinished']} unfinished -- excluded from every metric)", end="")
+    print()
+    if not finished:
+        print("  no finished battles: nothing to rate")
+        return
+    print(
+        f"  W/L/T {summary['wins']}/{summary['losses']}/{summary['ties']}  "
+        f"win_rate {summary['win_rate']:.3f}  score_rate {summary['score_rate']:.3f}  "
+        f"mean_turns {summary['mean_turns']}"
+    )
+    print(f"  Glicko-1 {summary['glicko']} +/- {summary['glicko_rd']}   GXE {summary['gxe']:.4f}")
+    print(f"  basis: {summary['gxe_basis']}")
+    elo = summary["showdown_elo"]
+    if elo["n_reported"]:
+        print(f"  Showdown Elo (pre-battle): self {elo['self_first']} -> {elo['self_last']}, "
+              f"opponent mean {elo['opponent_mean']} over {elo['n_reported']} rated games")
+    if outcome.restarts:  # type: ignore[attr-defined]
+        print(f"  reconnects: {outcome.restarts}")  # type: ignore[attr-defined]
+
+
+async def _run_live(args: argparse.Namespace) -> None:
+    from lategame.live.session import LiveConfig, run_session
+
+    cfg = LiveConfig(
+        agent=args.agent, mode=args.mode, battle_format=args.battle_format, n=args.n,
+        opponent=args.opponent, checkpoint=args.checkpoint, sample=args.sample,
+        loop_penalty=args.loop_penalty, team_pool=args.team_pool, team_seed=args.team_seed,
+        concurrency=args.concurrency, start_timer=args.start_timer,
+        username=args.username, avatar=args.avatar,
+        ws_url=args.server, auth_url=args.auth_url, allow_guest=args.allow_guest,
+        save_replays=args.save_replays, out=args.out,
+        battle_timeout=args.battle_timeout, stall_timeout=args.stall_timeout,
+        login_timeout=args.login_timeout, max_restarts=args.max_restarts,
+        ladder_ack=args.ladder_ack, log_level=args.log_level,
+    )
+    outcome = await run_session(cfg)
+    _print_live_summary(outcome)
+    print(f"\nwrote {args.out}")
 
 
 def _run_fetch_replays(args: argparse.Namespace) -> None:
@@ -480,6 +532,85 @@ def build_parser() -> argparse.ArgumentParser:
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
     )
 
+    live = sub.add_parser(
+        "live",
+        help="M5 deploy: play on a LIVE Showdown server (challenge / accept / ladder)",
+        description=(
+            "Connect a trained agent to a live Showdown server under a DEDICATED BOT account. "
+            f"Credentials come from ${USERNAME_ENV} / ${PASSWORD_ENV} and are never written to "
+            "--out. Default mode is 'accept' (opt-in opponents only). 'ladder' plays the RANKED "
+            "ladder, which plan.md NG3 puts out of scope -- see --ladder-ack."
+        ),
+    )
+    live.add_argument("--agent", default="ppo", choices=sorted(AGENTS), help="Agent to deploy")
+    live.add_argument(
+        "--mode", default="accept", choices=["challenge", "accept", "ladder"],
+        help="challenge: send --n challenges to --opponent; accept: accept --n incoming "
+             "challenges; ladder: search --n RANKED ladder games (policy-gated)",
+    )
+    live.add_argument(
+        "--opponent", default=None,
+        help="challenge: username to challenge (REQUIRED). accept: comma-separated allowlist; "
+             "omit to accept anyone",
+    )
+    live.add_argument("--n", type=int, default=1, help="Number of battles to play")
+    live.add_argument(
+        "--format", dest="battle_format", default=DEFAULT_FORMAT,
+        help="Showdown format string. FIXED for the session: poke-env silently ignores "
+             "challenges in any other format",
+    )
+    live.add_argument("--checkpoint", default=None, help="Checkpoint for a learned agent")
+    live.add_argument("--sample", action="store_true", help="Sample instead of arg-max")
+    live.add_argument("--loop-penalty", type=float, default=0.0, help="Build-14 LoopGuard")
+    live.add_argument("--team-pool", default=None, help="Packed team pool for teambuilt formats")
+    live.add_argument("--team-seed", type=int, default=0, help="TeamPool sampling seed")
+    live.add_argument(
+        "--concurrency", type=int, default=1,
+        help="max_concurrent_battles. Keep at 1 live: the turn clock is per battle and every "
+             "concurrent battle shares one process",
+    )
+    live.add_argument(
+        "--username", default=None,
+        help=f"Bot account name (default ${USERNAME_ENV}). The password is ALWAYS read from "
+             f"${PASSWORD_ENV} -- never a flag, never logged, never written to --out",
+    )
+    live.add_argument("--avatar", default=None, help="Showdown avatar for the bot account")
+    live.add_argument(
+        "--server", default=None,
+        help="Websocket URL override for a PRIVATE eval server (default: wss://sim3.psim.us)",
+    )
+    live.add_argument("--auth-url", default=None, help="Auth endpoint override (with --server)")
+    live.add_argument(
+        "--allow-guest", action="store_true",
+        help="Permit an empty password. REFUSED against the public server: poke-env degrades to "
+             "a Guest name and then hangs forever with no error",
+    )
+    live.add_argument(
+        "--no-timer", dest="start_timer", action="store_false",
+        help="Do NOT send '/timer on' at battle start",
+    )
+    live.set_defaults(start_timer=True)
+    live.add_argument("--save-replays", default=None, help="Directory to save replays into")
+    live.add_argument(
+        "--out", default="results/live_session.json",
+        help="Per-battle records + Glicko-1/GXE summary (rewritten after every battle)",
+    )
+    live.add_argument("--battle-timeout", type=float, default=900.0, help="Per-battle ceiling (s)")
+    live.add_argument(
+        "--stall-timeout", type=float, default=300.0,
+        help="Seconds without forward progress before the connection is declared dead "
+             "(poke-env 0.15 neither reconnects nor raises)",
+    )
+    live.add_argument("--login-timeout", type=float, default=30.0, help="Seconds to await login")
+    live.add_argument("--max-restarts", type=int, default=3, help="Client rebuilds on a drop")
+    live.add_argument(
+        "--ladder-ack", default=None, choices=[LADDER_ACK],
+        help="REQUIRED for --mode ladder. Acknowledges plan.md NG3 / section 15: automated RANKED "
+             f"ladder play is out of scope. You must ALSO export {ALLOW_LADDER_ENV}=1. The "
+             "acknowledgement is recorded in --out",
+    )
+    live.add_argument("--log-level", type=int, default=None, help="poke-env logger level")
+
     fetch = sub.add_parser(
         "fetch-replays", help="Download + cache rated human replays (M6 data plan)"
     )
@@ -577,6 +708,8 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(_run_selfplay(args))
     elif args.command == "ppo":
         asyncio.run(_run_ppo(args))
+    elif args.command == "live":
+        asyncio.run(_run_live(args))
     elif args.command == "fetch-replays":
         _run_fetch_replays(args)
     elif args.command == "ingest-replays":
