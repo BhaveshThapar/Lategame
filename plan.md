@@ -37,7 +37,9 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
 
 ### 3.1 Goals
 - **G1.** Connect to the live Showdown server and play complete battles autonomously (challenge and unranked ladder play) within the turn timer.
-- **G2.** Reach **strong-human performance** in the first target format (Gen 9 Random Battles), measured by matchmaking-bias-robust metrics (GXE / Glicko-1), competitive with the foul-play heuristic and Metamon baselines.
+- **G2.** Reach **strong-human performance** in the first target format, measured by matchmaking-bias-robust metrics (GXE / Glicko-1), competitive with the foul-play heuristic and Metamon baselines.
+  - **AMENDED 2026-08-10: the target format is `gen9ou`, not Gen 9 Random Battles, and the change was forced by measurement rather than preference.** Lever 15 measured the *achievable* ceiling on gen9-RB directly (see §13.1): the strongest competent bot reaches **0.523** vs the heuristic with its CI spanning 0.50, near-optimal depth-2 search with a white-box opponent model reaches **0.500**, and team strength does not predict the winner (AUC 0.495) — RB is balanced by design, and a good heuristic already sits at the achievable skill ceiling. Verdict **FORMAT_BOUND**: G2 is unreachable in gen9-RB *no matter the model*, so pursuing it there was not a difficulty problem but an impossibility one. On `gen9ou` the same measurement shows real headroom — `simpleheuristics` **0.633** [0.577, 0.686], heuristic mirror **0.487** — and the band is wider (0.610 vs RB's 0.516).
+  - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633. The *ladder* half is **not** met, and cannot be moved by more training: GXE and Glicko-1 require a varied opponent field, i.e. live play (**G1**). `lategame/live/` is that client; until a session is actually run, G2's headline metric is uncomputed rather than unmet.
 - **G3.** Demonstrate **continual improvement**: model strength measurably increases as self-play volume and replay data grow.
 - **G4.** Generalize the *system* to ≥3 formats spanning singles random, singles teambuilt (OU), and doubles (VGC) by plugging in per-format data, action heads, and team sources — without rewriting the core.
 - **G5.** Encode the competitive skill stack of Section 4 as explicit, testable capabilities (state estimation, prediction/opponent modeling, win-condition planning, precise damage math).
@@ -2525,7 +2527,12 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 
 ## 16. Open questions
 
-1. **First-format confirmation:** Gen 9 Random Battles as MVP — agreed? (Recommended.)
+1. ~~**First-format confirmation:** Gen 9 Random Battles as MVP — agreed? (Recommended.)~~
+   **ANSWERED (Lever 15, 2026-07): NO — and by measurement, not preference.** gen9-RB is
+   **FORMAT_BOUND**: the achievable ceiling vs a competent heuristic is ~parity (0.523, CI spans
+   0.50), so G2 is unreachable there whatever the model. The MVP format is **`gen9ou`**, where the
+   same diagnostic found genuine headroom (`simpleheuristics` 0.633, whole CI above the 0.58 bar).
+   RB remains the format the pipeline was *built* on and every pre-OU build is reported against.
 2. **Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?
 3. **Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?
 4. **Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)

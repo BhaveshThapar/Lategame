@@ -9,6 +9,17 @@ A complete experimental pipeline is built and verified — rule-based baseline �
 cloning → offline RL → self-play → entity transformer + on-policy PPO → human-replay
 ingestion (public-log **and** full-fidelity re-simulation).
 
+**Where the project stands against its own goals.** The target format for **G2** is **`gen9ou`**,
+amended from Gen 9 Random Battles *by measurement*: Lever 15 found gen9-RB **FORMAT_BOUND** — the
+strongest competent bot reaches 0.523 vs the heuristic (CI spanning 0.50) and near-optimal depth-2
+search reaches 0.500, so G2 was unreachable there whatever the model. On `gen9ou` the same
+diagnostic found real headroom (`simpleheuristics` 0.633, heuristic mirror 0.487).
+**§12's "> 50% vs the heuristic" bar is now cleared**: `v25b`'s selection-free terminal read is
+**0.6807** [0.6682, 0.6930], above the strongest scripted bot. What is *not* met is G2's headline
+metric — GXE/Glicko-1 need a varied opponent field, i.e. live play (**G1**), so no amount of
+further training can move it. `lategame/live/` (`lategame live`) is that client; until a session
+runs, G2's metric is **uncomputed rather than unmet**.
+
 **Key finding: a learned method finally clears the heuristic plateau.** For eight levers
 every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
 worse, ~5–11%), and winners-only behavior cloning saturated at ~0.42 imitation accuracy
