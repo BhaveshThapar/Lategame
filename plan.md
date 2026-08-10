@@ -39,7 +39,8 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
 - **G1.** Connect to the live Showdown server and play complete battles autonomously (challenge and unranked ladder play) within the turn timer.
 - **G2.** Reach **strong-human performance** in the first target format, measured by matchmaking-bias-robust metrics (GXE / Glicko-1), competitive with the foul-play heuristic and Metamon baselines.
   - **AMENDED 2026-08-10: the target format is `gen9ou`, not Gen 9 Random Battles, and the change was forced by measurement rather than preference.** Lever 15 measured the *achievable* ceiling on gen9-RB directly (see §13.1): the strongest competent bot reaches **0.523** vs the heuristic with its CI spanning 0.50, near-optimal depth-2 search with a white-box opponent model reaches **0.500**, and team strength does not predict the winner (AUC 0.495) — RB is balanced by design, and a good heuristic already sits at the achievable skill ceiling. Verdict **FORMAT_BOUND**: G2 is unreachable in gen9-RB *no matter the model*, so pursuing it there was not a difficulty problem but an impossibility one. On `gen9ou` the same measurement shows real headroom — `simpleheuristics` **0.633** [0.577, 0.686], heuristic mirror **0.487** — and the band is wider (0.610 vs RB's 0.516).
-  - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633. The *ladder* half is **not** met, and cannot be moved by more training: GXE and Glicko-1 require a varied opponent field, i.e. live play (**G1**). `lategame/live/` is that client; until a session is actually run, G2's headline metric is uncomputed rather than unmet.
+  - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633.
+  - **The *ladder* half is now COMPUTED (2026-08-10), on an agent-only eval ladder rather than the human ladder.** GXE and Glicko-1 need a varied opponent field, which no amount of further training can supply — but §12's own last line prefers "a private/agent-only server or eval ladder", and §16 Q5 is answered: there is *no* unranked public ladder, so that route is the only policy-clean one. `lategame/eval/ladder.py` fits a whole field jointly (Bradley-Terry on the Glicko scale, `heuristic` pinned at 1500). Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9, GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000) — see §13.1. Two caveats travel with it: the RD is a **lower bound** (battles cluster by team matchup, so the effective sample is under `n`), and this is an **agent-only** field, so the number is *not* comparable to a Showdown GXE measured against humans. The human-ladder reading remains out of scope under NG3; `lategame/live/` (**G1**) is built and gated for it should that ever change.
 - **G3.** Demonstrate **continual improvement**: model strength measurably increases as self-play volume and replay data grow.
 - **G4.** Generalize the *system* to ≥3 formats spanning singles random, singles teambuilt (OU), and doubles (VGC) by plugging in per-format data, action heads, and team sources — without rewriting the core.
 - **G5.** Encode the competitive skill stack of Section 4 as explicit, testable capabilities (state estimation, prediction/opponent modeling, win-condition planning, precise damage math).
@@ -2500,6 +2501,148 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     that carries this**. If #2 comes back near the significance boundary it must be read with that
     in mind rather than as a clean dose.
 
+- **M5 / G1 — LIVE PLAY, built and verified end-to-end (2026-08-10).** Every build through 26 plays
+  a *fixed* baseline on a local server, where win rate is the sufficient statistic. G2 is stated in
+  GXE/Glicko-1 instead, and those are ladder metrics. `lategame/live/` is the missing half: three
+  modes (`challenge` / `accept` / `ladder`), a session supervisor, and Glicko-1/GXE telemetry,
+  driven by `lategame live`. Verified against a real local server — two players, real websocket,
+  real battle, the finalize sweep, GXE computed, results file written. **Three findings, each a
+  case where the obvious implementation is silently wrong.**
+  - **`ShowdownException` NEVER REACHES THE CALLER'S `await`.** poke-env dispatches each message in
+    a detached `asyncio` task whose result nobody retrieves, so the exception raised on
+    `|nametaken|` is never re-raised: a failed login **hangs** rather than failing. A `try/except`
+    around the connect would be dead code. Detection is therefore a log handler (`LoginWatch`) plus
+    a watchdog that samples `(n_finished_battles, Σ turn counters)` — a slow battle still advances
+    turns and a dead socket advances neither, which is the distinction a flat wall-clock timeout
+    cannot make. `listen()` likewise swallows a closed socket, and there is no reconnect anywhere
+    in the library, so "recovery" means building a **new** player and merging records by battle tag.
+  - **`battle.rating` IS PRE-BATTLE ELO, NOT POST-BATTLE GLICKO — and it is `None` when you would
+    naturally read it.** poke-env fires `_battle_finished_callback` on the `|win|` line, while the
+    `|raw| ...'s rating:` lines are parsed *afterwards* in the same loop, so a rating read at
+    callback time is always `None` even on a rated game. Hence the mandatory `finalize` sweep that
+    re-reads every battle before the final write; without it the rating columns would be uniformly
+    empty and look exactly like an unrated session. And what the field holds is
+    `int(rating_info[:4])` — the *first* number on the raw line, i.e. the rating **before** the
+    game — which Showdown reports as **Elo**. It is recorded as `showdown_elo_before` and kept
+    strictly out of the Glicko math: feeding an Elo into a Glicko update is a units error dressed
+    up as precision.
+  - **`rate_win_rate` CANNOT REPRESENT A TIE**, because it reconstructs wins as
+    `round(win_rate * n)` and can only express scores in {0, 1}. So `summarize` builds its Glicko
+    results list directly; a test pins that the two agree exactly on tie-free records. **The same
+    bug exists one layer down in `poke_env.player.cross_evaluate`**, which reports
+    `n_won_battles / n_finished_battles` — a tie drags win rate down without counting as a loss.
+    That one is *booked, not fixed*: `eval/arena.py` was on the frozen path of the in-flight Build
+    26 jobs, and its callers are win-rate gates on a format where singles ties are vanishingly
+    rare. `eval/ladder.py` below avoids `cross_evaluate` for exactly this reason.
+  - **The ladder gate holds at all three levels.** No ack fails; a wrong phrase is rejected by
+    `argparse` `choices` rather than silently falling back to a non-ladder mode; and the right
+    phrase without `LATEGAME_LIVE_ALLOW_LADDER=1` still refuses, with the policy note. Requiring
+    both channels is the point: a CLI flag cannot be inherited from a stale export, and an
+    environment variable cannot be picked up from shell history.
+  - **G2 was still uncomputed after this build, and that is a measurement fact, not a gap.** A live
+    *session* produces GXE, but `summarize`'s default pins every opponent at `REFERENCE`, under
+    which GXE is a monotone reparameterisation of the score rate — the same degeneracy
+    `eval/rating.py` warns about. Only a **varied field** makes it a measurement. Hence the next
+    entry.
+
+- **R-LADDER — the agent-only eval ladder: G2's headline metric, computed without touching the
+  human ladder (2026-08-10).** §12's last line asks for evaluation "on a private/agent-only server
+  or eval ladder wherever possible", and §16 Q5 is now answered: there is no unranked public
+  ladder, so that route is the only one. `lategame/eval/ladder.py` (`lategame eval-ladder`) plays a
+  round-robin over a heterogeneous field on the local server and fits every rating **jointly**.
+  New file rather than an extension of `eval/rating.py` or `eval/arena.py`, both of which were on
+  the frozen path of the running Build 26 jobs; it imports them and adds nothing to them.
+  - **A SINGLE GLICKO PERIOD OVER A ROUND-ROBIN IS DEGENERATE, which is the whole difficulty.**
+    Every agent starts at (1500, 350). Update each against opponents held at their priors and every
+    opponent *is* the reference, so each rating collapses to a monotone function of that agent's own
+    score rate — the same degeneracy reached by a longer road. The fit must iterate, using the
+    current estimates as opponent ratings. At the fixed point every agent satisfies
+    `Σ_j g(RD_j)(s_j − E_j) = 0`, the **Bradley-Terry score equation**, so what this computes is the
+    BT/Elo maximum-likelihood fit reported on the Glicko scale. A two-agent field is checked against
+    the closed form `−400/g(350) · log₁₀(1/s − 1)` to 1e-6.
+  - **THE UNDAMPED ITERATION DOES NOT CONVERGE — IT OSCILLATES, and worst at two agents.** Because
+    every agent is updated against the *previous* sweep (Jacobi, which keeps the result independent
+    of walk order), a rating *difference* is corrected from both ends at once: with two agents the
+    new difference overshoots to `2·target − current`, an error that flips sign and keeps its
+    magnitude forever. The Glicko step is exactly a Newton step on the score equation, so the
+    iteration matrix is `I − D⁻¹H` with `H` the BT Hessian; its rows sum to zero, putting `D⁻¹H`'s
+    eigenvalues in `[0, 2]` with the 2 attained exactly at k=2. **Damping by 0.5 maps them to
+    `[0, 1]`** — not a fudge factor but the value that exactly cancels the double correction. The
+    residual eigenvalue 1 is the gauge direction, removed by the anchor. Measured: undamped fails to
+    converge in 200 sweeps and walks to the clamp; damped converges in 8.
+  - **THE FIT NEEDS A GAUGE FIX, and which agent is pinned is a real choice.** A round-robin matrix
+    identifies rating *differences* only — add 100 to everyone and the likelihood is unchanged — so
+    the fixed point is not unique. `heuristic` is pinned at 1500 because it is the fixed baseline
+    every build from M1 onward is already reported against, which makes the ladder's Glicko
+    commensurable with the entire win-rate history and makes GXE read as "expected score vs a
+    heuristic-strength average player". Gauge invariance is pinned by test: a different anchor
+    shifts every rating by one constant and leaves all differences unchanged.
+  - **RD IS COMPUTED ONCE, AT CONVERGENCE.** Running a Glicko period per sweep would shrink RD on
+    every sweep over the *same* games and manufacture certainty — an agent's deviation would depend
+    on how many iterations the solver happened to take. The sweeps move means only; the deviation
+    comes from a single period against the converged field. Pinned by a test that runs the solver to
+    two different tolerances and requires the RDs to agree.
+  - **SCORING A PPO CHECKPOINT THROUGH THE `ppo` AGENT MEASURES THE WRONG POLICY, and it is the
+    natural thing to type.** `PPORecordingAgent` forces `sample=True` — its docstring says sampling
+    is mandatory, because PPO needs the on-policy action distribution rather than greedy arg-max.
+    Every published number in this project reads a PPO checkpoint through **`offrl`**
+    (`seed_strength_gate.py:185`, `ppo_continue_gate.py`), because greedy is the deployed policy.
+    Measured head-to-head on `v25b`'s terminal checkpoint vs the heuristic, n=120: **0.675 sampled
+    against 0.767 greedy, a ~9-point gap.** This was caught by a smoke run whose standings came out
+    inverted. `parse_field` now **refuses** `ppo@<checkpoint>` and names `offrl@` as the fix, rather
+    than documenting the trap — a ~9-point systematic bias on every learned entry is not something a
+    reader can be expected to notice in a table.
+  - **NON-TRANSITIVITY IS A STATED LIMITATION, not a bug.** Bradley-Terry gives each agent one
+    latent strength, so it cannot represent cycles: in a perfect rock-paper-scissors field the fit
+    rates everyone equal, and says so. Pokémon carries real non-transitivity (team archetypes
+    counter each other), so a cluster of near-equal ratings can mean "cyclic" rather than "equally
+    strong". The full win matrix is written alongside the standings for exactly this reason.
+  - **WHAT IT IS NOT, recorded in the results file itself so a published number carries its own
+    basis.** (1) Not comparable to a Showdown GXE, which is measured against **humans** on the
+    public ladder. (2) Not a replacement for `scripts/seed_strength_gate.py`, which remains the
+    authoritative build-vs-build statistic. The default field also **excludes the in-flight `v26a`
+    arms** on purpose: Build 26's verdict comes from the pre-registered gate, and a mid-flight arm
+    in a rating table invites exactly the reading pre-registration exists to prevent.
+  - **RESULT — G2's headline metric is now COMPUTED (2026-08-10).** `gen9ou`, 8 agents, 28 pairs
+    × **300** battles = **8,400**, `loop_penalty` 4 (the authoritative gate's value, not 0), anchor
+    `heuristic` = 1500, converged in 85 sweeps, every pair at full `n`, nothing clamped or
+    unbounded. `results/eval_ladder_gen9ou.json`.
+
+    | agent | W–L | score | Glicko | RD | GXE |
+    |---|---|---|---|---|---|
+    | `offrl@ppo_v25a_s0/iter_120` | 1597–503 | 0.760 | **1715.5** | 15.0 | **0.6962** |
+    | `offrl@ppo_v25b_s0/iter_160` | 1570–530 | 0.748 | **1696.9** | 14.9 | **0.6809** |
+    | `offrl@ppo_v23b_s0/iter_80` | 1532–568 | 0.730 | 1671.1 | 14.7 | 0.6590 |
+    | `simpleheuristics` | 1394–706 | 0.664 | 1579.2 | 14.6 | 0.5756 |
+    | `heuristic` (anchor) | 1276–824 | 0.608 | 1500.0 | 14.8 | 0.5000 |
+    | `maxbasepower` | 636–1464 | 0.303 | 941.4 | 21.3 | 0.1044 |
+    | `random` | 358–1742 | 0.171 | 575.1 | 26.2 | 0.0277 |
+    | `offrl@offrl_gen9ou_wide_s0` | 37–2063 | 0.018 | −23.5 | 43.9 | 0.0029 |
+
+    **The ordering reproduces the entire win-rate history**, which is the check that matters: the
+    learned builds sit above `simpleheuristics` above `heuristic` above the naive bots, and the PPO
+    warm-start init lands at the bottom — consistent with OU Builds 2–4, which found that
+    checkpoint functionally dead on OU (it loses 37/2100 here, and `random` beats it).
+    **An independent reproduction of a published number:** `simpleheuristics` vs `heuristic` comes
+    back **0.623** against Lever 15's **0.633 [0.577, 0.686]**, well inside the CI.
+  - **WHAT THIS DOES AND DOES NOT SETTLE.** It settles G2's *headline metric*: `v25b` is
+    **Glicko 1696.9 ± 14.9, GXE 0.6809** on a varied field. It does **not** resolve the ordering
+    among the top three. Two independent `n=150` runs preceded this one, and the `v25a`↔`v25b`
+    pairing moved **0.460 → 0.587** between them — a 0.127 swing, ~3.1 binomial SE — while each
+    agent's own GXE moved under 0.004. **The battles are not independent Bernoulli trials:** a
+    12-team pool plus archetype counters clusters them by team matchup, so the effective sample is
+    well under `n` and the reported **RD is a lower bound, not an interval.** The standings
+    separate *bands*; they do not order neighbours. That is also consistent with the authoritative
+    gate, where Build 25's 120→160 contrast was pooled-significant but **not** seed-robust — and
+    the ladder is single-seed (`s0`), so it could not speak to build-vs-build regardless. This
+    caveat is written into the results file's own basis string.
+  - **ONE NUMERICAL COINCIDENCE, BOOKED AS ONE SO IT IS NOT MISREAD AS VALIDATION.** `v25b`'s GXE
+    is **0.6809** and its published terminal win rate vs the heuristic is **0.6807**. These are
+    *different quantities*: GXE discounts for the reference player's RD 350, whereas the published
+    figure is a direct win rate against one specific opponent — and `v25b`'s direct head-to-head in
+    this very run was **0.720**, not 0.681. The agreement to 2e-4 is a coincidence of magnitude,
+    not an identity, and must not be cited as the ladder reproducing the gate.
+
 ---
 
 ## 14. Risks & mitigations
@@ -2536,7 +2679,16 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
 2. **Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?
 3. **Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?
 4. **Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)
-5. **Eval environment:** stand up a private Showdown server for clean evaluation, or use anonymized non-ranked live play?
+5. ~~**Eval environment:** stand up a private Showdown server for clean evaluation, or use anonymized non-ranked live play?~~
+   **ANSWERED (M5 / G1 build, 2026-08-10): the private/agent-only route — and the alternative turned
+   out not to exist.** The question presupposes that "anonymized non-ranked live play" is available
+   on the public server. It is not: `/search <format>` on the public sim **is** the rated ladder,
+   and Showdown offers no unranked equivalent, so live public play cannot be made policy-safe —
+   only policy-*explicit*. `lategame/live/policy.py` is that finding turned into a gate (two
+   independent opt-in channels; see NG3 and §15), and `--server` is the supported private-eval
+   path. The clean-evaluation half of the question is answered by `lategame/eval/ladder.py`: an
+   **agent-only eval ladder** on the local server, which is what §12's "private/agent-only server
+   or eval ladder" asks for and the only varied field reachable without touching the human ladder.
 6. **Reward shaping specifics:** which intermediate signals densify learning without distorting the win objective?
 
 ---
