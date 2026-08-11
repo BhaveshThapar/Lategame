@@ -40,11 +40,12 @@ real non-transitivity (team archetypes counter each other), so a cluster of near
 mean "cyclic" rather than "equally strong". The full win matrix is written alongside the table for
 exactly this reason -- ``tests/test_eval_ladder.py`` pins the behaviour.
 
-Finally, note what this module does NOT use. ``poke_env.player.cross_evaluate`` (which
-``arena.evaluate_built`` wraps) reports ``Player.win_rate`` = ``n_won_battles /
-n_finished_battles``, so A TIE DRAGS WIN RATE DOWN WITHOUT COUNTING AS A LOSS -- the same failure
-that stops ``rating.rate_win_rate`` from representing a tie, one layer down. Pairs are therefore
-played through ``battle_against`` directly and scored off the win/loss/tie counters.
+Finally, note what this module does NOT use. ``poke_env.player.cross_evaluate`` reports
+``Player.win_rate`` = ``n_won_battles / n_finished_battles``, so A TIE DRAGS WIN RATE DOWN WITHOUT
+COUNTING AS A LOSS -- the same failure that stops ``rating.rate_win_rate`` from representing a tie,
+one layer down. Pairs are therefore played through ``battle_against`` directly and scored off the
+win/loss/tie counters. ``arena.evaluate_built`` wrapped ``cross_evaluate`` and inherited the bug
+when this was written; it was fixed to score the same way once Build 26 released the frozen path.
 """
 
 from __future__ import annotations
