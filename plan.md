@@ -2526,6 +2526,64 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     from a genuine saturation. Build 26's pre-registration inherits Build 25's design without
     restating an N, so Build 25's split is what carries over: **3000 primary / 1800 co-primary**,
     now pinned in the script and overridable only for a plumbing smoke.
+  - **RESULT — KNEE BETWEEN 240 AND 320 (2026-08-11).** Both gates ran clean in one job
+    (`7237875`, 3:17:34): primary N=3000 (27,000 battles) and the selection-free terminal read at
+    N=1800 (16,200). Pooled vs the heuristic, n=9000/arm: `v25b` **0.6691**, `v26a` **0.7250**,
+    `v26b` **0.7420** [0.7329, 0.7509]. On the terminal read: 0.6883 / 0.7354 / **0.7513**.
+    **0.7420 (and 0.7513 terminal) is the highest pooled rate in the project's history**, against
+    Build 25's 0.6534 / 0.6807. The anchor re-calibrates at 0.6691 vs Build 25's 0.6534 — 0.0157
+    apart, inside the ±0.027 cross-run band.
+  - **THE THREE CONTRASTS, bias subtracted before any dose is declared, α = 0.0167.**
+
+    | # | contrast | primary (adj) | seeds | terminal (adj) | seeds | call |
+    |---|---|---|---|---|---|---|
+    | 1 | `v25b` → `v26a` | **+0.0514** (z +8.16) | 3/3, t +2.44 | **+0.0425** (z +5.40) | 3/3, t +3.02 | **WIN, both reads** |
+    | 2 | `v26a` → `v26b` | +0.0145 (z +2.58, p 0.0099) | **2/3**, t +0.88 | +0.0134 (z +1.90, p 0.0581) | 3/3, t +1.95 | **not called** |
+    | 3 | `v25b` → `v26b` | **+0.0659** (z +10.73) | 3/3, t +5.69 | **+0.0560** (z +7.29) | 3/3, t +3.24 | **WIN, both reads** |
+
+    #1 + #2 = #3 exactly on both reads (0.0559 + 0.0170 = 0.0729; 0.0470 + 0.0159 = 0.0629 ≈ 0.0630).
+    *The bias correction was applied and did not bind*, as in Build 25 — though it is no longer
+    immaterial: on #2 it eats **15%** of the raw effect (+0.0170 → +0.0145) against 8% on #1, which
+    is what the pre-registration anticipated when it insisted the correction be re-simulated rather
+    than reused.
+  - **#1 SIGNIFICANT AND POSITIVE, #2 NOT CALLED ⇒ KNEE BETWEEN 240 AND 320** — the row the
+    pre-registration named as the anticipated modal outcome, reached without having to leave it.
+  - **THE TWO READS AGREE IN SIGN AND IN SIZE; THEY DISAGREE ONLY ON POWER, AND THAT IS NOT A
+    FINDING.** #2's effect is +0.0145 (primary) and +0.0134 (terminal) — the same number twice. What
+    differs is `n`: the primary read carries 9000/arm and the terminal 5400/arm, so an identical
+    effect gives z +2.58 there and z +1.90 here. There is **no sign disagreement to book** — the
+    case the pre-registration promoted the terminal read to co-primary in order to catch did not
+    arise. What did arise is that **#2's true effect sits at the resolution limit of this design**:
+    ~+0.014 against a per-contrast MDE of ~0.025 at N=3000. Calling it either way would be reading
+    the sample size, not the model, so it is booked as not called.
+  - **THE SEED-ROBUSTNESS PATTERN INVERTS, EXACTLY AS BUILD 25 WARNED.** On #2 the primary read is
+    pooled-significant but only **2/3** seeds (+0.031 / +0.013 / +0.003, t +0.88), while the
+    terminal read is pooled-null but **3/3** (t +1.95) — the same reversal Build 25 saw, and the
+    reason the terminal read was promoted. Neither read is "the strong one" here; they are
+    measuring a dose that is simply small.
+  - **THE DOSE-RESPONSE CURVE IS NOW FOUR POINTS, AND THE MARGINAL RETURN DECAYS MONOTONICALLY.**
+    Per *update*, ×10⁻³: **1.62** (80→120) → **0.91** (120→160) → **0.64** (160→240) → **0.18**
+    (240→320). A ~9× decay first-to-last, monotone at every step. That is the real content of this
+    build: not "320 is better than 240" but **the axis is saturating, and the cost per point is now
+    the binding question rather than the effect.** `v26b`'s `best_iter` was 315 / 289 / 318 — still
+    late in the arm, so the curve-side read does not contradict the gate, but the gain being bought
+    at that end is ~4× cheaper per update than at 160.
+  - **ATTRIBUTABLE, AND NO COLLAPSE.** The trust region **never bound**: `0/240` on all three
+    `v26a` arms and `0/320` on all three `v26b` arms, with `approx_kl_max` 0.052–0.072 all under
+    the 0.09 bar — against Build 22's verdict-costing 59/150. Final entropy 0.418–0.487 and
+    `vs_iter0` **1.00 on all six**. So the NULL on #2 is attributable to update count and not to a
+    binding optimizer constraint.
+  - **THE COMPARABILITY CAVEAT LANDED ON EXACTLY THE CONTRAST THAT WAS PRE-REGISTERED TO CARRY
+    IT.** `v26a` ran uninterrupted; `v26b` ran 160 → resume → 320. #2 is the `v26a` → `v26b`
+    contrast, and #2 is the one that came back ambiguous. The schedule was pinned and optimizer/RNG
+    state carried across, so the intended difference is still update count alone — but this is the
+    build where "if #2 comes back near the significance boundary it must be read with that in mind"
+    stops being hypothetical. It came back at p 0.0099 / 0.0581 across the two reads.
+  - **THE RESUME MECHANISM IS VALIDATED, AND THE MEMORY FINDING HOLDS.** Chunk 2 peaked at
+    **41.6–44.0 GiB** for a 320-iteration arm, against the **67.1 GiB** that OOM-killed the
+    unchunked attempt at iteration 304 and against the 64 GB `medium` cap. A fresh process really
+    does reset RSS: the arm that no QoS envelope could fit in one process finished with ~20 GiB of
+    headroom. Elapsed 9:36–11:00 per chunk-2 task.
   - **The analysis is now one submission.** `scripts/cluster/build26_analysis.slurm` starts its own
     Showdown server (on port base **8400**, clear of the PPO bases 8100–8102 / 8200–8202 and of
     `eval_ladder.slurm`'s 8300) and runs the preflight *before* claiming a node. `build26_analysis.sh`

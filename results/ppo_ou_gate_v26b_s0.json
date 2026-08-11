@@ -14,16 +14,16 @@
   "seeds": [
     0
   ],
-  "iters": 160,
+  "iters": 320,
   "games_per_opp": 48,
   "eval_n": 100,
   "ladder_n": 20,
   "opponent": "heuristic",
-  "best_checkpoint": "checkpoints/ppo_v26b_s0/iter_130.pt",
+  "best_checkpoint": "checkpoints/ppo_v26b_s0/iter_300.pt",
   "confirmatory_ladder": {
     "random": 1.0,
     "maxbasepower": 0.85,
-    "simpleheuristics": 0.45,
+    "simpleheuristics": 0.75,
     "heuristic": 0.65
   },
   "records": [
@@ -31,11 +31,11 @@
       "seed": 0,
       "out_dir": "checkpoints/ppo_v26b_s0",
       "start_vs_heuristic": 0.0,
-      "best_iter": 130,
-      "best_vs_heuristic": 0.75,
-      "best_checkpoint": "checkpoints/ppo_v26b_s0/iter_130.pt",
+      "best_iter": 300,
+      "best_vs_heuristic": 0.85,
+      "best_checkpoint": "checkpoints/ppo_v26b_s0/iter_300.pt",
       "final_vs_iter0": 1.0,
-      "delta_vs_start": 0.75,
+      "delta_vs_start": 0.85,
       "curve": [
         {
           "iter": 0,
@@ -1162,6 +1162,1126 @@
           "vs_simpleheuristics": 0.65,
           "vs_heuristic": 0.72,
           "vs_iter0": 1.0
+        },
+        {
+          "iter": 161,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.62,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 162,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.58,
+          "vs_heuristic": 0.67,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 163,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.65,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 164,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 165,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.58,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 166,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.67,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 167,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.63,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 168,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.57,
+          "vs_heuristic": 0.64,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 169,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 170,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 171,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.63,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 172,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 173,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.63,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 174,
+          "vs_random": 0.95,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 175,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.63,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 176,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.63,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 177,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 178,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 179,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 180,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.61,
+          "vs_heuristic": 0.64,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 181,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.62,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 182,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 183,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.63,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 184,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.65,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 185,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 186,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 187,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.62,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 188,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 189,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.61,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 190,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 191,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.63,
+          "vs_heuristic": 0.67,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 192,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 193,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.61,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 194,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 195,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 196,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 197,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.67,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 0.98
+        },
+        {
+          "iter": 198,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 199,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 200,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 201,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.6,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 202,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.6,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 203,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.67,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 204,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 205,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.65,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 206,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 207,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 208,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 209,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 210,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 211,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 212,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 213,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 214,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 215,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.6,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 216,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 217,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 218,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 219,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 220,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 221,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.67,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 222,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 223,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 224,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 225,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 226,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 227,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 228,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.81,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 229,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 230,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 231,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 232,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 233,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 234,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 235,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 236,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 237,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 238,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.81,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 239,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 240,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 241,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 242,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 243,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.64,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 244,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 245,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 246,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 247,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 248,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 249,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 250,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 251,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.81,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 252,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 253,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 254,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 255,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 256,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.84,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 257,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 258,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 259,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 260,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 261,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 262,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 263,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 264,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 265,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.8,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 266,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 267,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.61,
+          "vs_heuristic": 0.68,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 268,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 269,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 270,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 271,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 272,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 273,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 274,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 275,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 276,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 277,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 278,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.65,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 279,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 280,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 281,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 282,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.77,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 283,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 284,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.7,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 285,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.82,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 286,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 287,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.66,
+          "vs_heuristic": 0.8,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 288,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 289,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 290,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.73,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 291,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 292,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 293,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.69,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 294,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.77,
+          "vs_heuristic": 0.8,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 295,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.81,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 296,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 297,
+          "vs_random": 0.95,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.78,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 298,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 299,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.82,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 300,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.85,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 301,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.81,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 302,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 303,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.64,
+          "vs_heuristic": 0.83,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 304,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.8,
+          "vs_iter0": 0.98
+        },
+        {
+          "iter": 305,
+          "vs_random": 0.97,
+          "vs_simpleheuristics": 0.69,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 306,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.7,
+          "vs_heuristic": 0.72,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 307,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.78,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 308,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 309,
+          "vs_random": 0.95,
+          "vs_simpleheuristics": 0.72,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 310,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.71,
+          "vs_heuristic": 0.66,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 311,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.73,
+          "vs_heuristic": 0.83,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 312,
+          "vs_random": 0.96,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.79,
+          "vs_iter0": 0.99
+        },
+        {
+          "iter": 313,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 314,
+          "vs_random": 0.98,
+          "vs_simpleheuristics": 0.68,
+          "vs_heuristic": 0.75,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 315,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.82,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 316,
+          "vs_random": 1.0,
+          "vs_simpleheuristics": 0.74,
+          "vs_heuristic": 0.74,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 317,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.75,
+          "vs_heuristic": 0.83,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 318,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.76,
+          "vs_heuristic": 0.84,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 319,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.79,
+          "vs_heuristic": 0.76,
+          "vs_iter0": 1.0
+        },
+        {
+          "iter": 320,
+          "vs_random": 0.99,
+          "vs_simpleheuristics": 0.83,
+          "vs_heuristic": 0.71,
+          "vs_iter0": 1.0
         }
       ]
     }
@@ -1178,12 +2298,12 @@
     },
     "best_vs_heuristic": {
       "values": [
-        0.75
+        0.85
       ],
-      "mean": 0.75,
+      "mean": 0.85,
       "std": 0.0,
-      "min": 0.75,
-      "max": 0.75
+      "min": 0.85,
+      "max": 0.85
     },
     "final_vs_iter0": {
       "values": [
