@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import random
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -256,6 +257,75 @@ class PairResult:
         return (self.wins + 0.5 * self.ties) / self.games if self.games else 0.0
 
 
+@dataclass(frozen=True)
+class BattleRecord:
+    """One battle, tagged with the TEAM MATCHUP it was played under.
+
+    ``PairResult`` totals are all the point-estimate fit needs, but they cannot support a cluster
+    bootstrap: the clustering is by team matchup, and totals have already summed across matchups.
+    """
+
+    a: str
+    b: str
+    #: ``a``'s score. 1.0 win / 0.5 tie / 0.0 loss, matching ``_games_by_label``.
+    score: float
+    #: The cluster key -- see ``battle_cell``.
+    cell: str
+
+
+def _species_key(mons: Iterable[Any]) -> str:
+    named = (m for m in mons if m is not None and getattr(m, "species", None))
+    return "|".join(sorted(m.species for m in named))
+
+
+def battle_cell(own_team: Iterable[Any], opponent_preview: Iterable[Any], battle_tag: str) -> str:
+    """The unordered team matchup this battle was played under.
+
+    Unordered because the correlation being modelled is a property of the MATCHUP -- if team X
+    structurally beats team Y, every X-vs-Y battle leans the same way no matter which agent drew
+    which side. Ordering the key would split one cluster into two half-size ones and understate the
+    dependence, which is the thing the bootstrap exists to capture.
+
+    **Falls back to the battle tag when either side's team is unknown**, which makes the cluster
+    bootstrap degenerate to the ordinary per-battle bootstrap. That is the correct behaviour for
+    Random Battles, where every battle draws fresh teams and genuinely is its own cluster -- and it
+    means a caller never has to ask whether the format is teambuilt.
+    """
+    own, opponent = _species_key(own_team), _species_key(opponent_preview)
+    if not own or not opponent:
+        return f"battle:{battle_tag}"
+    return "\x1fvs\x1f".join(sorted((own, opponent)))
+
+
+def records_from_battles(a: str, b: str, battles: Iterable[Any]) -> list[BattleRecord]:
+    """Per-battle records for one pair, scored from ``a``'s side (``battles`` are ``a``'s)."""
+    records = []
+    for battle in battles:
+        if not battle.finished:
+            continue
+        score = 1.0 if battle.won else 0.0 if battle.lost else 0.5
+        records.append(
+            BattleRecord(
+                a=a,
+                b=b,
+                score=score,
+                cell=battle_cell(
+                    battle.team.values(), battle.teampreview_opponent_team, battle.battle_tag
+                ),
+            )
+        )
+    return records
+
+
+@dataclass(frozen=True)
+class RoundRobin:
+    """What a tournament produces: the pair totals the fit reads, and the per-battle records the
+    cluster bootstrap needs. Separate because the totals are lossy for the bootstrap's purposes."""
+
+    pairs: list[PairResult]
+    records: list[BattleRecord]
+
+
 def _counters(player: Any) -> tuple[int, int, int]:
     """(wins, losses, finished) as poke-env currently sees them.
 
@@ -279,7 +349,7 @@ async def run_round_robin(
     sample: bool = False,
     loop_penalty: float = DEFAULT_LOOP_PENALTY,
     on_pair: Any = None,
-) -> list[PairResult]:
+) -> RoundRobin:
     """Play every unordered pair ``n_battles`` times on the local server.
 
     Players are built ONCE for the whole tournament and reset between pairs, as poke-env's own
@@ -324,6 +394,11 @@ async def run_round_robin(
     ]
 
     results: list[PairResult] = []
+    records: list[BattleRecord] = []
+    # Battles already accounted for. `reset_battles` normally empties `_battles` between pairs, but
+    # it REFUSES while any battle is unfinished and that refusal is suppressed below -- so without
+    # this, one stuck battle would re-attribute the whole previous pair to the next one.
+    seen_tags: set[str] = set()
     try:
         for i, p1 in enumerate(players):
             for j in range(i + 1, len(players)):
@@ -349,6 +424,17 @@ async def run_round_robin(
                     games=finished,
                 )
                 results.append(pair)
+
+                # Per-battle records for the cluster bootstrap. Read from p1's side (p2's are the
+                # mirror) and only for battles this pair actually added.
+                fresh = [
+                    battle
+                    for tag, battle in getattr(p1, "_battles", {}).items()
+                    if tag not in seen_tags
+                ]
+                seen_tags.update(battle.battle_tag for battle in fresh)
+                records.extend(records_from_battles(entries[i].label, entries[j].label, fresh))
+
                 if on_pair is not None:
                     on_pair(pair)
                 for player in (p1, p2):
@@ -359,7 +445,7 @@ async def run_round_robin(
             with contextlib.suppress(Exception):
                 await player.ps_client.stop_listening()
 
-    return results
+    return RoundRobin(pairs=results, records=records)
 
 
 # --------------------------------------------------------------------------- #
@@ -412,11 +498,20 @@ def rate_field(
     anchor: str = DEFAULT_ANCHOR,
     max_sweeps: int = MAX_SWEEPS,
     tol: float = TOL,
+    start: Mapping[str, float] | None = None,
 ) -> FieldFit:
     """Fit every agent's rating jointly from the round-robin matrix.
 
     See the module docstring for why this iterates, why it needs an anchor, and why RD is computed
     exactly once at the end.
+
+    ``start`` seeds the iteration instead of the usual flat 1500. It cannot change the answer --
+    damping makes the sweep a contraction and the anchor removes the one remaining gauge direction,
+    so the fixed point is unique and starting nearer it only costs fewer sweeps. That is worth
+    having because ``cluster_bootstrap`` runs this fit hundreds of times over data that differs
+    only by resampling, where the point estimate is an excellent starting guess (85 sweeps cold vs
+    a handful warm). Pinned by a test that fits from a deliberately bad start and requires the same
+    ratings.
     """
     games = _games_by_label(pairs)
     labels = sorted(games)
@@ -441,7 +536,9 @@ def rate_field(
         )
     )
 
-    current = {lab: DEFAULT_RATING for lab in labels}
+    current = {
+        lab: float(start[lab]) if start and lab in start else DEFAULT_RATING for lab in labels
+    }
     sweeps = 0
     max_delta = float("inf")
     for sweep in range(1, max_sweeps + 1):
@@ -491,6 +588,132 @@ def rate_field(
 
 
 # --------------------------------------------------------------------------- #
+# The cluster bootstrap -- turning RD into an interval it is entitled to be
+# --------------------------------------------------------------------------- #
+def aggregate_records(records: Iterable[BattleRecord]) -> list[PairResult]:
+    """Collapse per-battle records back into the pair totals ``rate_field`` reads.
+
+    Pair orientation is canonicalised (``a < b``) so a resample that draws a cell containing both
+    orientations of the same pairing still sums into one row.
+    """
+    totals: dict[tuple[str, str], list[int]] = {}
+    for record in records:
+        flip = record.a > record.b
+        key = (record.b, record.a) if flip else (record.a, record.b)
+        score = 1.0 - record.score if flip else record.score
+        bucket = totals.setdefault(key, [0, 0, 0])
+        bucket[0 if score == 1.0 else 1 if score == 0.0 else 2] += 1
+    return [
+        PairResult(a=a, b=b, wins=w, losses=lo, ties=t, games=w + lo + t)
+        for (a, b), (w, lo, t) in totals.items()
+    ]
+
+
+def _percentile(values: Sequence[float], q: float) -> float:
+    """Linear-interpolated percentile. ``q`` in [0, 1]; ``values`` need not be sorted."""
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = q * (len(ordered) - 1)
+    low = int(position)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (position - low) * (ordered[high] - ordered[low])
+
+
+@dataclass(frozen=True)
+class Bootstrap:
+    """Percentile intervals from resampling TEAM MATCHUPS, plus what the resampling could not do."""
+
+    #: label -> (lo, hi) on the Glicko scale.
+    glicko: dict[str, tuple[float, float]]
+    #: label -> (lo, hi) on GXE.
+    gxe: dict[str, tuple[float, float]]
+    n_resamples: int
+    n_cells: int
+    #: Resamples discarded because they did not cover the whole field (see ``cluster_bootstrap``).
+    skipped: int
+    ci: float
+
+
+def cluster_bootstrap(
+    records: Sequence[BattleRecord],
+    point: FieldFit,
+    *,
+    anchor: str = DEFAULT_ANCHOR,
+    n_resamples: int = 300,
+    seed: int = 0,
+    ci: float = 0.95,
+) -> Bootstrap:
+    """Resample TEAM MATCHUPS with replacement and refit the whole field each time.
+
+    **This exists because RD is a lower bound, not an interval, and the results file has always
+    said so.** RD is derived from binomial noise alone -- it is the uncertainty the fit would have
+    if every battle were an independent Bernoulli trial. On a teambuilt format they are not: a
+    12-team pool plus archetype counters clusters battles by team matchup, so the effective sample
+    is well under ``n``. The evidence was already on the record and unexplained by RD: across two
+    independent n=150 gen9ou runs the ``v25a``/``v25b`` pairing moved 0.460 -> 0.587, about 3.1
+    binomial SE, while each agent's own GXE moved under 0.004.
+
+    A cluster bootstrap is the standard answer. The unit of resampling is the CELL (one team
+    matchup, ``BattleRecord.cell``), not the battle, because that is the level the dependence lives
+    at -- resampling battles would reproduce exactly the binomial interval RD already gives and
+    answer nothing.
+
+    Each resample draws ``n_cells`` cells with replacement, re-aggregates them into pair totals and
+    refits, warm-started from ``point`` (identical answer, far fewer sweeps -- see ``rate_field``).
+
+    **Resamples that do not cover the whole field are discarded, not patched.** A field member
+    absent from a draw has no rating in that resample, and substituting anything for it would put a
+    number into the percentile that no fit produced. They are counted and reported instead, so a
+    field too sparse to bootstrap is visible rather than silently narrow.
+    """
+    if not records:
+        raise LadderError("cluster_bootstrap needs per-battle records; none were collected")
+
+    by_cell: dict[str, list[BattleRecord]] = {}
+    for record in records:
+        by_cell.setdefault(record.cell, []).append(record)
+    cells = sorted(by_cell)
+    labels = sorted(point.ratings)
+    start = {label: rating.rating for label, rating in point.ratings.items()}
+
+    rng = random.Random(seed)
+    draws: dict[str, list[float]] = {label: [] for label in labels}
+    gxe_draws: dict[str, list[float]] = {label: [] for label in labels}
+    skipped = 0
+    for _ in range(n_resamples):
+        drawn = [record for cell in rng.choices(cells, k=len(cells)) for record in by_cell[cell]]
+        try:
+            fit = rate_field(aggregate_records(drawn), anchor=anchor, start=start)
+        except LadderError:
+            skipped += 1
+            continue
+        if set(fit.ratings) != set(labels):
+            skipped += 1
+            continue
+        for label, rating in fit.ratings.items():
+            draws[label].append(rating.rating)
+            gxe_draws[label].append(gxe(rating))
+
+    if not draws[anchor] and skipped == n_resamples:
+        raise LadderError(
+            f"every one of {n_resamples} resamples failed to cover the field of {len(labels)} "
+            "agents -- there are too few team matchups here to bootstrap over."
+        )
+
+    lo_q, hi_q = (1.0 - ci) / 2.0, 1.0 - (1.0 - ci) / 2.0
+    return Bootstrap(
+        glicko={lab: (_percentile(v, lo_q), _percentile(v, hi_q)) for lab, v in draws.items() if v},
+        gxe={lab: (_percentile(v, lo_q), _percentile(v, hi_q))
+             for lab, v in gxe_draws.items() if v},
+        n_resamples=n_resamples - skipped,
+        n_cells=len(cells),
+        skipped=skipped,
+        ci=ci,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Reporting
 # --------------------------------------------------------------------------- #
 def summarize_ladder(
@@ -500,6 +723,7 @@ def summarize_ladder(
     *,
     battle_format: str,
     n_battles: int,
+    bootstrap: Bootstrap | None = None,
 ) -> dict[str, Any]:
     """The payload: per-agent ratings, the full matrix, and the basis they mean nothing without."""
     by_label = {entry.label: entry for entry in entries}
@@ -530,6 +754,11 @@ def summarize_ladder(
                 "clamped": label in fit.clamped,
             }
         )
+        if bootstrap is not None and label in bootstrap.glicko:
+            lo, hi = bootstrap.glicko[label]
+            g_lo, g_hi = bootstrap.gxe[label]
+            agents[-1]["glicko_ci95"] = [round(lo, 1), round(hi, 1)]
+            agents[-1]["gxe_ci95"] = [round(g_lo, 4), round(g_hi, 4)]
     agents.sort(key=lambda row: row["glicko"], reverse=True)
 
     matrix: dict[str, dict[str, Any]] = {}
@@ -562,6 +791,42 @@ def summarize_ladder(
         "matrix": matrix,
         "gxe_basis": _GXE_BASIS.format(anchor=fit.anchor, rating=DEFAULT_RATING),
     }
+    if bootstrap is not None:
+        # THE QUESTION THE POINT ESTIMATE CANNOT ANSWER: are neighbours actually ordered? Reported
+        # per adjacent pair rather than left to the reader, because a standings table read top-down
+        # implies an ordering whether or not the data support one.
+        separation = [
+            {
+                "above": hi_row["label"],
+                "below": lo_row["label"],
+                "gap": round(hi_row["glicko"] - lo_row["glicko"], 1),
+                "separated": bool(
+                    "glicko_ci95" in hi_row
+                    and "glicko_ci95" in lo_row
+                    and hi_row["glicko_ci95"][0] > lo_row["glicko_ci95"][1]
+                ),
+            }
+            for hi_row, lo_row in zip(agents, agents[1:], strict=False)
+        ]
+        summary["bootstrap"] = {
+            "method": "cluster bootstrap over team matchups",
+            "n_resamples": bootstrap.n_resamples,
+            "n_cells": bootstrap.n_cells,
+            "skipped": bootstrap.skipped,
+            "ci": bootstrap.ci,
+            "adjacent_separation": separation,
+            "note": (
+                "Resampling unit is the TEAM MATCHUP, not the battle, because that is the level "
+                "the dependence lives at -- resampling battles would just reproduce the binomial "
+                "interval RD already reports. `separated` is true only where the two 95% intervals "
+                "do not overlap; everywhere else the table's order is not evidence of an ordering."
+            ),
+        }
+        if bootstrap.skipped:
+            summary["bootstrap"]["skipped_note"] = (
+                f"{bootstrap.skipped} of {bootstrap.skipped + bootstrap.n_resamples} resamples did "
+                "not cover the whole field and were discarded rather than patched."
+            )
     if not fit.converged:
         summary["warning"] = (
             f"the joint fit did NOT converge in {fit.sweeps} sweeps (max_delta "
@@ -595,18 +860,37 @@ def format_table(summary: Mapping[str, Any]) -> str:
     """The human-readable standings, for the CLI."""
     rows = summary["agents"]
     width = max([len(str(row["label"])) for row in rows] + [5])
-    lines = [
+    booted = any("glicko_ci95" in row for row in rows)
+    header = (
         f"  {'agent'.ljust(width)}  {'W-L-T':>13}  {'score':>6}  "
         f"{'Glicko':>8}  {'RD':>6}  {'GXE':>7}"
-    ]
+    )
+    lines = [header + ("  " + "cluster 95% CI".rjust(18) if booted else "")]
     for row in rows:
         record = f"{row['wins']}-{row['losses']}-{row['ties']}"
         score = "  n/a " if row["score_rate"] is None else f"{row['score_rate']:.3f}"
         flag = "  (CLAMPED -- a bound, not a rating)" if row["clamped"] else ""
+        interval = ""
+        if booted:
+            ci = row.get("glicko_ci95")
+            interval = f"  {f'[{ci[0]:.0f}, {ci[1]:.0f}]':>18}" if ci else f"  {'':>18}"
         lines.append(
             f"  {str(row['label']).ljust(width)}  {record:>13}  {score:>6}  "
-            f"{row['glicko']:>8.1f}  {row['glicko_rd']:>6.1f}  {row['gxe']:>7.4f}{flag}"
+            f"{row['glicko']:>8.1f}  {row['glicko_rd']:>6.1f}  {row['gxe']:>7.4f}"
+            f"{interval}{flag}"
         )
+
+    adjacent = (summary.get("bootstrap") or {}).get("adjacent_separation")
+    if adjacent:
+        # The RD column reads like an interval and is not one, so the separation verdict is spelled
+        # out next to the table rather than left to be inferred from overlapping brackets.
+        lines.append("")
+        lines.append("  adjacent pairs (cluster 95% CI):")
+        for row in adjacent:
+            verdict = "SEPARATED" if row["separated"] else "not separated"
+            lines.append(
+                f"    {row['above']} > {row['below']}: gap {row['gap']:+.1f}  -- {verdict}"
+            )
     return "\n".join(lines)
 
 
@@ -619,13 +903,20 @@ __all__ = [
     "RATING_CLAMP",
     "SCHEMA",
     "TOL",
+    "BattleRecord",
+    "Bootstrap",
     "FieldEntry",
     "FieldFit",
     "LadderError",
     "PairResult",
+    "RoundRobin",
+    "aggregate_records",
+    "battle_cell",
+    "cluster_bootstrap",
     "format_table",
     "parse_field",
     "rate_field",
+    "records_from_battles",
     "run_round_robin",
     "summarize_ladder",
     "write_results",

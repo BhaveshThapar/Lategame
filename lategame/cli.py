@@ -254,6 +254,7 @@ async def _run_eval_ladder(args: argparse.Namespace) -> None:
 
     from lategame.eval.ladder import (
         PairResult,
+        cluster_bootstrap,
         format_table,
         parse_field,
         rate_field,
@@ -298,7 +299,7 @@ async def _run_eval_ladder(args: argparse.Namespace) -> None:
             flush=True,
         )
 
-    pairs = await run_round_robin(
+    tournament = await run_round_robin(
         entries,
         args.battle_format,
         args.n,
@@ -308,9 +309,28 @@ async def _run_eval_ladder(args: argparse.Namespace) -> None:
         loop_penalty=args.loop_penalty,
         on_pair=_progress,
     )
+    pairs = tournament.pairs
     fit = rate_field(pairs, anchor=args.anchor)
+
+    # The cluster bootstrap runs AFTER the battles and cannot fail the run: an interval is worth
+    # having but not worth losing a completed tournament over, so a failure is reported and the
+    # point estimate is still written.
+    bootstrap = None
+    if args.bootstrap > 0 and tournament.records:
+        print(
+            f"\n  cluster bootstrap: {args.bootstrap} resamples over team matchups...", flush=True
+        )
+        try:
+            bootstrap = cluster_bootstrap(
+                tournament.records, fit, anchor=args.anchor,
+                n_resamples=args.bootstrap, seed=args.bootstrap_seed,
+            )
+        except Exception as exc:  # noqa: BLE001 -- never lose a finished tournament to the CI
+            print(f"  bootstrap FAILED ({exc}); writing the point estimate only")
+
     summary = summarize_ladder(
-        entries, pairs, fit, battle_format=args.battle_format, n_battles=args.n
+        entries, pairs, fit, battle_format=args.battle_format, n_battles=args.n,
+        bootstrap=bootstrap,
     )
     write_results(
         args.out,
@@ -320,6 +340,8 @@ async def _run_eval_ladder(args: argparse.Namespace) -> None:
             "concurrency": args.concurrency,
             "sample": args.sample,
             "loop_penalty": args.loop_penalty,
+            "bootstrap_resamples": args.bootstrap,
+            "bootstrap_seed": args.bootstrap_seed,
         },
         summary,
     )
@@ -758,6 +780,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--loop-penalty", type=float, default=DEFAULT_LOOP_PENALTY,
         help="Build-14 LoopGuard. Defaults to the value the AUTHORITATIVE strength gate uses (4), "
              "not 0, so the ladder scores the same policy the published win rates scored",
+    )
+    ladder.add_argument(
+        "--bootstrap", type=int, default=300,
+        help="Cluster-bootstrap resamples over TEAM MATCHUPS, for a 95%% CI on each rating. RD is "
+             "binomial-only and therefore a LOWER BOUND on a teambuilt format, where battles "
+             "cluster by matchup; this is the interval that is entitled to be read as one. "
+             "0 disables it (the point estimate is unaffected either way)",
+    )
+    ladder.add_argument(
+        "--bootstrap-seed", type=int, default=0, help="Resampling seed, so the CI is reproducible"
     )
     ladder.add_argument(
         "--out", default="results/eval_ladder.json",
