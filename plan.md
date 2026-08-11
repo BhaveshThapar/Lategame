@@ -2500,6 +2500,19 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     arms did not traverse byte-identical code paths, and **#2 (`v26a` → `v26b`) is the contrast
     that carries this**. If #2 comes back near the significance boundary it must be read with that
     in mind rather than as a clean dose.
+  - **THE CHUNKED ARM MADE THE ANALYSIS PREFLIGHT UNSOUND, AND IT WAS CAUGHT LIVE (2026-08-11).**
+    `build26_analysis.sh` refused on *missing* inputs but only checked that each per-seed JSON
+    **existed**. Chunking broke that assumption: both chunks write the same
+    `results/ppo_ou_gate_v26b_s<N>.json`, so between them the file is present, well-formed, and
+    **160 iterations long**. Observed at 09:32 with chunk 2 at iteration ~290/320: all six arm
+    files on disk, all seven inputs reported `ok`, and the script ready to run.
+    **What it would have produced is not a weaker result but a fabricated one:** #2 would compare
+    240 → **160** instead of 240 → 320 — backwards, i.e. the pre-registered **REVERSAL** row — and
+    #3 would compare 160 → 160, a near-null. A verdict of "more updates COST strength", printed
+    with every appearance of having passed its checks, from arms that were simply not finished.
+    The preflight now also checks **arm length** (each curve must reach its pre-registered
+    iteration count), because the existing guard was written when seed *count* was the only way an
+    input could be incomplete — arm length only became a variable when memory forced the split.
 
 - **M5 / G1 — LIVE PLAY, built and verified end-to-end (2026-08-10).** Every build through 26 plays
   a *fixed* baseline on a local server, where win rate is the sufficient statistic. G2 is stated in
