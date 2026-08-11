@@ -38,28 +38,61 @@ run() {
 }
 
 # ---- Preflight: refuse an incomplete arm set rather than silently pooling fewer seeds. ----
-say "preflight"
-missing=0
-for arm in "$ARM_A" "$ARM_B"; do
+#
+# EXISTENCE IS NOT ENOUGH, AND THIS BUILD IS THE FIRST WHERE IT NEVER WAS. `v26b` runs in two
+# chunks (160, then --resume to 320) because arm length is bounded by MEMORY, and EACH CHUNK
+# WRITES THE SAME results/ppo_ou_gate_v26b_s<N>.json. So between the chunks the file is present,
+# well-formed, and 160 iterations long -- and an existence-only check passes on it.
+#
+# What that costs, concretely: contrast #2 would compare 240 -> 160 instead of 240 -> 320 (i.e.
+# backwards, reading as a large REVERSAL) and #3 would compare 160 -> 160 (a near-null). Against
+# the pre-registered table that is the "sig < 0" row: a fabricated REVERSAL verdict, printed with
+# every appearance of having passed its checks. Observed live on 2026-08-11 09:32, with chunk 2 at
+# iteration ~290/320 and all six files sitting on disk marked ok.
+#
+# So each arm is also checked for LENGTH: the curve must actually reach the pre-registered
+# iteration count. The seed-count guard below was written before arm length was a variable.
+check_arm() {  # arm, expected_iters
+  local arm="$1" want="$2" f s got
   for s in "${SEEDS[@]}"; do
     f="results/ppo_ou_gate_${arm}_s${s}.json"
-    if [[ -f "$f" ]]; then
-      echo "  ok      $f"
+    if [[ ! -f "$f" ]]; then
+      echo "  MISSING  $f"
+      missing=$((missing + 1))
+      continue
+    fi
+    got="$(python - "$f" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+recs = d.get("records") or [d.get("record")]
+curve = (recs[0] or {}).get("curve") or []
+print(max((p["iter"] for p in curve), default=-1))
+PY
+)"
+    if [[ "$got" == "$want" ]]; then
+      echo "  ok       $f  (curve reaches iter $got)"
     else
-      echo "  MISSING $f"
+      echo "  TOO SHORT $f  (curve reaches iter $got, pre-registered $want)"
       missing=$((missing + 1))
     fi
   done
-done
+}
+
+say "preflight"
+missing=0
+check_arm "$ARM_A" "$ARM_A_ITERS"
+check_arm "$ARM_B" "$ARM_B_ITERS"
 [[ -f "results/ppo_ou_gate_${ANCHOR}.json" ]] \
-  && echo "  ok      results/ppo_ou_gate_${ANCHOR}.json (anchor, reused)" \
-  || { echo "  MISSING results/ppo_ou_gate_${ANCHOR}.json"; missing=$((missing + 1)); }
+  && echo "  ok       results/ppo_ou_gate_${ANCHOR}.json (anchor, reused)" \
+  || { echo "  MISSING  results/ppo_ou_gate_${ANCHOR}.json"; missing=$((missing + 1)); }
 
 if [[ $missing -gt 0 ]]; then
   echo
-  echo "REFUSING: $missing input(s) missing. A partial merge halves the gate's power and still"
-  echo "prints a verdict, which is exactly the failure this preflight exists to prevent."
-  echo "Check squeue -- Build 26 is 6 tasks (v26a s0-2, v26b s0-2)."
+  echo "REFUSING: $missing input(s) missing or short. A partial merge halves the gate's power, and"
+  echo "a SHORT ARM silently re-points a contrast at the wrong iteration count -- both still print"
+  echo "a verdict, which is exactly the failure this preflight exists to prevent."
+  echo "Check squeue -- Build 26 is 6 tasks (v26a s0-2, v26b s0-2), and v26b takes TWO submissions"
+  echo "(160, then RESUME=1 to 320) that write the same per-seed JSON."
   [[ $DRY_RUN -eq 1 ]] || exit 1
 fi
 
