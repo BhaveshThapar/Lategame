@@ -11,6 +11,12 @@
 # pre-registration requires the subtraction to be reported as an explicit, visible step:
 # a contrast must clear BOTH p < alpha AND diff - bias > 0.
 #
+# NEEDS A SHOWDOWN SERVER. The strength gates below play real battles, so this must run somewhere
+# with one listening on $LATEGAME_SHOWDOWN_PORT -- and at the pre-registered N that is ~3 h of
+# battles, which does not belong on a login node. Use the wrapper, which starts its own server on a
+# port clear of any in-flight PPO build:
+#   sbatch -p tron --qos=medium scripts/cluster/build26_analysis.slurm
+#
 # Usage:
 #   bash scripts/build26_analysis.sh --dry-run     # check inputs, print the plan, run nothing
 #   bash scripts/build26_analysis.sh               # run it
@@ -30,6 +36,28 @@ SEEDS=(0 1 2)
 ALPHA=0.0167
 BIAS_JSON="results/selection_bias_v26.json"
 LADDER_SRC="results/ppo_ou_gate_v25b.json"
+
+# ---- BATTLES PER CHECKPOINT. THE DEFAULT IS NOT SAFE HERE, WHICH IS WHY IT IS PINNED. ----
+#
+# `seed_strength_gate.py` defaults to --n 300, and this script used to leave it unset. That is the
+# same shape of failure as the alpha default the header above already guards: the gate runs, prints
+# a verdict, and nothing about the output says it could not have found the effect.
+#
+# At alpha=0.0125 the measured MDE at 80% power is 0.079 / 0.045 / 0.032 for N = 300 / 900 / 1800,
+# and Build 25 pre-registered N=3000 (MDE ~0.025) with the reasoning recorded in plan.md 13: "the
+# per-step doses here are plausibly ~0.02-0.04, where N=1800 has ~48% power". Build 25's own doses
+# came in at +0.0649 and +0.0362, and Build 26's should be SMALLER if the curve is flattening --
+# which is the whole hypothesis under test. So at N=300 both contrasts would land under the
+# detection threshold, return NULL, and book the pre-registered "SATURATED AT 160" row: a real row,
+# reached by an underpowered test rather than by evidence.
+#
+# Build 26's pre-registration inherits Build 25's design without restating an N, so Build 25's
+# values are what carry over -- 3000 for the seed-best primary, 1800 for the pinned-terminal
+# co-primary (Build 25 ran exactly that split: 36,000 and 21,600 battles).
+#
+# Overridable ONLY to run a cheap smoke of the plumbing. A real verdict uses the defaults.
+N_PRIMARY="${N_PRIMARY:-3000}"
+N_TERMINAL="${N_TERMINAL:-1800}"
 
 say() { printf '\n=== %s ===\n' "$*"; }
 run() {
@@ -109,19 +137,20 @@ for spec in "$ARM_A:$ARM_A_ITERS" "$ARM_B:$ARM_B_ITERS"; do
 done
 
 # ---- 2. Primary read: seed-best, all three arms in ONE invocation. ----
-say "2. PRIMARY (seed-best) strength gate, alpha=${ALPHA}"
+say "2. PRIMARY (seed-best) strength gate, alpha=${ALPHA}, n=${N_PRIMARY}"
 run python scripts/seed_strength_gate.py \
   --build "$ANCHOR" "results/ppo_ou_gate_${ANCHOR}.json" \
   --build "$ARM_A"  "results/ppo_ou_gate_${ARM_A}.json" \
   --build "$ARM_B"  "results/ppo_ou_gate_${ARM_B}.json" \
   --alpha "$ALPHA" \
+  --n     "$N_PRIMARY" \
   --out results/seed_strength_gate_v26.json
 
 # ---- 3. Co-primary read: pin every arm to its TERMINAL iteration (zero selection bias). ----
 # Build 25 promoted this from descriptive to co-primary because its contrast #2 was
 # pooled-significant but NOT seed-robust on the seed-best read, while the terminal read was the
 # stronger one (t = +2.34, 3/3) -- the reverse of the usual direction.
-say "3. CO-PRIMARY (pinned terminal) strength gate"
+say "3. CO-PRIMARY (pinned terminal) strength gate, n=${N_TERMINAL}"
 for spec in "$ANCHOR:$ANCHOR_ITERS" "$ARM_A:$ARM_A_ITERS" "$ARM_B:$ARM_B_ITERS"; do
   arm="${spec%%:*}"; iters="${spec##*:}"
   run python scripts/pin_gate_checkpoint.py \
@@ -134,6 +163,7 @@ run python scripts/seed_strength_gate.py \
   --build "$ARM_A"  "results/ppo_ou_gate_${ARM_A}_terminal.json" \
   --build "$ARM_B"  "results/ppo_ou_gate_${ARM_B}_terminal.json" \
   --alpha "$ALPHA" \
+  --n     "$N_TERMINAL" \
   --out results/seed_strength_gate_v26_terminal.json
 
 # ---- 4. The bias subtraction, reported explicitly. ----

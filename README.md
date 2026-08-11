@@ -939,6 +939,13 @@ python scripts/grad_noise_diag.py --policy <best> --init <warm-start> --league-d
 #     reporting noise. The seed is NOT recorded in the output JSON -- provenance is the filename only.
 #     The COSINE from the same runs did replicate (0.312 -> 0.317) and remains usable.
 
+# Build 26's whole analysis as ONE submission (server + merge + both strength gates + bias table).
+#   The preflight refuses a MISSING or SHORT arm before starting anything: v26b runs in two chunks
+#   that write the same per-seed JSON, so between them the file exists and is 160 iters long.
+#   N is pinned to Build 25's pre-registered 3000 / 1800 -- the gate's own default is 300, whose
+#   MDE (0.079) is wider than any dose this build can produce, so it would book a NULL by design.
+sbatch -p tron --qos=medium scripts/cluster/build26_analysis.slurm
+
 # R-EVAL — the agent-only eval ladder. On the cluster, scripts/cluster/eval_ladder.slurm.
 #   MUST set a port base clear of any in-flight PPO build: _job_common.sh computes 8100 + TASK_ID,
 #   a non-array job takes TASK_ID=0 -> 8100, and colliding jobs SILENTLY SHARE one Showdown server.

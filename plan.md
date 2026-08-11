@@ -2513,6 +2513,25 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     The preflight now also checks **arm length** (each curve must reach its pre-registered
     iteration count), because the existing guard was written when seed *count* was the only way an
     input could be incomplete — arm length only became a variable when memory forced the split.
+  - **AND THE SAME SCRIPT WOULD HAVE RUN THE GATE AT 1/10 THE PRE-REGISTERED N.** Found while
+    estimating the analysis runtime. `seed_strength_gate.py` defaults to `--n 300` and
+    `build26_analysis.sh` left it unset — the identical shape to the `alpha` default its own header
+    already guards against. At α = 0.0125 the measured MDE at 80% power is **0.079 / 0.045 / 0.032
+    for N = 300 / 900 / 1800**, and Build 25 pre-registered **N = 3000** (MDE ~0.025) precisely
+    because "the per-step doses here are plausibly ~0.02–0.04". Build 25's own doses landed at
+    +0.0649 and +0.0362, and **Build 26's should be smaller still if the curve is flattening —
+    which is the hypothesis under test.** So at N=300 both contrasts would sit under the detection
+    threshold, come back NULL, and book the pre-registered **SATURATED AT 160** row: a real row,
+    reached by an underpowered test rather than by evidence, and indistinguishable in the output
+    from a genuine saturation. Build 26's pre-registration inherits Build 25's design without
+    restating an N, so Build 25's split is what carries over: **3000 primary / 1800 co-primary**,
+    now pinned in the script and overridable only for a plumbing smoke.
+  - **The analysis is now one submission.** `scripts/cluster/build26_analysis.slurm` starts its own
+    Showdown server (on port base **8400**, clear of the PPO bases 8100–8102 / 8200–8202 and of
+    `eval_ladder.slurm`'s 8300) and runs the preflight *before* claiming a node. `build26_analysis.sh`
+    never started a server of its own, and at the pre-registered N it is ~43,200 battles ≈ **3 h** at
+    the 242 battles/min Build 25 measured — long enough that "start the server by hand first" is
+    exactly the step that gets skipped.
 
 - **M5 / G1 — LIVE PLAY, built and verified end-to-end (2026-08-10).** Every build through 26 plays
   a *fixed* baseline on a local server, where win rate is the sufficient statistic. G2 is stated in
