@@ -1,6 +1,6 @@
 """R-EVAL: run battles between two agents and report win rate, Glicko-1 and GXE.
 
-Wraps poke-env's ``cross_evaluate`` against the local server. Win rate remains the phase-1
+Drives battles against the local server via ``Player.battle_against``. Win rate remains the phase-1
 signal and the authoritative build-vs-build statistic (``scripts/seed_strength_gate.py``);
 the bias-robust metrics from ``lategame.eval.rating`` ride alongside it. Against the fixed
 baselines used here they are a reparameterisation of the win rate and carry no extra
@@ -18,7 +18,6 @@ from poke_env.player import (
     Player,
     RandomPlayer,
     SimpleHeuristicsPlayer,
-    cross_evaluate,
 )
 from poke_env.teambuilder.teambuilder import Teambuilder
 
@@ -113,14 +112,38 @@ def build_player(
 
 
 async def evaluate_built(p1: Player, p2: Player, n_battles: int) -> float:
-    """Win rate of ``p1`` vs ``p2`` over ``n_battles`` on the local server.
+    """Score rate of ``p1`` vs ``p2`` over ``n_battles`` on the local server.
 
     The low-level core shared by ``evaluate`` and the self-play loop, which needs to
     pit two already-built players (e.g. a specific checkpoint vs a baseline).
+
+    **This no longer goes through ``cross_evaluate``, which cannot represent a tie.** For two
+    players that helper is exactly ``battle_against`` followed by ``Player.win_rate``, and
+    ``win_rate`` is ``n_won_battles / n_finished_battles`` -- so a tie sits in the denominator
+    without contributing to the numerator and is scored as a *loss*. The correct score gives it a
+    half, which is what ``eval/ladder.py``'s ``PairResult`` has always done and what the Glicko /
+    Bradley-Terry fit downstream assumes. Booked in plan.md 13.1 (M5/G1) at the time and deferred
+    only because ``arena`` was on the frozen path of the in-flight Build 26 jobs.
+
+    **Identical to the old number on any tie-free record** (``(w + 0.5*0)/f == w/f``), which is
+    every result this project has published -- singles ties are vanishingly rare on ``gen9ou``.
+    Pinned by test rather than argued.
+
+    Scoring is by DIFFERENCING the counters around the games, as ``ladder.run_round_robin`` does:
+    poke-env's counters run over ``player._battles``, and ``cross_evaluate``'s ``reset_battles``
+    *raises* while any battle is unfinished, so one stuck battle could take a whole gate down.
     """
-    results = await cross_evaluate([p1, p2], n_challenges=n_battles)
-    win_rate = results[p1.username][p2.username]
-    return 0.0 if win_rate is None else float(win_rate)
+    before = (p1.n_won_battles, p1.n_finished_battles, p1.n_tied_battles)
+    await p1.battle_against(p2, n_battles=n_battles)
+    won, finished, tied = (
+        now - was
+        for was, now in zip(
+            before,
+            (p1.n_won_battles, p1.n_finished_battles, p1.n_tied_battles),
+            strict=True,
+        )
+    )
+    return (won + 0.5 * tied) / finished if finished else 0.0
 
 
 async def evaluate(
