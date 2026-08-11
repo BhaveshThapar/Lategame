@@ -2565,7 +2565,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     Per *update*, ×10⁻³: **1.62** (80→120) → **0.91** (120→160) → **0.64** (160→240) → **0.18**
     (240→320). A ~9× decay first-to-last, monotone at every step. That is the real content of this
     build: not "320 is better than 240" but **the axis is saturating, and the cost per point is now
-    the binding question rather than the effect.** `v26b`'s `best_iter` was 315 / 289 / 318 — still
+    the binding question rather than the effect.** `v26b`'s `best_iter` was 300 / 315 / 292 — still
     late in the arm, so the curve-side read does not contradict the gate, but the gain being bought
     at that end is ~4× cheaper per update than at 160.
   - **ATTRIBUTABLE, AND NO COLLAPSE.** The trust region **never bound**: `0/240` on all three
