@@ -1,0 +1,241 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "n_per_checkpoint": 3000,
+  "format": "gen9ou",
+  "loop_penalty": 4.0,
+  "builds": {
+    "v25b": {
+      "wins": 6022,
+      "n": 9000,
+      "rate": 0.6691,
+      "ci95": [
+        0.6593194487246598,
+        0.6787584668175238
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v25b_s0/iter_132.pt",
+          "wins": 1965,
+          "n": 3000,
+          "rate": 0.655,
+          "ci95": [
+            0.6378006611340047,
+            0.671802881209906
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v25b_s1/iter_125.pt",
+          "wins": 1895,
+          "n": 3000,
+          "rate": 0.6317,
+          "ci95": [
+            0.6142477369097074,
+            0.6487488205652275
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v25b_s2/iter_159.pt",
+          "wins": 2162,
+          "n": 3000,
+          "rate": 0.7207,
+          "ci95": [
+            0.7043367376469828,
+            0.7364321763996168
+          ]
+        }
+      ]
+    },
+    "v26a": {
+      "wins": 6525,
+      "n": 9000,
+      "rate": 0.725,
+      "ci95": [
+        0.7156803890453659,
+        0.7341276129079336
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v26a_s0/iter_200.pt",
+          "wins": 2183,
+          "n": 3000,
+          "rate": 0.7277,
+          "ci95": [
+            0.7114531673227571,
+            0.7432978421845353
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26a_s1/iter_186.pt",
+          "wins": 2148,
+          "n": 3000,
+          "rate": 0.716,
+          "ci95": [
+            0.6995951482611721,
+            0.7318523688116322
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26a_s2/iter_196.pt",
+          "wins": 2194,
+          "n": 3000,
+          "rate": 0.7313,
+          "ci95": [
+            0.7151827919616742,
+            0.7468921723107427
+          ]
+        }
+      ]
+    },
+    "v26b": {
+      "wins": 6678,
+      "n": 9000,
+      "rate": 0.742,
+      "ci95": [
+        0.7328585404792626,
+        0.750934954954953
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s0/iter_300.pt",
+          "wins": 2259,
+          "n": 3000,
+          "rate": 0.753,
+          "ci95": [
+            0.7372502352280327,
+            0.7681026435655761
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s1/iter_315.pt",
+          "wins": 2089,
+          "n": 3000,
+          "rate": 0.6963,
+          "ci95": [
+            0.6796356737715797,
+            0.7125288131973738
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s2/iter_292.pt",
+          "wins": 2330,
+          "n": 3000,
+          "rate": 0.7767,
+          "ci95": [
+            0.76141462581387,
+            0.7912110519182715
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too. TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' is the same contrast paired by seed, and is the claim about the TRAINING PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise, so procedure-level evidence is far weaker than the pooled p reads, and raising --n does not fix it (only more SEEDS would). Report both; the verdict field reflects the pooled test alone.",
+  "alpha": 0.0167,
+  "comparisons": [
+    {
+      "baseline": "v25b",
+      "candidate": "v26a",
+      "disjoint_ci": true,
+      "alpha": 0.0167,
+      "significant": true,
+      "diff": 0.0559,
+      "z": 8.159,
+      "p_value": 0.0,
+      "se": 0.0069,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.655,
+          0.6317,
+          0.7207
+        ],
+        "candidate_rates": [
+          0.7277,
+          0.716,
+          0.7313
+        ],
+        "paired_diffs": [
+          0.0727,
+          0.0843,
+          0.0106
+        ],
+        "mean_paired_diff": 0.0559,
+        "sd_paired_diff": 0.0396,
+        "t": 2.442,
+        "seeds": 3,
+        "n_positive": 3,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v25b",
+      "candidate": "v26b",
+      "disjoint_ci": true,
+      "alpha": 0.0167,
+      "significant": true,
+      "diff": 0.0729,
+      "z": 10.728,
+      "p_value": 0.0,
+      "se": 0.0068,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.655,
+          0.6317,
+          0.7207
+        ],
+        "candidate_rates": [
+          0.753,
+          0.6963,
+          0.7767
+        ],
+        "paired_diffs": [
+          0.098,
+          0.0646,
+          0.056
+        ],
+        "mean_paired_diff": 0.0729,
+        "sd_paired_diff": 0.0222,
+        "t": 5.688,
+        "seeds": 3,
+        "n_positive": 3,
+        "sign_test_p": 0.25
+      }
+    },
+    {
+      "baseline": "v26a",
+      "candidate": "v26b",
+      "disjoint_ci": false,
+      "alpha": 0.0167,
+      "significant": true,
+      "diff": 0.017,
+      "z": 2.579,
+      "p_value": 0.0099,
+      "se": 0.0066,
+      "verdict": "WIN",
+      "seed_level": {
+        "baseline_rates": [
+          0.7277,
+          0.716,
+          0.7313
+        ],
+        "candidate_rates": [
+          0.753,
+          0.6963,
+          0.7767
+        ],
+        "paired_diffs": [
+          0.0253,
+          -0.0197,
+          0.0454
+        ],
+        "mean_paired_diff": 0.017,
+        "sd_paired_diff": 0.0333,
+        "t": 0.883,
+        "seeds": 3,
+        "n_positive": 2,
+        "sign_test_p": 1.0
+      }
+    }
+  ]
+}

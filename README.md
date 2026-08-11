@@ -730,6 +730,47 @@ falls back to `iters` and would anneal over a different span per chunk. `v26b` n
 → 320. **Caveat to report with the result:** `v26a` ran uninterrupted and `v26b` is chunked, so #2
 (`v26a` → `v26b`) is the contrast carrying that difference.
 
+### OU pivot Build 26 — KNEE BETWEEN 240 AND 320: the update-count axis is saturating
+
+Both gates ran clean in one submission (3:17:34): primary N=3000 (27,000 battles) and the
+selection-free terminal read at N=1800 (16,200). Pooled vs the heuristic, n=9000/arm: `v25b`
+**0.6691**, `v26a` **0.7250**, `v26b` **0.7420** [0.7329, 0.7509]; terminal read 0.6883 / 0.7354 /
+**0.7513**. **0.7420 (0.7513 terminal) is the highest pooled rate in the project's history**,
+against Build 25's 0.6534 / 0.6807. The anchor re-calibrates 0.0157 from Build 25, inside the
+±0.027 cross-run band.
+
+*The three contrasts at α = 0.0167, bias subtracted before any dose is declared:*
+
+| # | contrast | primary (adj) | terminal (adj) | call |
+|---|---|---|---|---|
+| 1 | `v25b` → `v26a` | **+0.0514** (z +8.16, 3/3) | **+0.0425** (z +5.40, 3/3) | **WIN, both reads** |
+| 2 | `v26a` → `v26b` | +0.0145 (p 0.0099, 2/3) | +0.0134 (p 0.0581, 3/3) | **not called** |
+| 3 | `v25b` → `v26b` | **+0.0659** (z +10.73, 3/3) | **+0.0560** (z +7.29, 3/3) | **WIN, both reads** |
+
+#1 + #2 = #3 exactly on both reads. **#1 significant and positive with #2 not called ⇒ KNEE BETWEEN
+240 AND 320**, the row the pre-registration named as the anticipated modal outcome.
+
+*The two reads agree in sign and in size; they differ only in power, and that is not a finding.*
+#2's effect is +0.0145 and +0.0134 — the same number twice. The primary read carries 9000/arm and
+the terminal 5400/arm, so an identical effect gives z +2.58 there and +1.90 here. There is **no sign
+disagreement to book**. What there is: #2's true effect (~+0.014) sits at the resolution limit of
+this design against a ~0.025 MDE, so calling it either way would be reading the sample size rather
+than the model. The seed-robustness pattern inverts exactly as Build 25 warned — primary
+pooled-significant but 2/3 seeds, terminal pooled-null but 3/3.
+
+**The real content is the curve, now four points.** Marginal return per *update*, ×10⁻³: **1.62**
+(80→120) → **0.91** (120→160) → **0.64** (160→240) → **0.18** (240→320) — a ~9× decay, monotone at
+every step. Not "320 beats 240" but *the axis is saturating, and cost per point is now the binding
+question rather than the effect.*
+
+*Attributable, no collapse:* the trust region **never bound** — 0/240 on every `v26a` arm and 0/320
+on every `v26b` arm, `approx_kl_max` 0.052–0.072 under the 0.09 bar (against Build 22's
+verdict-costing 59/150), final entropy 0.418–0.487, `vs_iter0` **1.00 on all six**.
+*The caveat landed where it was pre-registered to:* `v26a` ran uninterrupted and `v26b` chunked, and
+#2 — the contrast carrying that difference — is precisely the ambiguous one.
+*The resume mechanism is validated:* chunk 2 peaked at **41.6–44.0 GiB** for a 320-iteration arm,
+against the **67.1 GiB** that OOM-killed the unchunked attempt at iteration 304 and the 64 GB cap.
+
 ### M5 / G1 — live play: the half of the project G2 is actually defined in
 
 Everything through Build 26 plays a *fixed* baseline on a local server, where win rate is the
