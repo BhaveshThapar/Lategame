@@ -2,120 +2,108 @@
   "gate": "rpredict_recon_live",
   "format": "gen9vgc2025regi",
   "doubles": true,
-  "battles": 6,
+  "battles": 40,
   "agent": "heuristic",
   "opponent": "heuristic",
   "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
   "pass_rate": 0.99,
-  "snapshots": 300,
+  "snapshots": 178,
   "errored": 0,
-  "checks": 12000,
-  "mismatches": 899,
-  "match_rate": 0.925083,
+  "checks": 7564,
+  "mismatches": 33,
+  "match_rate": 0.995637,
   "by_field": {
     "active": {
-      "mismatch": 299,
-      "total": 1800,
-      "rate": 0.8339
+      "mismatch": 27,
+      "total": 1228,
+      "rate": 0.978
     },
     "boosts": {
-      "mismatch": 0,
-      "total": 1800,
-      "rate": 1.0
+      "mismatch": 6,
+      "total": 1228,
+      "rate": 0.9951
     },
     "fainted": {
       "mismatch": 0,
-      "total": 1800,
+      "total": 1228,
       "rate": 1.0
     },
     "hazards": {
       "mismatch": 0,
-      "total": 600,
+      "total": 356,
       "rate": 1.0
     },
     "hp": {
       "mismatch": 0,
-      "total": 1800,
+      "total": 1228,
       "rate": 1.0
     },
     "present": {
-      "mismatch": 600,
-      "total": 1800,
-      "rate": 0.6667
+      "mismatch": 0,
+      "total": 712,
+      "rate": 1.0
     },
     "status": {
       "mismatch": 0,
-      "total": 1800,
+      "total": 1228,
       "rate": 1.0
     },
     "terrain": {
       "mismatch": 0,
-      "total": 300,
+      "total": 178,
       "rate": 1.0
     },
     "weather": {
       "mismatch": 0,
-      "total": 300,
+      "total": 178,
       "rate": 1.0
     }
   },
   "samples": [
     {
       "diffs": [
-        "p1.rillaboom MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.ogerponhearthflame.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.terapagos.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.amoonguss.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.amoonguss.active pe=False drv=True",
+        "p2.fluttermane.boosts pe={'atk': -1} drv={}"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.rillaboom.active pe=False drv=True",
+        "p2.incineroar.boosts pe={'atk': -1} drv={}"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.rillaboom.active pe=False drv=True",
+        "p2.incineroar.boosts pe={'atk': -1} drv={}"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.ironhands.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p1.ragingbolt.active pe=False drv=True",
-        "p1.tornadus MISSING in reconstruction",
-        "p1.ironhands MISSING in reconstruction"
+        "p2.ironhands.active pe=False drv=True"
       ]
     }
   ],
-  "verdict": "FAIL",
+  "verdict": "PASS",
   "note": "Live-play reconstruction fidelity, scored on recon_check._compare -- the same criteria as the replay-driven RB gate (145,400 checks / 7 mismatches / 0.99995), so the numbers are comparable. Gates the search strength run: search on an unfaithful forward model is GIGO. Hidden opponent set details are SAMPLED from the usage prior and are not scored; only what the agent observes is."
 }
