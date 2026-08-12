@@ -47,29 +47,70 @@ try {
 	process.exit(2);
 }
 
-const FORMAT = "gen9randombattle";
-const generator = Teams.getGenerator(FORMAT);
-const dex = Dex.forFormat(FORMAT);
-const ALL_SPECIES = Object.keys(generator.randomSets || {});
+const DEFAULT_FORMAT = "gen9randombattle";
+
+// FORMAT IS PER-SPEC, NOT PER-PROCESS, and the random-set generator is RB-ONLY.
+//
+// Only Random Battles have a `Teams.getGenerator(...).randomSet` to invent a legal set from a bare
+// species. On a TEAMBUILT format (gen9ou, gen9vgc*) that generator either does not exist or answers
+// for a different format's legality, so calling it would silently fabricate illegal sets -- the
+// caller supplies complete sets instead (see determinize.battle_to_spec, which fills unrevealed
+// fields from the Smogon usage prior).
+//
+// Cached per format id: `Dex.forFormat` and the generator are not free, and one agent's driver
+// serves thousands of reconstructions on the same format.
+const _cache = new Map();
+function forFormat(formatid) {
+	const id = toID(formatid) || DEFAULT_FORMAT;
+	let entry = _cache.get(id);
+	if (!entry) {
+		const dex = Dex.forFormat(id);
+		let generator = null;
+		let allSpecies = [];
+		if (id.includes("randombattle")) {
+			try {
+				generator = Teams.getGenerator(id);
+				allSpecies = Object.keys(generator.randomSets || {});
+			} catch {
+				generator = null;
+			}
+		}
+		entry = { id, dex, generator, allSpecies };
+		_cache.set(id, entry);
+	}
+	return entry;
+}
 
 const idOf = (x) => (x && typeof x === "object" && "id" in x ? x.id : x || "");
 const toID = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** Build a legal gen9 RB set for `species`, overriding with observed fields. */
-function buildSet(info, rng) {
-	const sp = dex.species.get(info.species);
-	let base;
-	try {
-		base = generator.randomSet(sp, {}, false, false);
-	} catch {
-		base = { species: sp.name, name: sp.name, level: 80, moves: [], ability: sp.abilities?.["0"] || "",
-			item: "", evs: { hp: 85, atk: 85, def: 85, spa: 85, spd: 85, spe: 85 },
-			ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, gender: "", teraType: sp.types?.[0] || "Normal" };
+/** Build a legal set for `species`, overriding with observed fields.
+ *
+ * Random Battles: start from the format's own generated set and keep observed fields.
+ * Teambuilt: there is no generator, so `info` must already carry the full set -- anything the
+ * caller left unspecified falls back to a neutral, legal-by-construction spread rather than to
+ * another format's idea of a legal set. */
+function buildSet(info, rng, fmt) {
+	const sp = fmt.dex.species.get(info.species);
+	const neutral = {
+		species: sp.name, name: sp.name, level: info.level || 100, moves: [],
+		ability: sp.abilities?.["0"] || "", item: "",
+		evs: { hp: 85, atk: 85, def: 85, spa: 85, spd: 85, spe: 85 },
+		ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+		gender: "", teraType: sp.types?.[0] || "Normal",
+	};
+	let base = neutral;
+	if (fmt.generator) {
+		try {
+			base = fmt.generator.randomSet(sp, {}, false, false);
+		} catch {
+			base = neutral;
+		}
 	}
 	const set = { ...base, species: sp.name, name: sp.name };
 	const moves = (info.moves || []).map(toID).filter(Boolean);
 	if (moves.length) {
-		// Keep observed moves; top up from the generator's legal picks to 4.
+		// Keep observed moves; top up from the base set's legal picks to 4.
 		const merged = [...moves];
 		for (const m of (base.moves || []).map(toID)) {
 			if (merged.length >= 4) break;
@@ -82,24 +123,30 @@ function buildSet(info, rng) {
 	if (info.gender) set.gender = info.gender;
 	if (info.level) set.level = info.level;
 	if (info.teraType) set.teraType = info.teraType;
+	if (info.nature) set.nature = info.nature;
+	if (info.evs) set.evs = { ...set.evs, ...info.evs };
+	if (info.ivs) set.ivs = { ...set.ivs, ...info.ivs };
 	return set;
 }
 
 /** Order the team so the active mon is slot 1 (active after >start); sample opp fill. */
-function buildTeam(sideSpec, rng) {
+function buildTeam(sideSpec, rng, fmt) {
 	const sets = [];
 	const used = new Set();
 	for (const info of sideSpec.team) {
-		sets.push(buildSet(info, rng));
+		sets.push(buildSet(info, rng, fmt));
 		used.add(toID(info.species));
 	}
-	const fill = sideSpec.fill || 0;
+	// Filling unknown SPECIES only makes sense where the opponent's roster is hidden -- i.e.
+	// Random Battles. On a teambuilt format team preview names all six up front, so the caller
+	// sends fill=0 and what is unknown is the SETS, which it supplies from the usage prior.
+	const fill = fmt.allSpecies.length ? sideSpec.fill || 0 : 0;
 	let guard = 0;
 	while (sets.length < 6 && fill > 0 && guard++ < 200) {
-		const cand = ALL_SPECIES[Math.floor(rng() * ALL_SPECIES.length)];
+		const cand = fmt.allSpecies[Math.floor(rng() * fmt.allSpecies.length)];
 		if (used.has(cand)) continue;
 		used.add(cand);
-		sets.push(buildSet({ species: cand }, rng));
+		sets.push(buildSet({ species: cand }, rng, fmt));
 		if (sets.length >= 6) break;
 	}
 	// Move the active mon to slot 1 so it leads.
@@ -248,6 +295,34 @@ function stateRequest(side) {
 	return "|request|" + JSON.stringify(clone);
 }
 
+/** Step a freshly started battle past TEAM PREVIEW, which teambuilt formats have and RB does not.
+ *
+ * On gen9randombattle `>start` lands directly on turn 1 with both leads active. Every teambuilt
+ * format (gen9ou, VGC) opens on a team-preview request instead, where NOTHING is active -- so a
+ * reconstruction stops there, `legalChoices` finds no active Pokemon and reports only switches,
+ * and search would evaluate a position in which neither side can move. Silent, and it looks like
+ * "the opponent has no moves" rather than like a phase error.
+ *
+ * `buildTeam` has already put the observed active in slot 1, so selecting the identity order
+ * preserves it. `maxTeamSize` is what makes this correct for VGC, where team preview BRINGS 6 and
+ * PICKS 4 -- picking all six would be rejected. */
+function advancePastTeamPreview(stream, battle) {
+	const needs = (r) => r && r.teamPreview && !r.wait;
+	for (let guard = 0; guard < 4; guard++) {
+		if (!battle.sides.some((s) => needs(s.activeRequest))) return;
+		for (let i = 0; i < battle.sides.length; i++) {
+			const side = battle.sides[i];
+			if (!needs(side.activeRequest)) continue;
+			const size = Math.min(
+				side.activeRequest.maxTeamSize || side.pokemon.length,
+				side.pokemon.length,
+			);
+			const order = Array.from({ length: size }, (_, k) => k + 1).join("");
+			stream.write(`>p${i + 1} team ${order}`);
+		}
+	}
+}
+
 function reconstruct(spec) {
 	const rng = mulberry32((spec.seed || 0) >>> 0);
 	// Build teams; record the active-first reordering so per-slot state lines up.
@@ -262,15 +337,17 @@ function reconstruct(spec) {
 		// idx[newSlot] = originalIndex; invert so order[newSlot] indexes state[].
 		ss._order = idx;
 	}
-	const t1 = Teams.pack(buildTeam(spec.p1, rng));
-	const t2 = Teams.pack(buildTeam(spec.p2, rng));
+	const fmt = forFormat(spec.format);
+	const t1 = Teams.pack(buildTeam(spec.p1, rng, fmt));
+	const t2 = Teams.pack(buildTeam(spec.p2, rng, fmt));
 	const stream = new BattleStream({ noCatch: true });
 	stream.write(
-		`>start {"formatid":"${FORMAT}"}\n` +
+		`>start {"formatid":"${fmt.id}"}\n` +
 			`>player p1 {"name":"p1","team":"${t1}"}\n` +
 			`>player p2 {"name":"p2","team":"${t2}"}`,
 	);
 	const battle = stream.battle;
+	advancePastTeamPreview(stream, battle);
 	applyState(battle, spec);
 	// Per-side POV logs (Lever 14): channel-filter the omniscient init log so a fresh poke-env
 	// Battle can be built from the opponent's perspective (leads revealed, own team full).
