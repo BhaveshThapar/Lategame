@@ -149,13 +149,29 @@ function buildTeam(sideSpec, rng, fmt) {
 		sets.push(buildSet({ species: cand }, rng, fmt));
 		if (sets.length >= 6) break;
 	}
-	// Move the active mon to slot 1 so it leads.
-	const a = sideSpec.active || 0;
-	if (a > 0 && a < sets.length) {
-		const [act] = sets.splice(a, 1);
-		sets.unshift(act);
+	// Move the active mon(s) to the front so they lead. Doubles has TWO, in slot order.
+	return reorderActiveFirst(sets, activeIndices(sideSpec));
+}
+
+/** `active` is an int on singles and a list on doubles; normalize to an ordered index list. */
+function activeIndices(sideSpec) {
+	const a = sideSpec.active;
+	if (Array.isArray(a)) return a.filter((i) => Number.isInteger(i) && i >= 0);
+	return [Number.isInteger(a) ? a : 0];
+}
+
+/** Reorder so `indices` occupy the leading slots, preserving their given order. */
+function reorderActiveFirst(items, indices) {
+	const lead = [];
+	const taken = new Set();
+	for (const i of indices) {
+		if (i < items.length && !taken.has(i)) {
+			lead.push(items[i]);
+			taken.add(i);
+		}
 	}
-	return sets;
+	const rest = items.filter((_, i) => !taken.has(i));
+	return [...lead, ...rest];
 }
 
 /** Mulberry32 PRNG from an int seed -> () -> [0,1). */
@@ -257,23 +273,89 @@ function digest(battle) {
 	};
 }
 
-/** Legal choices for a side, read from the live (post-edit) battle objects + labelled. */
-function legalChoices(side) {
+/** Per-slot legal choices: the moves one active can make (with targets) plus its switches. */
+function slotChoices(side, slotIndex, doubles) {
 	const out = [];
-	const active = side.active[0];
+	const active = side.active[slotIndex];
 	if (active && !active.fainted) {
 		const slots = active.moveSlots || [];
 		for (let i = 0; i < slots.length; i++) {
 			const m = slots[i];
 			if (m.disabled) continue;
 			if ((m.pp ?? 1) <= 0) continue;
-			out.push({ choice: `move ${i + 1}`, type: "move", id: toID(m.id) });
+			if (!doubles) {
+				out.push({ choice: `move ${i + 1}`, type: "move", id: toID(m.id), slot: slotIndex });
+				continue;
+			}
+			// DOUBLES MOVES NEED A TARGET, and which targets are legal is a property of the move:
+			// spread/self/ally-only moves take no explicit foe. Ask the simulator rather than
+			// assuming -- a target Showdown rejects costs the whole turn.
+			const move = side.battle.dex.moves.get(m.id);
+			const targets = [];
+			if (move && ["normal", "any", "adjacentFoe"].includes(move.target)) {
+				for (let t = 1; t <= 2; t++) {
+					const foe = side.foe.active[t - 1];
+					if (foe && !foe.fainted) targets.push(t);
+				}
+			}
+			if (!targets.length) targets.push(null); // no explicit target (spread, self, status)
+			for (const t of targets) {
+				out.push({
+					choice: t === null ? `move ${i + 1}` : `move ${i + 1} ${t}`,
+					type: "move",
+					id: toID(m.id),
+					slot: slotIndex,
+					target: t,
+				});
+			}
 		}
 	}
 	for (let j = 0; j < side.pokemon.length; j++) {
 		const p = side.pokemon[j];
 		if (side.active.indexOf(p) >= 0 || p.fainted) continue;
-		out.push({ choice: `switch ${j + 1}`, type: "switch", id: idOf(p.species) });
+		out.push({
+			choice: `switch ${j + 1}`,
+			type: "switch",
+			id: idOf(p.species),
+			slot: slotIndex,
+			switchIndex: j + 1,
+		});
+	}
+	return out;
+}
+
+/** Legal choices for a side, read from the live (post-edit) battle objects + labelled.
+ *
+ * Singles returns one entry per action. DOUBLES returns one entry per JOINT action -- the cross
+ * product of the two slots' choices, minus the combinations Showdown would reject. The joint form
+ * is what `battle.choose` takes ("move 1 1, move 2 2"), and it is also the honest branching factor
+ * for search: the two slots are not independent decisions. */
+function legalChoices(side) {
+	const doubles = (side.active || []).length > 1;
+	if (!doubles) return slotChoices(side, 0, false);
+
+	const first = slotChoices(side, 0, true);
+	const second = slotChoices(side, 1, true);
+	// A slot with no active (fainted, awaiting a replacement) contributes a literal "pass".
+	const pass = [{ choice: "pass", type: "pass", id: "", slot: -1 }];
+	const left = first.length ? first : pass;
+	const right = second.length ? second : pass;
+
+	const out = [];
+	for (const a of left) {
+		for (const b of right) {
+			// BOTH SLOTS MAY NOT SWITCH TO THE SAME BENCHED POKEMON. Showdown rejects the order
+			// outright and plays a default move instead, which is a silent lost turn.
+			if (a.type === "switch" && b.type === "switch" && a.switchIndex === b.switchIndex) {
+				continue;
+			}
+			out.push({
+				choice: `${a.choice}, ${b.choice}`,
+				type: a.type === "switch" && b.type === "switch" ? "switch" : "move",
+				id: `${a.id}+${b.id}`,
+				parts: [a, b],
+			});
+		}
 	}
 	return out;
 }
@@ -328,14 +410,12 @@ function reconstruct(spec) {
 	// Build teams; record the active-first reordering so per-slot state lines up.
 	for (const key of ["p1", "p2"]) {
 		const ss = spec[key];
-		const a = ss.active || 0;
-		const idx = ss.team.map((_, j) => j);
-		if (a > 0 && a < idx.length) {
-			const [x] = idx.splice(a, 1);
-			idx.unshift(x);
-		}
-		// idx[newSlot] = originalIndex; invert so order[newSlot] indexes state[].
-		ss._order = idx;
+		// idx[newSlot] = originalIndex; the same reordering buildTeam applies, so the per-slot
+		// state list lines up with the team the simulator actually received.
+		ss._order = reorderActiveFirst(
+			ss.team.map((_, j) => j),
+			activeIndices(ss),
+		);
 	}
 	const fmt = forFormat(spec.format);
 	const t1 = Teams.pack(buildTeam(spec.p1, rng, fmt));
