@@ -98,3 +98,77 @@ async def test_random_vs_random_completes_a_battle():
     result = await evaluate("random", "random", n_battles=1)
     assert result.n_battles == 1
     assert 0.0 <= result.p1_win_rate <= 1.0
+
+
+# --------------------------------------------------------------------------- #
+# The doubles guard (G4/M6 groundwork)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "battle_format,doubles",
+    [
+        ("gen9randombattle", False),
+        ("gen9ou", False),
+        ("gen9vgc2025regi", True),
+        ("gen9doublesou", True),
+        ("gen9randomdoublesbattle", True),
+        ("gen92v2doubles", True),
+    ],
+)
+def test_doubles_formats_are_recognised(battle_format, doubles):
+    from lategame.config import is_doubles_format
+
+    assert is_doubles_format(battle_format) is doubles
+
+
+def test_a_singles_only_agent_is_refused_on_a_doubles_format():
+    """The refusal exists because the failure is SILENT otherwise.
+
+    On a DoubleBattle poke-env passes `active_pokemon` as a list, so `HeuristicAgent` raises
+    AttributeError -- but poke-env dispatches protocol messages through `asyncio.create_task` and
+    never retrieves the result, so the raise is swallowed exactly as `ShowdownException` is on a
+    failed login. The agent then never answers and the server plays default moves on the timer,
+    which reads as a very weak agent rather than a broken one. A ceiling probe anchored on that
+    would report enormous headroom for the wrong reason.
+    """
+    with pytest.raises(ValueError, match="SINGLES-ONLY"):
+        build_player("heuristic", "gen9vgc2025regi")
+    with pytest.raises(ValueError, match="SINGLES-ONLY"):
+        build_player("offrl", "gen9doublesou", checkpoint_path="x.pt")
+
+
+def test_poke_envs_own_baselines_are_allowed_on_doubles(monkeypatch):
+    """`RandomPlayer`, `MaxBasePowerPlayer` and `SimpleHeuristicsPlayer` all branch on DoubleBattle
+    in poke-env itself, so the VGC ceiling probe can be run with them before any doubles code of
+    ours exists -- which is what makes the G4 decision cheap."""
+    import lategame.eval.arena as arena
+
+    for name in ("random", "maxbasepower", "simpleheuristics"):
+        monkeypatch.setitem(arena.AGENTS, name, lambda **kw: object())
+        build_player(name, "gen9vgc2025regi")  # must not raise
+
+
+def test_the_singles_agents_are_still_fine_on_singles(monkeypatch):
+    import lategame.eval.arena as arena
+
+    monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
+    build_player("heuristic", "gen9ou")
+    build_player("heuristic", "gen9randombattle")
+
+
+def test_the_vgc_format_constant_exists_in_the_vendored_simulator():
+    """It did not, until 2026-08-11: `gen9vgc2024regh` was a never-exercised placeholder and the
+    pinned simulator has no such format. Pinned against the simulator's own format table so the
+    constant cannot rot again silently."""
+    import re
+    from pathlib import Path
+
+    from lategame.config import VGC_FORMAT
+
+    formats = Path("third_party/pokemon-showdown/config/formats.ts")
+    if not formats.exists():
+        pytest.skip("vendored simulator not present")
+    ids = {
+        re.sub(r"[^a-z0-9]", "", name.lower())
+        for name in re.findall(r'name:\s*"([^"]+)"', formats.read_text())
+    }
+    assert VGC_FORMAT in ids, f"{VGC_FORMAT!r} is not a format the pinned simulator has"
