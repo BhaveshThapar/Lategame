@@ -57,6 +57,41 @@ def _is_random_battle(battle_format: str) -> bool:
     return "random" in _to_id(battle_format)
 
 
+def _actives(battle: AbstractBattle, *, ours: bool) -> list[Pokemon]:
+    """Our (or the opponent's) active Pokemon as a flat list -- 1 on singles, up to 2 on doubles."""
+    raw = battle.active_pokemon if ours else battle.opponent_active_pokemon
+    return [m for m in (raw if isinstance(raw, list) else [raw]) if m is not None]
+
+
+def in_battle_team(battle: AbstractBattle) -> list[Pokemon]:
+    """Our Pokemon that are actually IN the battle, actives first.
+
+    **VGC brings 6 and picks 4.** ``battle.team`` holds the full six-mon roster from the opening
+    request, but only the picked four exist in the battle the simulator is running -- so sending
+    all six produces a reconstruction the format rejects down to four, with the two unbrought mons
+    then reading as missing (Gate A'' measured exactly 2 per snapshot).
+
+    A mon is in the battle iff it is on the field, benched-and-switchable, or fainted. On formats
+    that pick the whole team this returns everything, so singles is unaffected.
+    """
+    ordered = _actives(battle, ours=True)
+    seen = {id(m) for m in ordered}
+
+    switches = battle.available_switches
+    nested = bool(switches) and isinstance(switches[0], list)
+    flat = [m for grp in switches for m in grp] if nested else list(switches)
+    for mon in flat:
+        if id(mon) not in seen:
+            ordered.append(mon)
+            seen.add(id(mon))
+
+    for mon in battle.team.values():
+        if id(mon) not in seen and mon.fainted:
+            ordered.append(mon)
+            seen.add(id(mon))
+    return ordered or list(battle.team.values())
+
+
 @lru_cache(maxsize=8)
 def _usage_prior_for(battle_format: str) -> Any:
     """The Smogon usage prior for a teambuilt format, or ``None`` if no artifact exists.
@@ -219,7 +254,7 @@ def battle_to_spec(battle: AbstractBattle, seed: int = 0) -> dict[str, Any]:
     module constant pinned to ``gen9randombattle`` there; on any other format that silently
     reconstructs under the wrong legality and the search runs on a battle that could not exist.
     """
-    our = list(battle.team.values())
+    our = in_battle_team(battle)
     opp = list(battle.opponent_team.values())
     battle_format = battle.format or DEFAULT_FORMAT
     is_rb = _is_random_battle(battle_format)
@@ -275,7 +310,7 @@ def pokeenv_digest(battle: AbstractBattle) -> dict[str, Any]:
         "turn": int(battle.turn),
         "weather": _field(battle)["weather"],
         "terrain": _field(battle)["terrain"],
-        "p1": _digest_side(list(battle.team.values()), battle.active_pokemon),
+        "p1": _digest_side(in_battle_team(battle), battle.active_pokemon),
         "p2": _digest_side(list(battle.opponent_team.values()), battle.opponent_active_pokemon),
         "hazards": {
             "p1": _hazards(battle.side_conditions),

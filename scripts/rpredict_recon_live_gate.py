@@ -39,12 +39,30 @@ from lategame.search.recon_check import ReconStats, check_live_snapshot
 PASS_RATE = 0.99
 
 
+def _is_full_decision(battle: AbstractBattle) -> bool:
+    """Whether every slot has an active Pokemon -- i.e. this is a MOVE turn, not a replacement.
+
+    On doubles a fainted mon leaves its slot empty until it is replaced, and poke-env asks for that
+    replacement through the same ``choose_move`` callback. A reconstruction cannot represent "slot
+    2 is momentarily empty": the spec names the actives and the driver leads them out, so a
+    one-active POV reconstructs as a two-active battle with an arbitrary bench mon promoted --
+    which Gate A'' correctly reported as ~1 spurious `active` mismatch per snapshot.
+
+    Search never runs at these turns either: a forced replacement has no move to look ahead over.
+    So they are not sampled, rather than being sampled and scored as failures.
+    """
+    active = getattr(battle, "active_pokemon", None)
+    if isinstance(active, list):
+        return len(active) > 0 and all(m is not None for m in active)
+    return active is not None
+
+
 def _snapshotting_agent(base_cls: type, stats: ReconStats, model: Any, cap: int) -> type:
     """Wrap an agent so every decision it makes is also a reconstruction-fidelity sample."""
 
     class _Snapshotter(base_cls):  # type: ignore[valid-type, misc]
         def choose_move(self, battle: AbstractBattle) -> BattleOrder:
-            if stats.snapshots < cap:
+            if stats.snapshots < cap and _is_full_decision(battle):
                 check_live_snapshot(stats, battle, model)
             return super().choose_move(battle)
 
