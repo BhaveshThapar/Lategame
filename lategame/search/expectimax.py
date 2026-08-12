@@ -24,10 +24,10 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from poke_env.battle import AbstractBattle
-from poke_env.player import BattleOrder
+from poke_env.player import BattleOrder, SingleBattleOrder
 
 from lategame.data.resim import _feed_line
 from lategame.data.reward import RewardWeights, state_value
@@ -42,6 +42,27 @@ if TYPE_CHECKING:
 _WEIGHTS = RewardWeights()
 
 
+class LeafPolicy(Protocol):
+    """What the search actually needs from a model: a leaf value, priors, and a battle deepcopy.
+
+    Named as an interface rather than pinned to ``PolicyValue`` because the VGC ceiling probe has
+    no trained doubles model to supply one -- ``ShapedOnlyPolicy`` satisfies this and scores leaves
+    from the shaped state-value alone.
+    """
+
+    #: Terminal leaf values, on whatever scale ``value`` returns.
+    v_min: float
+    v_max: float
+    #: Policy-blend lambda; 0 disables blending, which is the only sane value with no policy.
+    cfg_blend: float
+
+    def deepcopy_battle(self, battle: AbstractBattle) -> AbstractBattle: ...
+
+    def value(self, battle: AbstractBattle) -> float: ...
+
+    def action_log_probs(self, battle: AbstractBattle) -> dict[int, float]: ...
+
+
 @dataclass
 class SearchConfig:
     determinizations: int = 1  # opponent-team samples averaged per decision
@@ -53,6 +74,12 @@ class SearchConfig:
     top_k_my: int = 3  # prune OUR actions by policy prior at deep plies (root expands all)
     opp_cap_deep: int = 3  # cap opponent branching at deep plies (root keeps opp_cap)
     seed: int = 0
+    #: Cap on OUR branching at the ROOT. 0 = unlimited, which is what singles has always done and
+    #: what every published R-PREDICT number used. DOUBLES NEEDS IT: the driver enumerates JOINT
+    #: actions, ~70 on a real VGC turn against ~10 in singles, and the root is the one ply that
+    #: expands everything -- so depth-2 there costs ~50x a singles decision and the gate would not
+    #: finish. Ranked by the same static fallback `_top_k_by_prior` uses when there is no policy.
+    root_cap: int = 0
 
 
 def _opp_weights(
@@ -109,7 +136,7 @@ def _swap_roles(text: str) -> str:
 
 
 def _node_battle(
-    pv: PolicyValue, live: AbstractBattle, res: dict[str, Any], role: str
+    pv: LeafPolicy, live: AbstractBattle, res: dict[str, Any], role: str
 ) -> AbstractBattle:
     """Poke-env battle at the post-step node: deepcopy ``live`` + feed the fog-of-war delta.
 
@@ -130,7 +157,7 @@ def _node_battle(
     return node
 
 
-def _leaf_eval(pv: PolicyValue, node: AbstractBattle, shaped_coef: float) -> float:
+def _leaf_eval(pv: LeafPolicy, node: AbstractBattle, shaped_coef: float) -> float:
     """Leaf value: outcome ``V`` + ``shaped_coef`` * shaped state-value (tactical term).
 
     The outcome value head V is a coarse long-horizon estimator (nearly flat at one ply, so
@@ -144,12 +171,18 @@ def _leaf_eval(pv: PolicyValue, node: AbstractBattle, shaped_coef: float) -> flo
 
 
 def _top_k_by_prior(
-    choices: list[dict[str, Any]], node: AbstractBattle, pv: PolicyValue, k: int
+    choices: list[dict[str, Any]], node: AbstractBattle, pv: LeafPolicy, k: int
 ) -> list[dict[str, Any]]:
     """Keep the ``k`` choices the GREEN policy rates highest at ``node`` (always returns >= 1)."""
     if k <= 0 or len(choices) <= k:
         return choices
     logp = pv.action_log_probs(node)
+    if not logp:
+        # No policy to prune with (ShapedOnlyPolicy). Ranking every choice equally would make the
+        # cut arbitrary, and on doubles the joint list is ~70 long, so what survives matters.
+        # Attacking is the better default at a shallow depth -- a shaped leaf reads HP, and
+        # switching never changes it on the ply that pays for the switch.
+        return sorted(choices, key=lambda c: c.get("type") != "move")[:k]
 
     def prior(label: dict[str, Any]) -> float:
         a = _choice_action(label, node)
@@ -160,7 +193,7 @@ def _top_k_by_prior(
 
 def _node_value(
     fm: ForwardModel,
-    pv: PolicyValue,
+    pv: LeafPolicy,
     live: AbstractBattle,
     res: dict[str, Any],
     role: str,
@@ -227,7 +260,7 @@ def _advance_opp_pov(
 
 def choose_order(
     fm: ForwardModel,
-    pv: PolicyValue,
+    pv: LeafPolicy,
     battle: AbstractBattle,
     cfg: SearchConfig,
     opp_model: OpponentModel | None = None,
@@ -251,6 +284,8 @@ def choose_order(
         opp_weights = _opp_weights(battle, opp_choices, cfg, opp_model, cfg.opp_cap, root_opp)
         if not my_choices:
             continue
+        if cfg.root_cap:
+            my_choices = _top_k_by_prior(my_choices, battle, pv, cfg.root_cap)
 
         for mc in my_choices:
             key = mc["choice"]
@@ -291,7 +326,7 @@ def _root_opp_pov(
 def _blend_policy_prior(
     scored: dict[str, float],
     labels: dict[str, dict[str, Any]],
-    pv: PolicyValue,
+    pv: LeafPolicy,
     battle: AbstractBattle,
 ) -> dict[str, float]:
     """Add lambda * log-pi(prior) to z-scored search values so scales are comparable."""
@@ -321,21 +356,90 @@ def _choice_action(label: dict[str, Any], battle: AbstractBattle) -> int | None:
         return None
 
 
-def _to_order(label: dict[str, Any], battle: AbstractBattle) -> BattleOrder | None:
-    """Build a poke-env order from a driver choice label (matched by move id / species)."""
-    from poke_env.player import SingleBattleOrder
+def _slot_order(
+    part: dict[str, Any], moves: list[Any], switches: list[Any]
+) -> SingleBattleOrder | None:
+    """One slot's poke-env order from a driver choice part (matched by move id / species)."""
+    from poke_env import to_id_str
+    from poke_env.player import DefaultBattleOrder
 
-    if label["type"] == "move":
-        for mv in battle.available_moves:
-            if mv.id == label["id"]:
-                return SingleBattleOrder(mv)
+    if part["type"] == "pass":
+        return DefaultBattleOrder()
+    if part["type"] == "move":
+        for mv in moves:
+            if mv.id == part["id"]:
+                target = part.get("target")
+                return (
+                    SingleBattleOrder(mv)
+                    if target is None
+                    else SingleBattleOrder(mv, move_target=int(target))
+                )
         return None
-    for mon in battle.available_switches:
-        from poke_env import to_id_str
-
-        if to_id_str(mon.species) == label["id"] or to_id_str(mon.base_species) == label["id"]:
+    for mon in switches:
+        if to_id_str(mon.species) == part["id"] or to_id_str(mon.base_species) == part["id"]:
             return SingleBattleOrder(mon)
     return None
+
+
+def _to_order(label: dict[str, Any], battle: AbstractBattle) -> BattleOrder | None:
+    """Build a poke-env order from a driver choice label (matched by move id / species).
+
+    On doubles the driver emits JOINT labels carrying a ``parts`` list -- one entry per slot, each
+    with its own move target. Both halves must decode or the order is dropped: a half-formed
+    doubles order is rejected by the server, which answers with a default move rather than an
+    error, so search would silently lose the turn it just spent computing.
+    """
+    from poke_env.player import DoubleBattleOrder
+
+    parts = label.get("parts")
+    if not parts:
+        return _slot_order(label, list(battle.available_moves), list(battle.available_switches))
+
+    orders: list[SingleBattleOrder] = []
+    for slot, part in enumerate(parts):
+        moves = battle.available_moves[slot] if slot < len(battle.available_moves) else []
+        switches = battle.available_switches[slot] if slot < len(battle.available_switches) else []
+        order = _slot_order(part, list(moves), list(switches))
+        if order is None:
+            return None
+        orders.append(order)
+    return DoubleBattleOrder(orders[0], orders[1]) if len(orders) == 2 else None
+
+
+class ShapedOnlyPolicy:
+    """A ``PolicyValue`` stand-in for formats with no trained model: shaped leaves, no priors.
+
+    The VGC ceiling probe needs an M2 -- "what does near-optimal search achieve here?" -- and on
+    gen9-RB that leg is what turned a suggestive M1 band into a FORMAT_BOUND verdict. But RB's M2
+    evaluated leaves with GREEN's trained value head, and **no doubles value head exists**. So the
+    leaf here is the shaped state-value alone (HP/faints, ``data.reward.state_value``), which needs
+    no encoder and therefore no singles assumption.
+
+    THIS IS A WEAKER INSTRUMENT THAN RB's M2, and the asymmetry is pre-registered rather than
+    discovered afterwards: a WIN is decisive (search beating the heuristic proves skill headroom
+    above both scripted bots), while a NULL is suggestive only, because a shallower leaf could
+    produce it on its own.
+    """
+
+    #: A win/loss leaf on the shaped scale. `state_value` is bounded well inside this, so a
+    #: terminal node dominates any non-terminal one -- which is the ordering search needs.
+    v_min = -100.0
+    v_max = 100.0
+    cfg_blend = 0.0
+
+    def __init__(self) -> None:
+        import copy
+
+        self._copy = copy
+
+    def deepcopy_battle(self, battle: AbstractBattle) -> AbstractBattle:
+        return self._copy.deepcopy(battle)
+
+    def value(self, battle: AbstractBattle) -> float:
+        return 0.0  # the whole signal is `shaped_coef * state_value` -- see _leaf_eval
+
+    def action_log_probs(self, battle: AbstractBattle) -> dict[int, float]:
+        return {}  # no priors; _top_k_by_prior falls back to its static ranking
 
 
 class PolicyValue:
