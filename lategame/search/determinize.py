@@ -148,7 +148,7 @@ def _mon_state(mon: Pokemon) -> dict[str, Any]:
 
 def _side_spec(
     mons: list[Pokemon],
-    active: Pokemon | None,
+    active: Pokemon | list[Pokemon | None] | None,
     *,
     full: bool,
     fill: int,
@@ -156,17 +156,32 @@ def _side_spec(
     battle_tag: str = "",
     seed: int = 0,
 ) -> dict[str, Any]:
+    """One side of a reconstruction spec.
+
+    ``active`` is a single Pokemon on singles and a LIST of up to two on doubles -- poke-env types
+    it that way and the driver mirrors it, reordering the team so the actives lead. Emitting a bare
+    int for a doubles side would put only one of the two mons on the field and quietly reconstruct
+    a 2v1.
+    """
     team = [
         _mon_set_info(m, full=full, prior=prior, battle_tag=battle_tag, seed=seed) for m in mons
     ]
     state = [_mon_state(m) for m in mons]
-    active_idx = 0
-    if active is not None:
+
+    def _index_of(mon: Pokemon | None) -> int | None:
+        if mon is None:
+            return None
         for i, m in enumerate(mons):
-            if m is active:
-                active_idx = i
-                break
-    return {"team": team, "state": state, "active": active_idx, "fill": max(0, fill)}
+            if m is mon:
+                return i
+        return None
+
+    if isinstance(active, list):
+        indices = [i for i in (_index_of(m) for m in active) if i is not None]
+        active_spec: Any = indices or [0]
+    else:
+        active_spec = _index_of(active) or 0
+    return {"team": team, "state": state, "active": active_spec, "fill": max(0, fill)}
 
 
 def _hazards(conditions: dict) -> dict[str, int]:
@@ -236,14 +251,19 @@ def battle_to_spec(battle: AbstractBattle, seed: int = 0) -> dict[str, Any]:
     }
 
 
-def _digest_side(mons: list[Pokemon], active: Pokemon | None) -> dict[str, Any]:
+def _digest_side(
+    mons: list[Pokemon], active: Pokemon | list[Pokemon | None] | None
+) -> dict[str, Any]:
+    # Doubles has TWO actives; comparing against a single object would mark one of them inactive
+    # and the recon gate would report a phantom `active` mismatch on every doubles turn.
+    live = {id(m) for m in (active if isinstance(active, list) else [active]) if m is not None}
     out: dict[str, Any] = {}
     for m in mons:
         out[_to_id(m.species)] = {
             "hp": 0.0 if m.fainted else round(float(m.current_hp_fraction or 0.0), 2),
             "status": _to_id(m.status.name) if (m.status and m.status.name != "FNT") else "",
             "fainted": bool(m.fainted),
-            "active": m is active,
+            "active": id(m) in live,
             "boosts": {k: v for k, v in m.boosts.items() if v},
         }
     return out
