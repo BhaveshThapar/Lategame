@@ -75,6 +75,23 @@ _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
 # and are safe (`RandomPlayer`, `MaxBasePowerPlayer`, `SimpleHeuristicsPlayer`).
 _SINGLES_ONLY_AGENTS = {"bc", "offrl", "ppo", "search"}
 
+def _singles_only_agents() -> set[str]:
+    """``_SINGLES_ONLY_AGENTS``, minus ``search`` when it is running WITHOUT a trained model.
+
+    ``search`` is singles-only because of what it evaluates leaves with, not because of the search
+    itself: a ``PolicyValue`` leaf calls ``embed_battle``/``action_mask``, both singles-only. In
+    shaped-only mode (``LATEGAME_SEARCH_SHAPED_ONLY=1``) the leaf is ``data.reward.state_value``,
+    which reads the battle object directly, the driver enumerates JOINT doubles orders, and the
+    fallback is the doubles-capable heuristic rule -- so no singles assumption survives anywhere on
+    that path. That mode is exactly what the VGC M2 ceiling probe runs.
+    """
+    import os
+
+    if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1":
+        return _SINGLES_ONLY_AGENTS - {"search"}
+    return _SINGLES_ONLY_AGENTS
+
+
 _DOUBLES_SAFE_AGENTS = tuple(sorted(set(AGENTS) - _SINGLES_ONLY_AGENTS))
 
 
@@ -111,7 +128,7 @@ def build_player(
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
-    if name in _SINGLES_ONLY_AGENTS and is_doubles_format(battle_format):
+    if name in _singles_only_agents() and is_doubles_format(battle_format):
         raise ValueError(
             f"'{name}' is a SINGLES-ONLY agent and {battle_format!r} is a doubles format. It would "
             f"not fail loudly there: poke-env hands doubles agents `active_pokemon` as a list, the "
