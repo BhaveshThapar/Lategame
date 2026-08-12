@@ -1,0 +1,65 @@
+{
+  "gate": "rpredict_recon_live",
+  "format": "gen9ou",
+  "doubles": false,
+  "battles": 20,
+  "agent": "heuristic",
+  "opponent": "heuristic",
+  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "pass_rate": 0.99,
+  "snapshots": 451,
+  "errored": 0,
+  "checks": 26505,
+  "mismatches": 0,
+  "match_rate": 1.0,
+  "by_field": {
+    "active": {
+      "mismatch": 0,
+      "total": 4399,
+      "rate": 1.0
+    },
+    "boosts": {
+      "mismatch": 0,
+      "total": 4399,
+      "rate": 1.0
+    },
+    "fainted": {
+      "mismatch": 0,
+      "total": 4399,
+      "rate": 1.0
+    },
+    "hazards": {
+      "mismatch": 0,
+      "total": 902,
+      "rate": 1.0
+    },
+    "hp": {
+      "mismatch": 0,
+      "total": 4399,
+      "rate": 1.0
+    },
+    "present": {
+      "mismatch": 0,
+      "total": 2706,
+      "rate": 1.0
+    },
+    "status": {
+      "mismatch": 0,
+      "total": 4399,
+      "rate": 1.0
+    },
+    "terrain": {
+      "mismatch": 0,
+      "total": 451,
+      "rate": 1.0
+    },
+    "weather": {
+      "mismatch": 0,
+      "total": 451,
+      "rate": 1.0
+    }
+  },
+  "samples": [],
+  "verdict": "PASS",
+  "note": "Live-play reconstruction fidelity, scored on recon_check._compare -- the same criteria as the replay-driven RB gate (145,400 checks / 7 mismatches / 0.99995), so the numbers are comparable. Gates the search strength run: search on an unfaithful forward model is GIGO. Hidden opponent set details are SAMPLED from the usage prior and are not scored; only what the agent observes is."
+}
