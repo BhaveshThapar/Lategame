@@ -26,7 +26,7 @@ from lategame.agents.heuristic_agent import HeuristicAgent
 from lategame.agents.offline_rl_agent import OfflineRLAgent
 from lategame.agents.ppo_agent import PPORecordingAgent
 from lategame.agents.search_agent import SearchAgent
-from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
+from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, is_doubles_format, local_account
 from lategame.eval.rating import gxe, rate_win_rate
 
 # BCAgent / OfflineRLAgent / PPORecordingAgent are torch-free to import (torch loads
@@ -50,6 +50,28 @@ _CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search"}
 # ``search`` is checkpoint-backed but has no LoopGuard. ``LoopGuard(0.0)`` is exact identity,
 # so forwarding the default 0.0 is a no-op for every existing caller.
 _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
+
+# SINGLES-ONLY, AND THE FAILURE ON DOUBLES IS SILENT RATHER THAN LOUD.
+#
+# Everything this project wrote assumes one active Pokemon per side: `HeuristicAgent.choose_move`
+# reads `battle.active_pokemon` directly, the 720-d encoder's OBS_LAYOUT has one active slot per
+# side, and `action_space` is built on `SinglesEnv.get_action_space_size(9)` (27 actions, against
+# doubles' 107 per slot x 2 slots). On a `DoubleBattle` poke-env passes `active_pokemon` as a LIST,
+# so `matchup()` reaches `list.types` and raises AttributeError.
+#
+# That exception never reaches a caller. poke-env dispatches every protocol message through
+# `asyncio.create_task` and only calls `add_done_callback(discard)` -- nobody retrieves the result
+# -- so the raise is logged and swallowed, exactly as `ShowdownException` is on a failed login
+# (plan.md 13.1, M5/G1). The agent then simply never answers the request and the SERVER plays a
+# default move for it on the timer. A ceiling probe anchored on an agent in that state would
+# measure the timer, read it as enormous headroom, and be wrong in the most expensive direction.
+#
+# Refused at BUILD time, where the format string is in hand and the error is synchronous, rather
+# than at choose-move time where it would vanish. poke-env's own baselines branch on `DoubleBattle`
+# and are safe (`RandomPlayer`, `MaxBasePowerPlayer`, `SimpleHeuristicsPlayer`).
+_SINGLES_ONLY_AGENTS = {"heuristic", "bc", "offrl", "ppo", "search"}
+
+_DOUBLES_SAFE_AGENTS = tuple(sorted(set(AGENTS) - _SINGLES_ONLY_AGENTS))
 
 
 @dataclass
@@ -85,6 +107,17 @@ def build_player(
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
+    if name in _SINGLES_ONLY_AGENTS and is_doubles_format(battle_format):
+        raise ValueError(
+            f"'{name}' is a SINGLES-ONLY agent and {battle_format!r} is a doubles format. It would "
+            f"not fail loudly there: poke-env hands doubles agents `active_pokemon` as a list, the "
+            f"resulting AttributeError is swallowed by poke-env's detached message task, and the "
+            f"server plays default moves on the timer instead -- which reads as a very weak agent "
+            f"rather than as a broken one.\n"
+            f"Doubles-native agents: {', '.join(_DOUBLES_SAFE_AGENTS)}.\n"
+            f"Making the learned agents doubles-capable is the G4/M6 build (plan.md 13): a "
+            f"per-slot action head and a two-active encoder."
+        )
     cls = AGENTS[name]
     extra: dict[str, object] = {}
     if name in _CHECKPOINT_AGENTS:
