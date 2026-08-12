@@ -2843,7 +2843,53 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     on a doubles-capable `HeuristicAgent` — which is not scope creep but M1's deliverable for a
     third format, and is the baseline any learned doubles agent would be scored against anyway.
     A validator-checked `gen9vgc2025regi` team pool (**10/10 legal**, built by the existing
-    `scripts/build_ou_teampool.py` with no new code) is staged and waiting on it.
+    `scripts/build_ou_teampool.py` with no new code) supplies the teams.
+  - **THE DOUBLES M1 BASELINE, BUILT.** `HeuristicAgent` now applies the same R-CALC rule per slot
+    and joins the two into a `DoubleBattleOrder`. Doubles forces two things singles never did, both
+    silent failures if got wrong: a move needs a legal **target** (chosen together with the move,
+    since expected damage depends on which foe it lands on, and only used when
+    `get_possible_showdown_targets` agrees — a rejected target costs the turn), and the two slots
+    **may not switch to the same benched Pokemon** (an illegal order the server answers with a
+    default move). Verified live: **0.900 vs `random` over 10 battles, 10/10 finished, 7.1 mean
+    turns in 4 s** — fast enough to rule out the timer-default failure mode above, which is slow
+    by construction.
+
+- **VGC CEILING PROBE — RESULT: `INSUFFICIENT`, and the instrument is the reason (2026-08-11).**
+  M1 on `gen9vgc2025regi`, n=300 per matchup, the 10-team pool, `results/format_ceiling_gate_vgc.json`:
+
+  | vs `heuristic` | gen9-RB (FORMAT_BOUND) | gen9ou (headroom) | **gen9vgc2025regi** |
+  |---|---|---|---|
+  | mirror (sanity) | 0.513 | 0.493 | 0.523 |
+  | `simpleheuristics` | **0.523** [0.467, 0.579] | **0.643** | **0.527** [0.470, 0.582] |
+  | `maxbasepower` | 0.107 | 0.060 | 0.300 |
+  | `random` | 0.007 | 0.030 | 0.017 |
+
+  - **On the discriminating quantity VGC reproduces the gen9-RB signature almost exactly.** The
+    strongest competent bot reaches **0.527 with a CI spanning 0.50** against RB's 0.523 [0.467,
+    0.579] — and against OU's 0.643, whose CI clears the 0.58 headroom bar entirely.
+    `simpleheuristics` is not even distinguishable from the heuristic's own **mirror** (0.523).
+  - **But the verdict is INSUFFICIENT, not FORMAT_BOUND, and the distinction is the whole point of
+    running this honestly.** Two readings fit the same numbers. (a) VGC's achievable ceiling over a
+    competent heuristic really is ~parity, as on RB. (b) **Both bots are equally blind to
+    doubles-specific skill** — target selection, Protect timing, speed control, spread-damage
+    positioning, and the bring-6-pick-4 team-preview decision — so the instrument cannot resolve a
+    gap that exists above both of them. `maxbasepower` at **0.300** on VGC against 0.107 on RB and
+    0.060 on OU is the tell: a *naive* bot is far closer to competent play here than on either
+    singles format, which is what reading (b) predicts and what a genuinely flat ceiling would also
+    produce.
+  - **Nothing breaks the tie, unlike on RB.** Lever 15's FORMAT_BOUND verdict rested on three legs
+    — M1's skill band, **M2** (near-optimal depth-2 search with a white-box opponent model reaching
+    0.500), and **M3** (team strength does not predict the winner, AUC 0.495). Only M1 exists for
+    VGC: there is no doubles forward model, so no M2, and no scraped VGC replays, so no M3. On RB,
+    M2 was what turned a suggestive band into a verdict.
+  - **So G4 is neither greenlit nor descoped by this build, and that is the finding.** The
+    Lever-15 idiom — measure the ceiling before spending on the pipeline — worked on RB because a
+    cheap probe there was *decisive*. On doubles the same probe is **not decisive**, because every
+    agent cheap enough to run before building the pipeline is a singles policy applied per slot.
+    Deciding G4 by measurement therefore costs more than the idiom promised: it needs either a
+    doubles M2 (extend `lategame/search/` to doubles — the forward model already serialises and
+    steps arbitrary battles) or a doubles-competent reference to put at the top of the gradient.
+    Recording the cost honestly is better than reading a suggestive M1 as a verdict it cannot bear.
 
 ---
 

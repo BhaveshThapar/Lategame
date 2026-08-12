@@ -131,7 +131,7 @@ def test_a_singles_only_agent_is_refused_on_a_doubles_format():
     would report enormous headroom for the wrong reason.
     """
     with pytest.raises(ValueError, match="SINGLES-ONLY"):
-        build_player("heuristic", "gen9vgc2025regi")
+        build_player("bc", "gen9vgc2025regi", checkpoint_path="x.pt")
     with pytest.raises(ValueError, match="SINGLES-ONLY"):
         build_player("offrl", "gen9doublesou", checkpoint_path="x.pt")
 
@@ -142,7 +142,7 @@ def test_poke_envs_own_baselines_are_allowed_on_doubles(monkeypatch):
     ours exists -- which is what makes the G4 decision cheap."""
     import lategame.eval.arena as arena
 
-    for name in ("random", "maxbasepower", "simpleheuristics"):
+    for name in ("random", "maxbasepower", "simpleheuristics", "heuristic"):
         monkeypatch.setitem(arena.AGENTS, name, lambda **kw: object())
         build_player(name, "gen9vgc2025regi")  # must not raise
 

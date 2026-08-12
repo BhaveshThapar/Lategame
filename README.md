@@ -906,6 +906,36 @@ than stylistic: the ladder's Glicko ordering is not even monotone in update coun
 160), and no adjacent learned pair separates — a single-seed field cannot speak to build-vs-build.
 It is not evidence against the gate; it just cannot carry this curve.
 
+### G4 / VGC ceiling probe — INSUFFICIENT, and the instrument is the reason
+
+Following the Lever-15 idiom (measure a format's ceiling before building its pipeline), M1 was run
+on `gen9vgc2025regi` — n=300 per matchup, a validator-checked 10-team pool,
+`results/format_ceiling_gate_vgc.json`. Two prerequisites had to be built first: the
+`VGC_FORMAT` constant named `gen9vgc2024regh`, **which the vendored simulator does not have**
+(corrected to `gen9vgc2025regi` and pinned by test), and `HeuristicAgent` gained a doubles path,
+because poke-env supplies only *one* competent doubles bot and the probe needs two near the top.
+
+| vs `heuristic` | gen9-RB (FORMAT_BOUND) | gen9ou (headroom) | **gen9vgc2025regi** |
+|---|---|---|---|
+| mirror (sanity) | 0.513 | 0.493 | 0.523 |
+| `simpleheuristics` | **0.523** [0.467, 0.579] | **0.643** | **0.527** [0.470, 0.582] |
+| `maxbasepower` | 0.107 | 0.060 | 0.300 |
+| `random` | 0.007 | 0.030 | 0.017 |
+
+**On the discriminating quantity VGC reproduces the gen9-RB signature almost exactly** — the
+strongest competent bot at 0.527 with a CI spanning 0.50, indistinguishable even from the
+heuristic's own mirror. **But the verdict is INSUFFICIENT, not FORMAT_BOUND.** Two readings fit:
+either VGC's ceiling really is ~parity, or both bots are equally blind to doubles-specific skill
+(targeting, Protect timing, speed control, bring-6-pick-4) and the instrument cannot see a gap that
+lives above them both. `maxbasepower` at **0.300** — far closer to competent play than its 0.107/
+0.060 on the singles formats — is consistent with either.
+
+Nothing breaks the tie the way it did on RB, where **M2** (near-optimal search reaching 0.500) turned
+a suggestive band into a verdict: there is no doubles forward model and no scraped VGC replays, so
+neither M2 nor M3 exists here. **G4 is therefore neither greenlit nor descoped** — the finding is
+that on doubles the cheap probe is *not decisive*, because every agent cheap enough to run before
+building the pipeline is a singles policy applied per slot.
+
 ## Setup
 
 ```bash

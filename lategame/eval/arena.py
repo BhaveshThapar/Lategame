@@ -53,11 +53,15 @@ _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
 
 # SINGLES-ONLY, AND THE FAILURE ON DOUBLES IS SILENT RATHER THAN LOUD.
 #
-# Everything this project wrote assumes one active Pokemon per side: `HeuristicAgent.choose_move`
-# reads `battle.active_pokemon` directly, the 720-d encoder's OBS_LAYOUT has one active slot per
-# side, and `action_space` is built on `SinglesEnv.get_action_space_size(9)` (27 actions, against
-# doubles' 107 per slot x 2 slots). On a `DoubleBattle` poke-env passes `active_pokemon` as a LIST,
-# so `matchup()` reaches `list.types` and raises AttributeError.
+# The LEARNED agents assume one active Pokemon per side: the 720-d encoder's OBS_LAYOUT has one
+# active slot per side, and `action_space` is built on `SinglesEnv.get_action_space_size(9)`
+# (27 actions, against doubles' 107 per slot x 2 slots). Making them doubles-capable is the G4/M6
+# build. On a `DoubleBattle` poke-env passes `active_pokemon` as a LIST, so a singles policy
+# reaches `list.types` and raises AttributeError.
+#
+# `heuristic` is NOT in this set: it gained a doubles path (a per-slot decision joined into a
+# DoubleBattleOrder) because the VGC ceiling probe needs two agents near the top of the doubles
+# skill gradient and poke-env supplies exactly one.
 #
 # That exception never reaches a caller. poke-env dispatches every protocol message through
 # `asyncio.create_task` and only calls `add_done_callback(discard)` -- nobody retrieves the result
@@ -69,7 +73,7 @@ _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
 # Refused at BUILD time, where the format string is in hand and the error is synchronous, rather
 # than at choose-move time where it would vanish. poke-env's own baselines branch on `DoubleBattle`
 # and are safe (`RandomPlayer`, `MaxBasePowerPlayer`, `SimpleHeuristicsPlayer`).
-_SINGLES_ONLY_AGENTS = {"heuristic", "bc", "offrl", "ppo", "search"}
+_SINGLES_ONLY_AGENTS = {"bc", "offrl", "ppo", "search"}
 
 _DOUBLES_SAFE_AGENTS = tuple(sorted(set(AGENTS) - _SINGLES_ONLY_AGENTS))
 
