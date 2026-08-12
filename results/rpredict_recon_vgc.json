@@ -1,0 +1,121 @@
+{
+  "gate": "rpredict_recon_live",
+  "format": "gen9vgc2025regi",
+  "doubles": true,
+  "battles": 6,
+  "agent": "heuristic",
+  "opponent": "heuristic",
+  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "pass_rate": 0.99,
+  "snapshots": 300,
+  "errored": 0,
+  "checks": 12000,
+  "mismatches": 899,
+  "match_rate": 0.925083,
+  "by_field": {
+    "active": {
+      "mismatch": 299,
+      "total": 1800,
+      "rate": 0.8339
+    },
+    "boosts": {
+      "mismatch": 0,
+      "total": 1800,
+      "rate": 1.0
+    },
+    "fainted": {
+      "mismatch": 0,
+      "total": 1800,
+      "rate": 1.0
+    },
+    "hazards": {
+      "mismatch": 0,
+      "total": 600,
+      "rate": 1.0
+    },
+    "hp": {
+      "mismatch": 0,
+      "total": 1800,
+      "rate": 1.0
+    },
+    "present": {
+      "mismatch": 600,
+      "total": 1800,
+      "rate": 0.6667
+    },
+    "status": {
+      "mismatch": 0,
+      "total": 1800,
+      "rate": 1.0
+    },
+    "terrain": {
+      "mismatch": 0,
+      "total": 300,
+      "rate": 1.0
+    },
+    "weather": {
+      "mismatch": 0,
+      "total": 300,
+      "rate": 1.0
+    }
+  },
+  "samples": [
+    {
+      "diffs": [
+        "p1.rillaboom MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    },
+    {
+      "diffs": [
+        "p1.ragingbolt.active pe=False drv=True",
+        "p1.tornadus MISSING in reconstruction",
+        "p1.ironhands MISSING in reconstruction"
+      ]
+    }
+  ],
+  "verdict": "FAIL",
+  "note": "Live-play reconstruction fidelity, scored on recon_check._compare -- the same criteria as the replay-driven RB gate (145,400 checks / 7 mismatches / 0.99995), so the numbers are comparable. Gates the search strength run: search on an unfaithful forward model is GIGO. Hidden opponent set details are SAMPLED from the usage prior and are not scored; only what the agent observes is."
+}

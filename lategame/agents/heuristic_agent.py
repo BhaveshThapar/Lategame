@@ -112,6 +112,74 @@ def best_target(
     )
 
 
+#: One slot's doubles decision: (Move, showdown target) or (Pokemon to switch to, unused), or
+#: ``None`` for "no preference -- default". Ordered by slot.
+DoublesPick = tuple[Move | Pokemon, int] | None
+
+
+def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
+    """The doubles decision rule as a PURE function of the battle, one entry per slot.
+
+    Free-standing for the same reason ``heuristic_pick`` is: the Lever-14 white-box opponent model
+    has to evaluate *the eval opponent's* policy on a reconstructed POV, and it must call the
+    identical function the live agent calls. Duplicating the rule is what would silently reopen the
+    model-vs-reality gap that made L11/L12's opponent model too weak to be worth searching against.
+
+    Two things doubles forces that singles never did.
+
+    *A move needs a TARGET, and the target is part of the decision.* A move's expected damage
+    depends on which foe it hits, so ``best_target`` picks the slot first and the move is then
+    chosen against that foe. The chosen target is only used if the simulator agrees it is legal
+    (spread and self-targeting moves have their own fixed target sets), otherwise the first legal
+    target is taken -- guessing a target Showdown rejects would cost the turn.
+
+    *The two slots are not independent.* Both may not switch to the same benched Pokemon, so a
+    bench mon claimed by slot 0 is removed from slot 1's options before slot 1 decides. Without
+    that the order is illegal and the server plays a default move instead -- a silent lost turn.
+    """
+    out: list[DoublesPick] = []
+    claimed: set[str] = set()
+    foes = [
+        (i, foe)
+        for i, foe in enumerate(battle.opponent_active_pokemon)
+        if foe is not None and not foe.fainted
+    ]
+
+    for slot in (0, 1):
+        mon = battle.active_pokemon[slot] if slot < len(battle.active_pokemon) else None
+        moves = list(battle.available_moves[slot]) if slot < len(battle.available_moves) else []
+        switches = [
+            m
+            for m in (
+                battle.available_switches[slot] if slot < len(battle.available_switches) else []
+            )
+            if m.species not in claimed
+        ]
+        if mon is None or (not moves and not switches):
+            out.append(None)
+            continue
+
+        target = best_target(mon, foes, moves)
+        pick = heuristic_pick(mon, target[1] if target else None, moves, switches)
+        if pick is None:
+            out.append(None)
+            continue
+        # Narrowed on the object, not the ``str`` tag: the tag carries no type information.
+        decision = pick[1]
+        if isinstance(decision, Pokemon):
+            claimed.add(decision.species)
+            out.append((decision, DoubleBattle.EMPTY_TARGET_POSITION))
+        else:
+            legal = battle.get_possible_showdown_targets(decision, mon)
+            wanted = target[0] + 1 if target else DoubleBattle.EMPTY_TARGET_POSITION
+            chosen = (
+                wanted if wanted in legal
+                else (legal[0] if legal else DoubleBattle.EMPTY_TARGET_POSITION)
+            )
+            out.append((decision, chosen))
+    return out
+
+
 class HeuristicAgent(Player):
     """M1 baseline. Singles is the original rule; doubles applies the same rule per slot.
 
@@ -136,65 +204,16 @@ class HeuristicAgent(Player):
         return self.create_order(pick[1])
 
     def _choose_doubles_move(self, battle: DoubleBattle) -> BattleOrder:
-        """The same rule, once per slot, joined into a ``DoubleBattleOrder``.
-
-        Two things doubles forces that singles never did.
-
-        *A move needs a TARGET, and the target is part of the decision.* A move's expected damage
-        depends on which foe it hits, so ``best_target`` picks the slot first and the move is then
-        chosen against that foe. The chosen target is only used if the simulator agrees it is
-        legal (spread and self-targeting moves have their own fixed target sets), otherwise the
-        first legal target is taken -- guessing a target Showdown rejects would cost the turn.
-
-        *The two slots are not independent.* Both may not switch to the same benched Pokemon, so a
-        bench mon claimed by slot 0 is removed from slot 1's options before slot 1 decides. Without
-        that the order is illegal and the server plays a default move instead.
-        """
-        orders: list[SingleBattleOrder] = []
-        claimed: set[str] = set()
-        foes = [
-            (i, foe)
-            for i, foe in enumerate(battle.opponent_active_pokemon)
-            if foe is not None and not foe.fainted
+        """The same rule, once per slot, joined into a ``DoubleBattleOrder``."""
+        picks = doubles_pick(battle)
+        orders: list[SingleBattleOrder] = [
+            DefaultBattleOrder()
+            if p is None
+            else self.create_order(p[0])
+            if isinstance(p[0], Pokemon)
+            else self.create_order(p[0], move_target=p[1])
+            for p in picks
         ]
-
-        for slot in (0, 1):
-            mon = battle.active_pokemon[slot] if slot < len(battle.active_pokemon) else None
-            moves = list(battle.available_moves[slot]) if slot < len(battle.available_moves) else []
-            switches = [
-                mon_
-                for mon_ in (
-                    battle.available_switches[slot]
-                    if slot < len(battle.available_switches)
-                    else []
-                )
-                if mon_.species not in claimed
-            ]
-            if mon is None or (not moves and not switches):
-                orders.append(DefaultBattleOrder())
-                continue
-
-            target = best_target(mon, foes, moves)
-            pick = heuristic_pick(mon, target[1] if target else None, moves, switches)
-            if pick is None:
-                orders.append(DefaultBattleOrder())
-                continue
-            # Narrowed on the object, not the ``str`` tag: the tag carries no type information,
-            # and a switch order and a move order need different handling below.
-            decision = pick[1]
-            if isinstance(decision, Pokemon):
-                claimed.add(decision.species)
-                orders.append(self.create_order(decision))
-            else:
-                legal = battle.get_possible_showdown_targets(decision, mon)
-                wanted = target[0] + 1 if target else DoubleBattle.EMPTY_TARGET_POSITION
-                chosen = (
-                    wanted
-                    if wanted in legal
-                    else (legal[0] if legal else DoubleBattle.EMPTY_TARGET_POSITION)
-                )
-                orders.append(self.create_order(decision, move_target=chosen))
-
         if all(isinstance(order, DefaultBattleOrder) for order in orders):
             return self.choose_default_move()
         return DoubleBattleOrder(orders[0], orders[1])
