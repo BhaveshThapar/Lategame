@@ -16,13 +16,16 @@ amended from Gen 9 Random Battles *by measurement*: Lever 15 found gen9-RB **FOR
 strongest competent bot reaches 0.523 vs the heuristic (CI spanning 0.50) and near-optimal depth-2
 search reaches 0.500, so G2 was unreachable there whatever the model. On `gen9ou` the same
 diagnostic found real headroom (`simpleheuristics` 0.633, heuristic mirror 0.487).
-**§12's "> 50% vs the heuristic" bar is now cleared**: `v25b`'s selection-free terminal read is
-**0.6807** [0.6682, 0.6930], above the strongest scripted bot. **G2's headline metric is now
-computed too** — GXE/Glicko-1 need a varied opponent field, which no amount of further training can
-supply, so it came from an **agent-only eval ladder** (`lategame eval-ladder`, the "private/agent-only
-server or eval ladder" §12 asks for) rather than from the human ladder, which NG3 puts out of scope.
-Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9,
-GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000).
+**§12's "> 50% vs the heuristic" bar is cleared decisively**: `v26b`'s selection-free terminal read
+is **0.7513** (pooled n=9000/arm, 3 seeds), far above the strongest scripted bot. **G2's headline
+metric is computed too** — GXE/Glicko-1 need a varied opponent field, which no amount of further
+training can supply, so it came from an **agent-only eval ladder** (`lategame eval-ladder`, the
+"private/agent-only server or eval ladder" §12 asks for) rather than from the human ladder, which
+NG3 puts out of scope. Over 9 agents × 36 pairs × 300 battles on `gen9ou`, **`v26b` reaches Glicko
+1776.3, GXE 0.7434**, above `simpleheuristics` (1572.7 / 0.5695) and the `heuristic` anchor
+(1500 / 0.5000). **G3 is booked** on the five-dose continual-improvement curve (80 → 320 updates,
+monotone on both inference reads). **G1** is built and verified. That leaves **G4** — VGC doubles,
+the missing third format — and **G5**, as *demonstrated* rather than merely implemented capability.
 
 **Key finding: a learned method finally clears the heuristic plateau.** For eight levers
 every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
@@ -850,6 +853,58 @@ seed-robust. The ladder is single-seed and so cannot speak to build-vs-build at 
 *One coincidence, booked as one:* `v25b`'s GXE 0.6809 sits 2e-4 from its published 0.6807 win rate,
 but these are different quantities (GXE discounts for the reference's RD 350; the direct head-to-head
 here was 0.720). Not the ladder reproducing the gate.
+
+### G2 refreshed on Build 26, and the first measurement of what the standings cannot order
+
+The 2026-08-10 ladder excluded `v26a`/`v26b` as in-flight arms. Re-run now that they are not
+(`gen9ou`, 9 agents, 36 pairs × 300 = **10,800** battles, `results/eval_ladder_gen9ou_v26.json`),
+with **300 cluster-bootstrap resamples over the 78 team matchups**:
+
+| agent | score | Glicko | RD | GXE | cluster 95% CI |
+|---|---|---|---|---|---|
+| `offrl@ppo_v26a_s0/iter_240` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1732, 1811] |
+| `offrl@ppo_v26b_s0/iter_320` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1739, 1815] |
+| `offrl@ppo_v25a_s0/iter_120` | 0.679 | 1755.0 | 12.4 | 0.7275 | [1719, 1791] |
+| `offrl@ppo_v25b_s0/iter_160` | 0.642 | 1710.7 | 12.2 | 0.6924 | [1676, 1743] |
+| `offrl@ppo_v23b_s0/iter_80` | 0.593 | 1653.4 | 12.1 | 0.6435 | [1618, 1689] |
+| `simpleheuristics` | 0.525 | 1572.7 | 12.3 | 0.5695 | [1546, 1600] |
+| `heuristic` (anchor) | 0.465 | 1500.0 | 12.6 | 0.5000 | — |
+| `maxbasepower` | 0.166 | 1001.4 | 19.0 | 0.1280 | [938, 1053] |
+| `random` | 0.039 | 617.0 | 28.6 | 0.0325 | [530, 684] |
+
+**G2's headline metric is now `v26b`: Glicko 1776.3, GXE 0.7434** (from `v25b`'s 1696.9 / 0.6809).
+
+**RD was always a lower bound; now there is an interval that is not.** RD comes from binomial noise
+alone, but on a teambuilt format battles cluster by team matchup, so the effective sample is well
+under `n`. The bootstrap resamples **matchups**, not battles — resampling battles would just
+reproduce the binomial interval RD already gives. The result: **every band boundary separates**
+(learned > `simpleheuristics` > `heuristic` > `maxbasepower` > `random`) and **not one adjacent
+learned pair does**. "Read the standings as separating bands, not as ordering neighbours" has been
+in the results file since it was written — this is the first run that measures it.
+
+*One coincidence, booked as one:* `v26a` and `v26b` post identical totals (1671–729) and therefore
+identical Glicko/GXE, while being clearly different agents — all seven per-opponent records differ
+and they went 165–135 head to head. `v26b`'s +30 across the rest of the field cancels its −30 there.
+
+### G3 — BOOKED: the continual-improvement curve was already on the record
+
+§12's continual-improvement row asks for "metric vs self-play volume → monotonic improvement".
+Builds 24–26 are that curve; nobody had written it up as one. Five doses at a pinned schedule,
+3 seeds, pooled n=9000/arm vs the heuristic, chained through the shared `v25b` anchor (which
+re-calibrated +0.0157 between runs, inside the ±0.027 cross-run band):
+
+| updates | 80 | 120 | 160 | 240 | 320 |
+|---|---|---|---|---|---|
+| seed-best read | 0.5607 | 0.6301 | 0.6691 | 0.7250 | 0.7420 |
+| terminal (selection-free) | 0.5778 | 0.6189 | 0.6883 | 0.7354 | 0.7513 |
+
+**Monotone at every step on both reads.** G3 is met — *and* the axis that met it is saturating:
+the marginal return per update decays 1.62 → 0.91 → 0.64 → 0.18 (×10⁻³), ~9×, monotone.
+
+The curve comes from `seed_strength_gate.py`, **not** from the ladder, and that is measured rather
+than stylistic: the ladder's Glicko ordering is not even monotone in update count (120 sits above
+160), and no adjacent learned pair separates — a single-seed field cannot speak to build-vs-build.
+It is not evidence against the gate; it just cannot carry this curve.
 
 ## Setup
 

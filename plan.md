@@ -42,6 +42,16 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
   - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633.
   - **The *ladder* half is now COMPUTED (2026-08-10), on an agent-only eval ladder rather than the human ladder.** GXE and Glicko-1 need a varied opponent field, which no amount of further training can supply — but §12's own last line prefers "a private/agent-only server or eval ladder", and §16 Q5 is answered: there is *no* unranked public ladder, so that route is the only policy-clean one. `lategame/eval/ladder.py` fits a whole field jointly (Bradley-Terry on the Glicko scale, `heuristic` pinned at 1500). Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9, GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000) — see §13.1. Two caveats travel with it: the RD is a **lower bound** (battles cluster by team matchup, so the effective sample is under `n`), and this is an **agent-only** field, so the number is *not* comparable to a Showdown GXE measured against humans. The human-ladder reading remains out of scope under NG3; `lategame/live/` (**G1**) is built and gated for it should that ever change.
 - **G3.** Demonstrate **continual improvement**: model strength measurably increases as self-play volume and replay data grow.
+  - **MET (booked 2026-08-11), and the evidence was already on the record before it was claimed.** §12's continual-improvement row asks for "metric vs self-play/data volume → monotonic improvement". Builds 24–26 are exactly that curve and nobody had written it up as one. Five doses of PPO self-play at a pinned schedule (`anneal_iters` 80, `target_kl` 0.06, from the converged offline init), 3 seeds each, pooled **n = 9000/arm** against the fixed heuristic, chained through the shared `v25b` anchor because absolute rates move between runs (the anchor re-calibrated **+0.0157**, inside the ±0.027 cross-run band) and only within-run differences are trustworthy:
+
+    | updates | 80 | 120 | 160 | 240 | 320 |
+    |---|---|---|---|---|---|
+    | seed-best read | 0.5607 | 0.6301 | 0.6691 | 0.7250 | 0.7420 |
+    | terminal (selection-free) read | 0.5778 | 0.6189 | 0.6883 | 0.7354 | 0.7513 |
+
+    **Monotone at every step on both reads**, which is the claim G3 makes. What it does *not* claim is that the improvement continues: the marginal return per update decays **1.62 → 0.91 → 0.64 → 0.18** (×10⁻³, bias-corrected; the raw chained figures are 1.73/0.98/0.70/0.21 and agree in shape), a ~9× decay that is itself monotone. G3 is met **and** the axis that met it is saturating — see Build 26.
+  - **The curve comes from `seed_strength_gate.py`, NOT from the eval ladder, and that is a measured decision rather than a stylistic one.** The obvious improvement — plot the curve in the Glicko the goal is stated in — was tried and refused by the data. On the 2026-08-11 ladder the Glicko ordering is not even monotone in update count (120 → 1755.0 sits *above* 160 → 1710.7, against the gate's seed-robust move the other way), and the cluster bootstrap shows **no adjacent learned pair separates at 95%**. The ladder is a single-seed field: it separates bands, and cannot speak to build-vs-build at all. It is therefore not evidence against the gate, and not a substitute for it.
+  - **Not demonstrated on the other half of G3's wording.** The goal says "self-play volume *and replay data* grow". Only the self-play axis has a dose-response curve; the replay-data axis was measured once (OU Builds 2–4) and never scaled, so no claim is made for it.
 - **G4.** Generalize the *system* to ≥3 formats spanning singles random, singles teambuilt (OU), and doubles (VGC) by plugging in per-format data, action heads, and team sources — without rewriting the core.
 - **G5.** Encode the competitive skill stack of Section 4 as explicit, testable capabilities (state estimation, prediction/opponent modeling, win-condition planning, precise damage math).
 
@@ -2732,6 +2742,108 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     figure is a direct win rate against one specific opponent — and `v25b`'s direct head-to-head in
     this very run was **0.720**, not 0.681. The agreement to 2e-4 is a coincidence of magnitude,
     not an identity, and must not be cited as the ladder reproducing the gate.
+
+- **THE LADDER, RE-RUN ON THE FINISHED BUILD 26 ARMS — G2's HEADLINE REFRESHED, AND THE FIRST
+  MEASUREMENT OF WHAT THE STANDINGS CANNOT ORDER (2026-08-11).** The 2026-08-10 field deliberately
+  excluded `v26a`/`v26b` as in-flight arms. They are no longer in flight, and `v26b` is the
+  project's best configuration while G2's published Glicko still pointed at `v25b`. Re-run on
+  `gen9ou` with the dose ladder as the field (9 agents, 36 pairs × **300** = **10,800** battles,
+  `loop_penalty` 4, anchor `heuristic` = 1500), plus **300 cluster-bootstrap resamples** over the
+  78 team matchups. `results/eval_ladder_gen9ou_v26.json`.
+
+  | agent | score | Glicko | RD | GXE | cluster 95% CI |
+  |---|---|---|---|---|---|
+  | `offrl@ppo_v26a_s0/iter_240` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1732, 1811] |
+  | `offrl@ppo_v26b_s0/iter_320` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1739, 1815] |
+  | `offrl@ppo_v25a_s0/iter_120` | 0.679 | 1755.0 | 12.4 | 0.7275 | [1719, 1791] |
+  | `offrl@ppo_v25b_s0/iter_160` | 0.642 | 1710.7 | 12.2 | 0.6924 | [1676, 1743] |
+  | `offrl@ppo_v23b_s0/iter_80` | 0.593 | 1653.4 | 12.1 | 0.6435 | [1618, 1689] |
+  | `simpleheuristics` | 0.525 | 1572.7 | 12.3 | 0.5695 | [1546, 1600] |
+  | `heuristic` (anchor) | 0.465 | 1500.0 | 12.6 | 0.5000 | — |
+  | `maxbasepower` | 0.166 | 1001.4 | 19.0 | 0.1280 | [938, 1053] |
+  | `random` | 0.039 | 617.0 | 28.6 | 0.0325 | [530, 684] |
+
+  - **G2's headline metric moves to `v26b`: Glicko 1776.3, GXE 0.7434**, from `v25b`'s 1696.9 /
+    0.6809. Both caveats travel unchanged — agent-only field, not comparable to a Showdown GXE.
+  - **RD WAS A LOWER BOUND, AND NOW THERE IS AN INTERVAL THAT IS NOT.** RD is derived from binomial
+    noise alone. On a teambuilt format the battles are clustered by team matchup, so the effective
+    sample is well under `n` — the evidence was already on the record (a pairing moved 0.460 →
+    0.587 across two n=150 runs, ~3.1 binomial SE, while each agent's own GXE moved under 0.004)
+    and unexplained by RD. `eval/ladder.py` now resamples **team matchups**, not battles, and
+    refits the whole field per resample. Resampling battles would merely reproduce the binomial
+    interval RD already gives; pinned by a test where a 1000-battle field whose outcomes are fixed
+    by 10 matchups comes back >5× wider than RD implies, against an unclustered control that does
+    not.
+  - **THE RESULT IS THAT EVERY BAND BOUNDARY SEPARATES AND NOT ONE LEARNED NEIGHBOUR DOES.**
+    learned > `simpleheuristics` > `heuristic` > `maxbasepower` > `random`: all four separated.
+    `v26a`/`v26b`, `v26b`/`v25a`, `v25a`/`v25b`, `v25b`/`v23b`: none separated. The instruction
+    "read the standings as separating BANDS, not as ordering neighbours" has been in the results
+    file since it was written; this is the first run that **measures** it rather than asserting it.
+  - **ONE COINCIDENCE, BOOKED AS ONE SO IT IS NOT MISREAD AS A BUG.** `v26a` and `v26b` post
+    *identical* totals (1671–729), hence identical Glicko and GXE. They are demonstrably different
+    agents: all seven per-opponent records differ and they went **165–135** head to head. `v26b`'s
+    +30 wins across the rest of the field (chiefly **+38** vs `simpleheuristics`) exactly cancel
+    its −30 head to head. A coincidence of arithmetic, not a shared checkpoint.
+
+- **OPEN NEXT (BUILD 27) — DO NOT EXTEND THE DOSE AGAIN; the axis is closed and the remaining
+  goals are elsewhere.** Every build from 16 onward named its successor; Build 26 was the first
+  that did not, because its own result removed the obvious one.
+  - **Why 480 updates is not Build 27.** At the observed 0.18×10⁻³/update, 320 → 480 buys **+0.029
+    nominal**. But the decay ratio across segments runs ~1.8× → 1.4× → 3.6×, so the next segment
+    projects to ~0.05×10⁻³/update ⇒ **~+0.008**, against a per-contrast MDE of ~**0.025** at
+    N=3000. The arm is powered to detect approximately nothing. It would also cost ~33 h per seed
+    across 2–3 resume chunks and ~25 GB of checkpoints — on the shared quota that already cost
+    Build 26 four of six arms. Spending the entire remaining budget to measure an effect the curve
+    predicts is 3× under the resolution limit is the one move this build's own data forbids.
+  - **What is actually left, against the goals rather than against the lever list.** G1 met; G2 met
+    on both halves and refreshed above; G3 booked above. That leaves **G4** (≥3 formats — VGC
+    doubles is the missing third) and **G5** (the skill stack as *demonstrated* rather than merely
+    implemented capabilities), plus **M7/§16 Q2**, where test-time search was retired at parity on
+    gen9-RB — a format Lever 15 subsequently proved FORMAT_BOUND, i.e. the retirement was measured
+    where nothing could beat the heuristic and says nothing about OU.
+
+- **G4 GROUNDWORK, AND A MEASUREMENT THE OBVIOUS PROBE CANNOT MAKE (2026-08-11).** Following the
+  Lever-15 idiom — measure a format's ceiling before spending on it — the VGC probe was built
+  before the doubles pipeline. Three findings, in increasing order of consequence.
+  - **`config.VGC_FORMAT` NAMED A FORMAT THAT DOES NOT EXIST.** It was `gen9vgc2024regh`, written
+    as a Phase-3 placeholder and never exercised, so nothing ever failed. The pinned simulator
+    (rev 393d5c8) offers gen 9 VGC 2023 Reg C/D, **2024 Reg G**, **2025 Reg I**, and the
+    `[Gen 9 Champions]` 2026 Reg M-A/M-B mod — no Reg H. Corrected to **`gen9vgc2025regi`** and
+    pinned by a test against the simulator's own format table. The `...bo3` ids are avoided
+    deliberately: a "battle" there is a best-of-three **series**, which every win/loss counter in
+    `eval/` would miscount without noticing. (`bestOfDefault: true` on Reg I turns out to be only
+    a client-side UI bit — the enforced Bo3 comes from a `'Best of = 3'` ruleset entry that only
+    the explicitly-named Bo3 formats carry.)
+  - **A SINGLES-ONLY AGENT FAILS *SILENTLY* ON DOUBLES, so the refusal is at build time.** On a
+    `DoubleBattle` poke-env passes `active_pokemon` as a list, so `HeuristicAgent` reaches
+    `list.types` and raises `AttributeError`. That exception never reaches a caller: poke-env
+    dispatches every protocol message through `asyncio.create_task` and only attaches
+    `add_done_callback(discard)`, so the raise is logged and swallowed — the same detached-task
+    pathology M5/G1 found for `ShowdownException`. The agent then simply never answers the request
+    and the **server plays a default move for it on the timer**. A ceiling probe anchored on an
+    agent in that state would have measured the timer, read it as enormous headroom, and been
+    wrong in the most expensive possible direction. `arena.build_player` now refuses a singles-only
+    agent on a doubles format, where the format string is in hand and the error is synchronous.
+  - **THE PLANNED CHEAP PROBE CANNOT DECIDE G4, AND THE REASON IS IN THE PUBLISHED BANDS.** The
+    plan was to anchor the VGC M1 sweep on `simpleheuristics` — poke-env's own bots are all
+    doubles-native, so this needs no doubles code of ours. Comparing the RB and OU bands shows why
+    that measures the wrong thing:
+
+    | vs `heuristic` | `random` | `maxbasepower` | `simpleheuristics` |
+    |---|---|---|---|
+    | gen9-RB (FORMAT_BOUND) | 0.007 | 0.107 | **0.523** |
+    | gen9ou (headroom) | 0.030 | 0.060 | **0.643** |
+
+    The two formats are **indistinguishable at the bottom** of the skill gradient — a competent bot
+    crushes naive bots in both. They differ *only at the top*: on RB the last increment of skill
+    buys parity, on OU it buys 0.14. A probe anchored on `simpleheuristics` can only measure
+    `random`/`maxbasepower` *below* it, i.e. precisely the region where FORMAT_BOUND and
+    MODEL_BOUND look the same. **The discriminating measurement needs two agents near the top of
+    the doubles gradient, and poke-env supplies exactly one.** So the VGC ceiling probe is blocked
+    on a doubles-capable `HeuristicAgent` — which is not scope creep but M1's deliverable for a
+    third format, and is the baseline any learned doubles agent would be scored against anyway.
+    A validator-checked `gen9vgc2025regi` team pool (**10/10 legal**, built by the existing
+    `scripts/build_ou_teampool.py` with no new code) is staged and waiting on it.
 
 ---
 
