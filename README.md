@@ -936,6 +936,33 @@ neither M2 nor M3 exists here. **G4 is therefore neither greenlit nor descoped**
 that on doubles the cheap probe is *not decisive*, because every agent cheap enough to run before
 building the pipeline is a singles policy applied per slot.
 
+### Build 27 / Gate B — search does not compound on OU either, and the h2h says it is harmful
+
+L11–L14 retired test-time search at parity, but all of it was measured on gen9-RB — which Lever 15
+then proved **FORMAT_BOUND**, where near-optimal search reaches 0.500 because nothing beats the
+heuristic. That retirement was measured somewhere it could not have come out otherwise. Re-run on
+`gen9ou`, where headroom is proven and the base is 0.77, with the strongest arm available: depth-2
+expectimax, the **exact** white-box opponent model (the eval opponent *is* `HeuristicAgent`), same
+checkpoint both sides, n=2500/arm pooled from a 10-shard array. `results/rpredict_search_ou.json`.
+
+| | rate |
+|---|---|
+| base (greedy `v26b`) vs `heuristic` | 0.7688 |
+| depth-2 search vs `heuristic` | 0.7724 |
+| **contrast** | **+0.0036** (z 0.303, p 0.76) — positive in **6/10** shards |
+| search vs its own base, head-to-head | **0.3932** — below 0.500 in **10/10** shards |
+
+**NULL on the contrast — and the head-to-head is not a null.** Search loses to the policy it
+descends from by ~10.7 SE (p ≈ 1e-26). Both can be true because against an opponent that loses 77%
+there is slack for a slightly worse policy, while an opponent strong enough to punish it converts
+the same deviations into losses. **Measuring search only against the fixed baseline would have
+reported "no effect" and missed that the effect is negative.**
+
+This also closes the escape hatch L11/L12 named — "the opponent model was too weak". Here it is
+exact, the forward model is validated at **0 mismatches on this format** (Gate A′), and search
+still does not help. §16 Q2 is answered (ship policy-only) and **M7 closes**: six independent
+mechanisms now.
+
 ## Setup
 
 ```bash
