@@ -2891,6 +2891,49 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     steps arbitrary battles) or a doubles-competent reference to put at the top of the gradient.
     Recording the cost honestly is better than reading a suggestive M1 as a verdict it cannot bear.
 
+- **BUILD 27 / GATE B — SEARCH DOES NOT COMPOUND ON gen9ou EITHER (NULL), AND THE HEAD-TO-HEAD
+  SAYS IT IS MILDLY HARMFUL (2026-08-12).** L11–L14 retired test-time search at parity, but every
+  one of those ran on gen9-RB — which Lever 15 then proved FORMAT_BOUND, where near-optimal search
+  reaches 0.500 because *nothing* beats the heuristic. That retirement was therefore measured
+  somewhere it could not have come out otherwise. This re-runs it where headroom is proven and the
+  base is 0.77. Pre-registered before running; `results/rpredict_search_ou.json`.
+  - **THE ARM WAS THE STRONGEST ONE AVAILABLE, DELIBERATELY.** Depth-2 expectimax with
+    `opp_aggregation="model"` and the **white-box** opponent model — the eval opponent *is*
+    `HeuristicAgent`, so it is modeled exactly (L14 measured that model at 0.958 agreement). Same
+    checkpoint on both sides (`ppo_v26b_s0/iter_300`), so any gap is the search procedure and not
+    the weights. n = **2500/arm** (MDE ≈ 0.025, Build 26's resolution), pooled from a 10-shard
+    array because search is serial in its node driver at ~29 s/battle.
+  - **THE RESULT.**
+
+    | | rate | n |
+    |---|---|---|
+    | base (greedy `v26b`) vs `heuristic` | 0.7688 | 2500 |
+    | depth-2 search vs `heuristic` | 0.7724 | 2500 |
+    | **contrast** | **+0.0036** (z 0.303, p 0.76) | — |
+    | search vs its own base, head-to-head | **0.3932** | 2500 |
+    | search vs `random` (sanity) | 0.895 | 400 |
+
+    The contrast is **NULL**, and not marginally: it is positive in **6 of 10** shards, which is a
+    coin flip. **VERDICT: NULL** on the pre-registered rule.
+  - **THE HEAD-TO-HEAD IS THE REAL CONTENT, AND IT IS NOT A NULL.** Search loses to the greedy
+    policy it descends from at **0.3932** — **10.7 SE** below parity, p ≈ 1.3e-26, and below 0.500
+    in **10 of 10** shards. So search is not neutral: it is *worse*, unanimously.
+  - **WHY BOTH CAN BE TRUE, AND IT IS AN INTRANSITIVITY.** Search and its base are
+    indistinguishable against the heuristic while the base beats search decisively head-to-head.
+    Against an opponent that loses ~77% there is slack — a slightly worse policy still converts.
+    Against an opponent strong enough to punish them, the same deviations cost games. The lesson is
+    that **measuring search only against the fixed baseline would have reported "no effect" and
+    missed that the effect is negative**; it took scoring search against its own base to see it.
+    Note also that no single latent strength can represent this — exactly the limitation
+    `eval/ladder.py`'s Bradley-Terry docstring warns about.
+  - **THE ESCAPE HATCH L11/L12 NAMED IS NOW CLOSED.** Those builds retired search with "the
+    opponent model was too weak" as the stated residual. Here the opponent model is *exact*, the
+    forward model is validated at **0 mismatches on this very format** (Gate A′), the format has
+    proven headroom, and the base is the strongest checkpoint the project has. Search still does
+    not help. **§16 Q2 is answered — ship policy-only — and M7 closes on the record**: six
+    independent mechanisms (gradient, depth-1, depth-2, curriculum, real-opponent-model search, and
+    now depth-2-with-exact-model on a format with headroom).
+
 ---
 
 ## 14. Risks & mitigations
@@ -2924,7 +2967,16 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
    0.50), so G2 is unreachable there whatever the model. The MVP format is **`gen9ou`**, where the
    same diagnostic found genuine headroom (`simpleheuristics` 0.633, whole CI above the 0.58 bar).
    RB remains the format the pipeline was *built* on and every pre-OU build is reported against.
-2. **Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?
+2. ~~**Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?~~
+   **ANSWERED (Build 27 Gate B, 2026-08-12): POLICY-ONLY — and this time the answer is not
+   confounded by the format.** L11–L14 already found search at parity, but all of that was measured
+   on gen9-RB, which Lever 15 subsequently proved FORMAT_BOUND: near-optimal search reaches 0.500
+   there because nothing beats the heuristic, so the test could not have come out any other way.
+   Re-run on `gen9ou` — proven headroom, a 0.77 base, an *exact* white-box opponent model, and a
+   forward model validated at 0 mismatches on that format — depth-2 search comes back
+   **+0.0036 (p 0.76, positive in 6/10 shards) at n=2500/arm**. And it is worse than neutral: it
+   loses to the greedy policy it descends from **head-to-head at 0.3932, 10/10 shards, ~10.7 SE**.
+   Search is not the missing ingredient at this level of play; **M7 closes**.
 3. **Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?
 4. **Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)
 5. ~~**Eval environment:** stand up a private Showdown server for clean evaluation, or use anonymized non-ranked live play?~~
