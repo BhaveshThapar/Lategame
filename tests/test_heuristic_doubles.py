@@ -17,7 +17,7 @@ from poke_env.battle import Move, Pokemon, Status
 from poke_env.battle.double_battle import DoubleBattle
 from poke_env.player import DefaultBattleOrder, DoubleBattleOrder
 
-from lategame.agents.heuristic_agent import HeuristicAgent, best_target
+from lategame.agents.heuristic_agent import HeuristicAgent, best_target, doubles_pick
 
 
 class _FakeDoubleBattle(DoubleBattle):
@@ -28,9 +28,14 @@ class _FakeDoubleBattle(DoubleBattle):
     the four properties the decision reads are overridden instead.
     """
 
-    def __init__(self, active, opponent_active, moves, switches, targets=None):
+    def __init__(self, active, opponent_active, moves, switches, targets=None, force=None):
         self._a, self._oa, self._m, self._s = active, opponent_active, moves, switches
         self._targets = targets or {}
+        self._force = force or [False, False]
+
+    @property
+    def force_switch(self):
+        return self._force
 
     @property
     def active_pokemon(self):
@@ -180,3 +185,46 @@ def test_singles_is_untouched():
         [Pokemon(9, species="tangrowth")],
     )
     assert pick[0] == "move" and pick[1].id == "earthquake"
+
+
+def test_only_the_slot_being_asked_acts_on_a_partial_replacement():
+    """One active fainted, the other still standing: `force_switch` is [False, True] and ONLY that
+    slot may act. poke-env still populates `available_switches` for the OTHER slot, so a rule that
+    reads just that list emits an order the server REJECTS -- and poke-env then re-requests, which
+    measured as 28 choose_move calls for 10 turns and made 98% of collected turns unlabelable."""
+    bench = [Pokemon(9, species="tangrowth"), Pokemon(9, species="arcanine")]
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), None],
+        opponent_active=[Pokemon(9, species="pikachu"), None],
+        moves=[[Move("earthquake", 9)], []],
+        switches=[bench, bench],   # poke-env offers switches for BOTH slots...
+        force=[False, True],       # ...but only slot 1 is being asked
+    )
+    picks = doubles_pick(battle)
+    assert picks[0] is None, "slot 0 must pass -- it is not this slot's decision"
+    assert picks[1] is not None and isinstance(picks[1][0], Pokemon)
+
+
+def test_a_forced_slot_may_only_switch_never_move():
+    """A replacement request offers switches only; emitting a move there is rejected outright."""
+    bench = [Pokemon(9, species="tangrowth")]
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), Pokemon(9, species="magikarp")],
+        opponent_active=[Pokemon(9, species="pikachu"), None],
+        moves=[[Move("earthquake", 9)], [Move("splash", 9)]],
+        switches=[bench, bench],
+        force=[True, True],
+    )
+    for pick in doubles_pick(battle):
+        assert pick is None or isinstance(pick[0], Pokemon), f"forced slot must switch, got {pick}"
+
+
+def test_an_ordinary_turn_is_unaffected_by_the_force_switch_guard():
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), Pokemon(9, species="arcanine")],
+        opponent_active=[Pokemon(9, species="pikachu"), Pokemon(9, species="tangrowth")],
+        moves=[[Move("earthquake", 9)], [Move("flamethrower", 9)]],
+        switches=[[], []],
+    )
+    picks = doubles_pick(battle)
+    assert all(p is not None and isinstance(p[0], Move) for p in picks)

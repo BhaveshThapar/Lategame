@@ -139,6 +139,14 @@ def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
     """
     out: list[DoublesPick] = []
     claimed: set[str] = set()
+    # WHICH SLOTS ARE ACTUALLY BEING ASKED. On a partial replacement -- one active fainted, the
+    # other still standing -- `force_switch` is e.g. [False, True] and ONLY that slot may act; the
+    # other must `pass`. poke-env still populates `available_switches` for the unasked slot, so a
+    # rule that reads only that list produces an order the server REJECTS. It then re-requests,
+    # which is why an unfixed version showed 28 choose_move calls for 10 turns and made 98% of
+    # collected turns unlabelable. A forced slot may only switch, never move.
+    force = battle.force_switch if isinstance(battle.force_switch, list) else [False, False]
+    any_forced = any(force)
     foes = [
         (i, foe)
         for i, foe in enumerate(battle.opponent_active_pokemon)
@@ -146,8 +154,18 @@ def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
     ]
 
     for slot in (0, 1):
+        forced = force[slot] if slot < len(force) else False
+        if any_forced and not forced:
+            out.append(None)  # not this slot's decision -- it must pass
+            continue
         mon = battle.active_pokemon[slot] if slot < len(battle.active_pokemon) else None
-        moves = list(battle.available_moves[slot]) if slot < len(battle.available_moves) else []
+        moves = (
+            []
+            if forced  # a replacement request offers switches only
+            else list(battle.available_moves[slot])
+            if slot < len(battle.available_moves)
+            else []
+        )
         switches = [
             m
             for m in (
@@ -155,7 +173,10 @@ def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
             )
             if m.species not in claimed
         ]
-        if mon is None or (not moves and not switches):
+        # A FORCED slot has no active by definition -- that is what it is replacing -- so the
+        # "no mon here" guard must not fire on it, or the one slot being asked to act returns
+        # nothing and the server plays a default in its place.
+        if (mon is None and not forced) or (not moves and not switches):
             out.append(None)
             continue
 
@@ -169,6 +190,8 @@ def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
         if isinstance(decision, Pokemon):
             claimed.add(decision.species)
             out.append((decision, DoubleBattle.EMPTY_TARGET_POSITION))
+        elif mon is None:
+            out.append(None)  # unreachable: a move implies an active, but do not guess
         else:
             legal = battle.get_possible_showdown_targets(decision, mon)
             wanted = target[0] + 1 if target else DoubleBattle.EMPTY_TARGET_POSITION
