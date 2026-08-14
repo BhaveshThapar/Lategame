@@ -349,6 +349,7 @@ async def collect_trajectories(
     battle_format: str = DEFAULT_FORMAT,
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
+    team_pool: str | None = None,
 ) -> TrajectoryDataset:
     """Play every distinct pair in ``pool`` and return all turns + shaped rewards."""
     if len(pool) < 2:
@@ -362,9 +363,12 @@ async def collect_trajectories(
     done_chunks: list[bool] = []
     dropped = 0
 
-    for a, b in itertools.combinations(pool, 2):
-        pa = _build_recording_player(PlayerSpec(a), battle_format, weights)
-        pb = _build_recording_player(PlayerSpec(b), battle_format, weights)
+    make_team = _team_factory(team_pool)
+    for i, (a, b) in enumerate(itertools.combinations(pool, 2)):
+        pa = _build_recording_player(PlayerSpec(a), battle_format, weights, team=make_team(2 * i))
+        pb = _build_recording_player(
+            PlayerSpec(b), battle_format, weights, team=make_team(2 * i + 1)
+        )
         await cross_evaluate([pa, pb], n_challenges=n_per_pair)
         for player in (pa, pb):
             dropped += _append_episodes(
