@@ -22,6 +22,7 @@ from poke_env.player import (
 from poke_env.teambuilder.teambuilder import Teambuilder
 
 from lategame.agents.bc_agent import BCAgent
+from lategame.agents.doubles_agent import DoublesAgent
 from lategame.agents.heuristic_agent import HeuristicAgent
 from lategame.agents.offline_rl_agent import OfflineRLAgent
 from lategame.agents.ppo_agent import PPORecordingAgent
@@ -40,11 +41,16 @@ AGENTS: dict[str, type[Player]] = {
     "offrl": OfflineRLAgent,
     "ppo": PPORecordingAgent,
     "search": SearchAgent,
+    # G4/M6: the learned DOUBLES policy. Separate from `offrl` rather than a mode of it,
+    # because it reads a different encoder and a different action codec -- and the
+    # checkpoint fingerprint (d1-/888) makes loading the wrong one an error, not a
+    # silent mis-encode.
+    "doubles": DoublesAgent,
 }
 
 # Agents backed by a trained checkpoint accept ``checkpoint_path``/``sample`` kwargs;
 # the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
-_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search"}
+_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search", "doubles"}
 
 # Learned-policy agents whose constructors accept a Build-14 ``loop_penalty`` (LoopGuard);
 # ``search`` is checkpoint-backed but has no LoopGuard. ``LoopGuard(0.0)`` is exact identity,
@@ -53,15 +59,16 @@ _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
 
 # SINGLES-ONLY, AND THE FAILURE ON DOUBLES IS SILENT RATHER THAN LOUD.
 #
-# The LEARNED agents assume one active Pokemon per side: the 720-d encoder's OBS_LAYOUT has one
-# active slot per side, and `action_space` is built on `SinglesEnv.get_action_space_size(9)`
-# (27 actions, against doubles' 107 per slot x 2 slots). Making them doubles-capable is the G4/M6
-# build. On a `DoubleBattle` poke-env passes `active_pokemon` as a LIST, so a singles policy
-# reaches `list.types` and raises AttributeError.
+# The SINGLES learned agents assume one active Pokemon per side: the 761-d encoder's OBS_LAYOUT
+# has one active slot per side, and `action_space` is built on `SinglesEnv.get_action_space_size(9)`
+# (26 actions, against doubles' 107 per slot x 2 slots). On a `DoubleBattle` poke-env passes
+# `active_pokemon` as a LIST, so a singles policy reaches `list.types` and raises AttributeError.
 #
-# `heuristic` is NOT in this set: it gained a doubles path (a per-slot decision joined into a
-# DoubleBattleOrder) because the VGC ceiling probe needs two agents near the top of the doubles
-# skill gradient and poke-env supplies exactly one.
+# Two agents are NOT in this set because they were made doubles-capable (G4/M6):
+#   * `heuristic` -- a per-slot decision joined into a DoubleBattleOrder, built because the VGC
+#     ceiling probe needs two agents near the top of the doubles gradient and poke-env supplies one.
+#   * `doubles`   -- the learned per-slot policy over the 888-d doubles encoder and the 2x107
+#     factored action codec.
 #
 # That exception never reaches a caller. poke-env dispatches every protocol message through
 # `asyncio.create_task` and only calls `add_done_callback(discard)` -- nobody retrieves the result
@@ -74,6 +81,7 @@ _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
 # than at choose-move time where it would vanish. poke-env's own baselines branch on `DoubleBattle`
 # and are safe (`RandomPlayer`, `MaxBasePowerPlayer`, `SimpleHeuristicsPlayer`).
 _SINGLES_ONLY_AGENTS = {"bc", "offrl", "ppo", "search"}
+
 
 def _singles_only_agents() -> set[str]:
     """``_SINGLES_ONLY_AGENTS``, minus ``search`` when it is running WITHOUT a trained model.
