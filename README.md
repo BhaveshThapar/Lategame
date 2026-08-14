@@ -963,6 +963,35 @@ exact, the forward model is validated at **0 mismatches on this format** (Gate A
 still does not help. §16 Q2 is answered (ship policy-only) and **M7 closes**: six independent
 mechanisms now.
 
+### G4 MET — three formats play end to end through one core
+
+The doubles pipeline (G4/M6) is in: a per-slot action codec, a doubles encoder, and a learned
+doubles agent. Verified against a live local server, 6/6 battles completed on each:
+
+| format | agent | vs `random` | finished |
+|---|---|---|---|
+| `gen9randombattle` (singles random) | `heuristic` | 1.000 | 6/6 |
+| `gen9ou` (singles teambuilt) | `offrl` @ `v26b` | 1.000 | 6/6 |
+| `gen9vgc2025regi` (**doubles**) | `doubles` @ init | 0.667 | 6/6 |
+
+**"Without rewriting the core" is the substantive half of that goal, and it held.** The model
+factory needed *no change*: `build_model` already read `input_dim`/`n_actions` from checkpoint
+metadata, so the doubles network is the same architecture at a different width. The only genuine
+edit to shared code was making `EntityTransformer` take its token layout as a parameter rather than
+importing the singles constant — and it resolves that layout from `input_dim`, so every existing
+checkpoint still builds exactly the model it always did.
+
+**The action space is factored: 2 × 107, not a joint 11,449.** What factoring cannot express is a
+constraint coupling the slots, and exactly one matters — both slots switching to the same benched
+Pokemon. Showdown answers that with a *default move rather than an error*, so it is a silently lost
+turn; it is resolved explicitly after sampling rather than by the mask.
+
+Singles is frozen and pinned by test (`OBS_DIM` 761, `OBS_VERSION` `v5-`, 26 actions). Doubles is
+separately versioned (`d1-`, 888-d) on both fields, so a cross-format shard is rejected on either.
+
+*Not claimed:* the doubles checkpoint is randomly initialised. G4's exit is "playable end to end";
+VGC strength is a separate question and the 0.667 is 6 battles of an untrained policy.
+
 ## Setup
 
 ```bash
