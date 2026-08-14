@@ -63,3 +63,55 @@ class BCPolicy(nn.Module):
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         return self.net(obs)
+
+
+# --------------------------------------------------------------------------- #
+# Factored (doubles) policy helpers -- G4/M6.
+#
+# A doubles turn commits BOTH active slots, so the head emits `n_slots * slot_actions` logits read
+# as that many independent distributions rather than one joint one. A joint head would be
+# 107^2 = 11,449 outputs; factoring is what makes a third format trainable at all, and the cost is
+# that the two slots are modelled as independent when in one respect they are not (see
+# `agents.doubles_agent.resolve_switch_conflict`).
+# --------------------------------------------------------------------------- #
+def factored_logits(logits: torch.Tensor, n_slots: int = 2) -> torch.Tensor:
+    """Reshape a flat ``(B, n_slots * A)`` head into per-slot ``(B, n_slots, A)``."""
+    return logits.reshape(logits.shape[0], n_slots, -1)
+
+
+def factored_masked_logits(logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Per-slot masking. ``logits`` ``(B, n_slots, A)``, ``mask`` ``(B, n_slots, A)``.
+
+    A slot with NO legal action (an empty field slot) would otherwise be all ``NEG_INF``, which is
+    a uniform distribution over illegal actions rather than an error. `pass` (action 0) is always
+    re-enabled for such a slot, because that is the order the server actually accepts there.
+    """
+    out = logits.masked_fill(~mask, NEG_INF)
+    dead = ~mask.any(dim=-1)  # (B, n_slots)
+    if dead.any():
+        out = out.clone()
+        out[..., 0] = torch.where(dead, torch.zeros_like(out[..., 0]), out[..., 0])
+    return out
+
+
+def factored_cross_entropy(logits: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    """Summed per-slot cross-entropy. ``logits`` ``(B, S, A)``, ``action`` ``(B, S)``.
+
+    Summed rather than averaged over slots: each slot is a separate decision the demonstrator
+    made, and averaging would halve the gradient on a turn where both slots matter.
+    """
+    b, s, a = logits.shape
+    return torch.nn.functional.cross_entropy(logits.reshape(b * s, a), action.reshape(b * s)) * s
+
+
+def factored_accuracy(logits: torch.Tensor, action: torch.Tensor) -> tuple[int, int]:
+    """``(turns where BOTH slots match, slot-level matches)``.
+
+    Both are reported because they answer different questions: per-slot accuracy is the training
+    signal's own scale, while the strict both-slots number is what "imitates the demonstrator's
+    TURN" means -- and on a factored head the second is much harder than the first.
+    """
+    pred = logits.argmax(dim=-1)
+    per_slot = int((pred == action).sum().item())
+    both = int((pred == action).all(dim=-1).sum().item())
+    return both, per_slot

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 from poke_env.battle import DoubleBattle, Pokemon
+from poke_env.environment.doubles_env import DoublesEnv
 from poke_env.player import DefaultBattleOrder, ForfeitBattleOrder
 
 from lategame.features.doubles_action_space import (
@@ -161,3 +162,40 @@ def test_a_move_action_reindexes_symmetrically():
                 pe = _reindex_move_action(ours, b, slot, to_canonical=False)
                 back = _reindex_move_action(pe, b, slot, to_canonical=True)
                 assert back == ours, (slot, move_idx, target, ours, pe, back)
+
+
+def test_a_half_default_becomes_a_pass_not_a_sentinel():
+    """poke-env maps a DefaultBattleOrder HALF to -2 -- its whole-order sentinel -- but -2 has no
+    meaning per slot, where "this slot does nothing" is action 0 (`pass`) in its own documented
+    layout. 96% of collected VGC turns carry one such half (every partial replacement), and
+    cross-entropy rejects them outright: `Target -2 is out of bounds`."""
+    from lategame.features.doubles_action_space import normalize_half_default
+
+    assert list(normalize_half_default(np.array([12, -2]))) == [12, 0]
+    assert list(normalize_half_default(np.array([-2, 5]))) == [0, 5]
+    # A WHOLE default is a real "no decision" and must keep its sentinel for callers to drop.
+    assert list(normalize_half_default(np.array([-2, -2]))) == [-2, -2]
+    assert list(normalize_half_default(np.array([-1, -1]))) == [-1, -1]
+    assert list(normalize_half_default(np.array([7, 9]))) == [7, 9]
+
+
+def test_a_whole_default_order_keeps_its_sentinel():
+    """Only a HALF-default is a pass; a whole DefaultBattleOrder still means 'no decision' and is
+    dropped by callers rather than learned."""
+    assert list(order_to_action(DefaultBattleOrder(), _battle())) == [-2, -2]
+
+
+def test_the_mask_reads_poke_envs_per_index_flags_not_its_values():
+    """`get_action_mask_individual` returns a length-107 0/1 mask indexed BY ACTION, not a list of
+    legal indices. Iterating its values gave a 2-legal-action mask on a turn with 4 moves and 2
+    switches -- which made 91% of collected slot-1 labels illegal under their own mask and drove
+    BC's loss to 9.4e8, the model being trained toward a masked-out target."""
+    b = _battle()
+    ours = action_mask(b)
+    for pos in (0, 1):
+        raw = DoublesEnv.get_action_mask_individual(b, pos)
+        assert len(raw) == GEN9_DOUBLES_SLOT_ACTIONS, "poke-env returns a per-index mask"
+        assert int(ours[pos].sum()) == sum(raw), (
+            f"slot {pos}: we marked {int(ours[pos].sum())} legal, poke-env says {sum(raw)}"
+        )
+    assert ours.sum() > 8, "two healthy actives with 4 moves each must offer well over 8 actions"

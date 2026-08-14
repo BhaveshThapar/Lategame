@@ -19,7 +19,7 @@ genuine PRD path) would drop in here without touching the model or training code
 from __future__ import annotations
 
 import itertools
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,8 +30,7 @@ from poke_env.player import BattleOrder, Player, cross_evaluate
 from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
 from lategame.data.reward import RewardWeights, state_value
 from lategame.eval.arena import _CHECKPOINT_AGENTS, AGENTS, _unique_username
-from lategame.features.action_space import action_mask, order_to_action
-from lategame.features.encoder import OBS_DIM, OBS_VERSION, embed_battle
+from lategame.features.codec import codec_for, codec_for_battle
 
 _Record = tuple[np.ndarray, int, np.ndarray]
 _Episode = tuple[list[_Record], list[float]]  # one battle's records + per-turn rewards
@@ -65,9 +64,14 @@ class _RecordingMixin:
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
         order = super().choose_move(battle)  # type: ignore[misc]
         try:
-            obs = embed_battle(battle)
-            action = order_to_action(order, battle)
-            mask = action_mask(battle)
+            # Per-format codec, read off the battle itself: a doubles turn records a (2,)
+            # per-slot action and a (2, 107) mask, a singles turn a scalar and (26,). The
+            # shapes deliberately differ -- flattening doubles into one 11,449-way index would
+            # erase the factoring that makes it tractable.
+            codec = codec_for_battle(battle)
+            obs = codec.embed(battle)
+            action = codec.order_to_action(order, battle)
+            mask = codec.action_mask(battle)
         except Exception:
             self.dropped += 1
             return order
@@ -106,6 +110,7 @@ def _build_recording_player(
     battle_format: str,
     weights: RewardWeights | None = None,
     max_concurrent: int = 1,
+    team: object | None = None,
 ) -> Player:
     if spec.name not in AGENTS:
         raise ValueError(f"Unknown agent '{spec.name}'. Choose from: {', '.join(AGENTS)}")
@@ -120,6 +125,10 @@ def _build_recording_player(
     # bottleneck). Default 1 keeps M2/M3 collection behaviour unchanged.
     if max_concurrent > 1:
         extra["max_concurrent_battles"] = max_concurrent
+    # A teambuilt format (gen9ou, VGC) needs a team; Random Battles must NOT get one, since the
+    # server supplies them there. Same convention as eval.arena.build_player.
+    if team is not None:
+        extra["team"] = team
     player = cls(
         account_configuration=local_account(_unique_username(f"rec{spec.name}")),
         battle_format=battle_format,
@@ -129,6 +138,30 @@ def _build_recording_player(
     if weights is not None:
         player._reward_weights = weights  # type: ignore[attr-defined]
     return player
+
+
+def _is_learnable(action: np.ndarray | int, mask: np.ndarray) -> bool:
+    """Whether a recorded turn carries a decision worth training on.
+
+    Two rejections, both measured on real VGC collection rather than assumed:
+
+    * **The label must be legal under its own mask.** 2 rows in 51,650 were not, and each
+      contributes ~1e9 to cross-entropy (the target sits at ``NEG_INF``), which alone drove BC's
+      reported train loss to 43,024 while validation sat at 0.04.
+    * **The turn must offer a choice.** On doubles, 98.4% of recorded turns had exactly ONE legal
+      action per slot -- forced replacements and unasked slots -- because poke-env calls
+      ``choose_move`` for those too. Training on them is not imitation, it is copying the only
+      option, and it inflated accuracy to 0.988 against ~19 legal actions per slot on the 1.6% of
+      turns that were real decisions. Singles hits this far less, which is why it never surfaced.
+    """
+    if mask.ndim == 1:  # singles: scalar action, (A,) mask
+        a = int(action)
+        return bool(0 <= a < mask.shape[0] and mask[a] and mask.sum() > 1)
+    for i in range(mask.shape[0]):
+        a = int(action[i])  # type: ignore[index]
+        if not (0 <= a < mask.shape[1] and bool(mask[i][a])):
+            return False
+    return bool(mask.sum(axis=1).max() > 1)  # at least one slot faced a real choice
 
 
 def _winning_records(player: Player) -> list[_Record]:
@@ -152,10 +185,21 @@ class Dataset:
         return len(self.action)
 
 
+def _team_factory(team_pool: str | None) -> Callable[[int], object | None]:
+    """A fresh ``TeamPool`` per player, seeded distinctly so the two sides draw independently."""
+    if not team_pool:
+        return lambda _seed: None
+    from lategame.teambuilding.pool import TeamPool
+
+    teams = TeamPool.from_packed_file(team_pool).teams
+    return lambda seed: TeamPool(teams, seed=seed)
+
+
 async def collect(
     pool: list[str],
     n_per_pair: int,
     battle_format: str = DEFAULT_FORMAT,
+    team_pool: str | None = None,
 ) -> Dataset:
     """Play every distinct pair in ``pool`` and return winners' ``(obs, action, mask)``."""
     if len(pool) < 2:
@@ -166,13 +210,17 @@ async def collect(
     mask_chunks: list[np.ndarray] = []
     dropped = 0
 
-    for a, b in itertools.combinations(pool, 2):
-        pa = _build_recording_player(PlayerSpec(a), battle_format)
-        pb = _build_recording_player(PlayerSpec(b), battle_format)
+    make_team = _team_factory(team_pool)
+    for i, (a, b) in enumerate(itertools.combinations(pool, 2)):
+        pa = _build_recording_player(PlayerSpec(a), battle_format, team=make_team(2 * i))
+        pb = _build_recording_player(PlayerSpec(b), battle_format, team=make_team(2 * i + 1))
         await cross_evaluate([pa, pb], n_challenges=n_per_pair)
         for player in (pa, pb):
             dropped += player.dropped  # type: ignore[attr-defined]
             for obs, action, mask in _winning_records(player):
+                if not _is_learnable(action, mask):
+                    dropped += 1
+                    continue
                 obs_chunks.append(obs)
                 action_chunks.append(action)
                 mask_chunks.append(mask)
@@ -183,7 +231,7 @@ async def collect(
     print(f"collected {len(obs_chunks)} winning turns ({dropped} unlabelable turns dropped)")
     return Dataset(
         obs=np.stack(obs_chunks).astype(np.float32),
-        action=np.asarray(action_chunks, dtype=np.int64),
+        action=np.asarray(action_chunks, dtype=np.int64),  # [K] or [K, 2]
         mask=np.stack(mask_chunks).astype(bool),
         battle_format=battle_format,
     )
@@ -197,8 +245,8 @@ def save(dataset: Dataset, path: str | Path) -> None:
         obs=dataset.obs,
         action=dataset.action,
         mask=dataset.mask,
-        obs_version=np.array(OBS_VERSION),
-        obs_dim=np.array(OBS_DIM),
+        obs_version=np.array(codec_for(dataset.battle_format).obs_version),
+        obs_dim=np.array(codec_for(dataset.battle_format).obs_dim),
         battle_format=np.array(dataset.battle_format),
     )
     print(f"wrote {len(dataset)} samples to {path}")
@@ -285,7 +333,7 @@ def _trajectory_dataset(
         raise RuntimeError("No finished trajectories collected -- is the local server running?")
     return TrajectoryDataset(
         obs=np.stack(obs_chunks).astype(np.float32),
-        action=np.asarray(action_chunks, dtype=np.int64),
+        action=np.asarray(action_chunks, dtype=np.int64),  # [K] or [K, 2]
         mask=np.stack(mask_chunks).astype(bool),
         reward=np.asarray(reward_chunks, dtype=np.float32),
         done=np.asarray(done_chunks, dtype=bool),
@@ -393,8 +441,8 @@ def save_rl(dataset: TrajectoryDataset, path: str | Path) -> None:
         mask=dataset.mask,
         reward=dataset.reward,
         done=dataset.done,
-        obs_version=np.array(OBS_VERSION),
-        obs_dim=np.array(OBS_DIM),
+        obs_version=np.array(codec_for(dataset.battle_format).obs_version),
+        obs_dim=np.array(codec_for(dataset.battle_format).obs_dim),
         battle_format=np.array(dataset.battle_format),
         gamma=np.array(dataset.gamma, dtype=np.float32),
         hp_value=np.array(w.hp_value, dtype=np.float32),
@@ -425,12 +473,25 @@ def concat_rl_shards(paths: Sequence[str | Path], out: str | Path) -> Trajectory
     gamma = 0.99
     weights = RewardWeights()
 
+    fingerprint: tuple[str, int] | None = None
     for p in paths:
         data = np.load(Path(p), allow_pickle=False)
         version, dim = str(data["obs_version"].item()), int(data["obs_dim"].item())
-        if version != OBS_VERSION or dim != OBS_DIM:
+        # Shards must agree WITH EACH OTHER rather than with the singles constants: a doubles
+        # buffer is legitimately (d1-, 888) and could otherwise never be concatenated. The check
+        # still catches the case that matters -- mixing encoders inside one buffer.
+        expected = codec_for(str(data["battle_format"].item())) if "battle_format" in data else None
+        if expected is not None and (version, dim) != (expected.obs_version, expected.obs_dim):
             raise ValueError(
-                f"Shard {p} encoder mismatch ({version}/{dim} vs {OBS_VERSION}/{OBS_DIM})."
+                f"Shard {p} encoder mismatch ({version}/{dim} vs "
+                f"{expected.obs_version}/{expected.obs_dim} for {data['battle_format'].item()})."
+            )
+        if fingerprint is None:
+            fingerprint = (version, dim)
+        elif (version, dim) != fingerprint:
+            raise ValueError(
+                f"Shard {p} encoder ({version}/{dim}) differs from the first shard's "
+                f"{fingerprint[0]}/{fingerprint[1]} -- refusing to mix encoders in one buffer."
             )
         obs.append(data["obs"])
         action.append(data["action"])

@@ -99,6 +99,21 @@ def _reindex_move_action(action: int, battle: DoubleBattle, pos: int, to_canonic
     return _MOVE_BASE + gimmick * _N_MOVES * _N_TARGETS + move_idx * _N_TARGETS + target
 
 
+def normalize_half_default(action: np.ndarray) -> np.ndarray:
+    """A HALF-default is a ``pass``; a WHOLE default keeps its sentinel.
+
+    poke-env maps a ``DefaultBattleOrder`` half to -2, its whole-order sentinel, but -2 has no
+    meaning in the per-slot layout -- where "this slot does nothing" is action 0, ``pass``, exactly
+    as poke-env's own documented layout says. Left alone, **96% of collected VGC turns** carry one
+    -2 half (every partial replacement, and every turn with a single active), and cross-entropy
+    rejects them outright: ``Target -2 is out of bounds``.
+    """
+    negative = action < 0
+    if negative.any() and not negative.all():
+        return np.where(negative, 0, action)
+    return action
+
+
 def order_to_action(order: BattleOrder, battle: AbstractBattle) -> np.ndarray:
     """Label a demonstrator's doubles ``order`` with its per-slot action pair.
 
@@ -112,10 +127,11 @@ def order_to_action(order: BattleOrder, battle: AbstractBattle) -> np.ndarray:
     if isinstance(order, ForfeitBattleOrder):
         return np.array([-1, -1], dtype=np.int64)
     pe = DoublesEnv.order_to_action(order, b, strict=True)
-    return np.array(
+    out = np.array(
         [_reindex_move_action(int(pe[i]), b, i, to_canonical=True) for i in (0, 1)],
         dtype=np.int64,
     )
+    return normalize_half_default(out)
 
 
 def action_to_order(action: np.ndarray, battle: AbstractBattle) -> BattleOrder:
@@ -147,9 +163,15 @@ def action_mask(battle: AbstractBattle) -> np.ndarray:
     n = slot_actions(b)
     mask = np.zeros((2, n), dtype=bool)
     for pos in (0, 1):
-        for a in DoublesEnv.get_action_mask_individual(b, pos):
-            if 0 <= a < n:
-                mask[pos, _reindex_move_action(int(a), b, pos, to_canonical=True)] = True
+        # `get_action_mask_individual` returns a length-107 0/1 mask PER ACTION INDEX
+        # (`int(i in actions)`), not a list of legal indices. Iterating its VALUES instead of its
+        # positions silently produced a 2-legal-action mask on a turn with 4 moves and 2 switches,
+        # which made 91% of collected slot-1 labels illegal under their own mask and drove BC's
+        # loss to 9.4e8 -- the model being pushed toward a masked-out target.
+        raw = DoublesEnv.get_action_mask_individual(b, pos)
+        for index, legal in enumerate(raw):
+            if legal:
+                mask[pos, _reindex_move_action(index, b, pos, to_canonical=True)] = True
     return mask
 
 
@@ -177,6 +199,7 @@ def decode_pokemon(action: int, battle: AbstractBattle) -> Pokemon | None:
 
 __all__ = [
     "GEN9_DOUBLES_ACTION_SPACE_SIZE",
+    "normalize_half_default",
     "GEN9_DOUBLES_SLOT_ACTIONS",
     "action_mask",
     "action_to_order",

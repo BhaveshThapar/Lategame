@@ -20,9 +20,18 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset, random_split
 
 from lategame.data.dataset import BCDataset
-from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION
+from lategame.features.codec import FormatCodec, codec_for
+from lategame.features.encoder import OBS_LAYOUT
 from lategame.model.factory import build_model, model_metadata
-from lategame.model.policy import BCPolicy, masked_logits, policy_logits
+from lategame.model.policy import (
+    BCPolicy,
+    factored_accuracy,
+    factored_cross_entropy,
+    factored_logits,
+    factored_masked_logits,
+    masked_logits,
+    policy_logits,
+)
 from lategame.train.augment import augment_pp_full, augment_pp_noise, augment_pp_resample
 
 BC_POLICY = "bc_policy"  # model_type sentinel for the flat MLP (factory has no BCPolicy).
@@ -82,13 +91,24 @@ def _subset(dataset: BCDataset, max_samples: int | None) -> BCDataset | Subset:
     return Subset(dataset, indices)
 
 
-def _build_model(config: TrainConfig, device: torch.device) -> nn.Module:
-    """BC_POLICY -> flat MLP (legacy default); anything else -> factory architecture."""
+def _build_model(config: TrainConfig, device: torch.device, codec: FormatCodec) -> nn.Module:
+    """BC_POLICY -> flat MLP (legacy default); anything else -> factory architecture.
+
+    Width comes from the CODEC, not from the singles constants: a doubles run is the same
+    architecture at 888-d input and a 214-wide factored head. Singles resolves to exactly the
+    values it always used, so no existing run changes.
+    """
     if config.model_type == BC_POLICY:
-        return BCPolicy(OBS_DIM, hidden_dim=config.hidden_dim, dropout=config.dropout).to(device)
+        return BCPolicy(
+            codec.obs_dim,
+            hidden_dim=config.hidden_dim,
+            n_actions=codec.n_actions,
+            dropout=config.dropout,
+        ).to(device)
     meta = {
         "model_type": config.model_type,
-        "input_dim": OBS_DIM,
+        "input_dim": codec.obs_dim,
+        "n_actions": codec.n_actions,
         "dropout": config.dropout,
         "hidden_dim": config.hidden_dim,
         "arch": {
@@ -106,8 +126,14 @@ def _run_epoch(
     device: torch.device,
     optimizer: torch.optim.Optimizer | None,
     config: TrainConfig,
+    codec: FormatCodec | None = None,
 ) -> tuple[float, float]:
-    """Returns (mean loss, accuracy). Trains when ``optimizer`` is given, else evals."""
+    """Returns (mean loss, accuracy). Trains when ``optimizer`` is given, else evals.
+
+    On a FACTORED (doubles) codec the accuracy reported is the strict one -- both slots correct --
+    because that is what imitating the demonstrator's TURN means. Per-slot accuracy is higher and
+    would flatter the model.
+    """
     training = optimizer is not None
     model.train(training)
     total_loss = 0.0
@@ -128,14 +154,23 @@ def _run_epoch(
                 obs = augment_pp_noise(obs, action, OBS_LAYOUT, std=config.pp_noise_std)
             if training and config.pp_resample_frac > 0.0:
                 obs = augment_pp_resample(obs, action, OBS_LAYOUT, frac=config.pp_resample_frac)
-            logits = masked_logits(policy_logits(model(obs)), mask)
-            loss = F.cross_entropy(logits, action)
+            raw = policy_logits(model(obs))
+            if codec is not None and codec.factored:
+                logits = factored_masked_logits(factored_logits(raw, mask.shape[1]), mask)
+                loss = factored_cross_entropy(logits, action)
+            else:
+                logits = masked_logits(raw, mask)
+                loss = F.cross_entropy(logits, action)
             if optimizer is not None:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             total_loss += loss.item() * obs.shape[0]
-            correct += int((logits.argmax(dim=1) == action).sum().item())
+            if codec is not None and codec.factored:
+                both, _per_slot = factored_accuracy(logits, action)
+                correct += both
+            else:
+                correct += int((logits.argmax(dim=1) == action).sum().item())
             count += obs.shape[0]
     return total_loss / count, correct / count
 
@@ -147,6 +182,8 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
 
     dataset = BCDataset(data_path)
     battle_format = dataset.battle_format
+    codec = codec_for(battle_format)
+    print(f"codec: {codec.name} (obs {codec.obs_dim}, {codec.n_actions} logits)")
     data = _subset(dataset, config.max_samples)
     print(f"training on {len(data)}/{len(dataset)} samples")
     n_val = max(1, int(len(data) * config.val_frac))
@@ -156,14 +193,14 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
-    model = _build_model(config, device)
+    model = _build_model(config, device, codec)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 
     best_val = float("inf")
     best_metrics: dict = {}
     for epoch in range(1, config.epochs + 1):
-        train_loss, train_acc = _run_epoch(model, train_loader, device, optimizer, config)
-        val_loss, val_acc = _run_epoch(model, val_loader, device, None, config)
+        train_loss, train_acc = _run_epoch(model, train_loader, device, optimizer, config, codec)
+        val_loss, val_acc = _run_epoch(model, val_loader, device, None, config, codec)
         print(
             f"epoch {epoch:>3}/{config.epochs}  "
             f"train loss {train_loss:.4f} acc {train_acc:.3f}  "
@@ -172,7 +209,7 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
         if val_loss < best_val:
             best_val = val_loss
             best_metrics = {"epoch": epoch, "val_loss": val_loss, "val_acc": val_acc}
-            _save_checkpoint(model, out_path, battle_format, config, best_metrics)
+            _save_checkpoint(model, out_path, battle_format, config, best_metrics, codec)
 
     print(f"best: {best_metrics}")
     return best_metrics
@@ -184,8 +221,10 @@ def _save_checkpoint(
     battle_format: str,
     config: TrainConfig,
     metrics: dict,
+    codec: FormatCodec | None = None,
 ) -> None:
     out_path = Path(out_path)
+    codec = codec or codec_for(battle_format)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(model, BCPolicy):
         meta = {
@@ -198,8 +237,8 @@ def _save_checkpoint(
     torch.save(
         {
             "state_dict": model.state_dict(),
-            "input_dim": OBS_DIM,
-            "obs_version": OBS_VERSION,
+            "input_dim": codec.obs_dim,
+            "obs_version": codec.obs_version,
             "battle_format": battle_format,
             "metrics": metrics,
             "pp_aug": {"frac": config.pp_aug_frac, "turn_threshold": config.pp_aug_turn_threshold},
