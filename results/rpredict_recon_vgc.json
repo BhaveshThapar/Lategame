@@ -7,100 +7,102 @@
   "opponent": "heuristic",
   "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
   "pass_rate": 0.99,
-  "snapshots": 178,
+  "snapshots": 698,
   "errored": 0,
-  "checks": 7564,
-  "mismatches": 33,
-  "match_rate": 0.995637,
+  "checks": 29984,
+  "mismatches": 27,
+  "match_rate": 0.9991,
   "by_field": {
     "active": {
-      "mismatch": 27,
-      "total": 1228,
-      "rate": 0.978
+      "mismatch": 21,
+      "total": 4880,
+      "rate": 0.9957
     },
     "boosts": {
       "mismatch": 6,
-      "total": 1228,
-      "rate": 0.9951
+      "total": 4880,
+      "rate": 0.9988
     },
     "fainted": {
       "mismatch": 0,
-      "total": 1228,
+      "total": 4880,
       "rate": 1.0
     },
     "hazards": {
       "mismatch": 0,
-      "total": 356,
+      "total": 1396,
       "rate": 1.0
     },
     "hp": {
       "mismatch": 0,
-      "total": 1228,
+      "total": 4880,
       "rate": 1.0
     },
     "present": {
       "mismatch": 0,
-      "total": 712,
+      "total": 2792,
       "rate": 1.0
     },
     "status": {
       "mismatch": 0,
-      "total": 1228,
+      "total": 4880,
       "rate": 1.0
     },
     "terrain": {
       "mismatch": 0,
-      "total": 178,
+      "total": 698,
       "rate": 1.0
     },
     "weather": {
       "mismatch": 0,
-      "total": 178,
+      "total": 698,
       "rate": 1.0
     }
   },
   "samples": [
     {
       "diffs": [
-        "p2.ogerponhearthflame.active pe=False drv=True"
+        "p2.chienpao.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p2.terapagos.active pe=False drv=True"
+        "p2.chienpao.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p2.amoonguss.active pe=False drv=True"
+        "p2.farigiraf.active pe=False drv=True"
       ]
     },
     {
       "diffs": [
-        "p2.amoonguss.active pe=False drv=True",
-        "p2.fluttermane.boosts pe={'atk': -1} drv={}"
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.ogerponwellspring.active pe=False drv=True",
+        "p2.incineroar.boosts pe={'atk': -1, 'spa': -1} drv={}"
       ]
     },
     {
       "diffs": [
         "p2.rillaboom.active pe=False drv=True",
         "p2.incineroar.boosts pe={'atk': -1} drv={}"
-      ]
-    },
-    {
-      "diffs": [
-        "p2.rillaboom.active pe=False drv=True",
-        "p2.incineroar.boosts pe={'atk': -1} drv={}"
-      ]
-    },
-    {
-      "diffs": [
-        "p2.ironhands.active pe=False drv=True"
-      ]
-    },
-    {
-      "diffs": [
-        "p2.ironhands.active pe=False drv=True"
       ]
     }
   ],
