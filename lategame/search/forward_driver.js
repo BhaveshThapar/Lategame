@@ -479,6 +479,15 @@ function step(serialized, p1, p2) {
 		ended: !!fork.ended,
 		winner: fork.winner ?? null,
 		state: State.serializeBattle(fork),
+		// The same observable digest `reconstruct` returns, now also at the post-step node.
+		//
+		// It is here so a SHAPED leaf can be scored without building a poke-env Battle at all.
+		// `data.reward.state_value` reads only per-mon hp / fainted / status, the two team sizes
+		// and the winner -- every one of which is in this digest. The alternative path (deepcopy
+		// the live battle, feed the delta line by line, then read the same fields off it) measured
+		// ~170 ms per node against ~1 ms for the RPC, which is what made a depth-2 VGC search cost
+		// ~190 s/battle and put M2 out of reach.
+		digest: digest(fork),
 	};
 }
 

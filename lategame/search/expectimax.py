@@ -30,7 +30,7 @@ from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder, SingleBattleOrder
 
 from lategame.data.resim import _feed_line
-from lategame.data.reward import RewardWeights, state_value
+from lategame.data.reward import RewardWeights, digest_state_value, state_value
 from lategame.features.action_space import action_mask
 from lategame.features.encoder import embed_battle
 from lategame.search.determinize import battle_to_spec
@@ -61,6 +61,10 @@ class LeafPolicy(Protocol):
     def value(self, battle: AbstractBattle) -> float: ...
 
     def action_log_probs(self, battle: AbstractBattle) -> dict[int, float]: ...
+
+    def digest_value(self, res: dict[str, Any], shaped_coef: float) -> float | None:
+        """Leaf value straight from a step result's digest, or ``None`` to use the battle path."""
+        ...
 
 
 @dataclass
@@ -219,6 +223,14 @@ def _node_value(
         if winner == "p2":
             return pv.v_min
         return 0.0
+    if depth <= 0:
+        # A leaf that can be scored from the digest skips building a poke-env node entirely --
+        # deepcopy + delta replay is ~170x the RPC that produced the digest. Interior nodes still
+        # need a real battle (the opponent model and the action priors both read one), but at
+        # depth 2 the leaves are 4 of every 5 nodes, so this is where the cost lives.
+        from_digest = pv.digest_value(res, cfg.shaped_coef)
+        if from_digest is not None:
+            return from_digest
     node = _node_battle(pv, live, res, role)
     if depth <= 0:
         return _leaf_eval(pv, node, cfg.shaped_coef)
@@ -441,6 +453,17 @@ class ShapedOnlyPolicy:
     def action_log_probs(self, battle: AbstractBattle) -> dict[int, float]:
         return {}  # no priors; _top_k_by_prior falls back to its static ranking
 
+    def digest_value(self, res: dict[str, Any], shaped_coef: float) -> float | None:
+        """The whole point of this policy: score the leaf without a poke-env battle.
+
+        Returns ``None`` only if the driver did not supply a digest (an older driver), so the
+        caller silently falls back to the battle path rather than losing the node.
+        """
+        digest = res.get("digest")
+        if not digest:
+            return None
+        return shaped_coef * digest_state_value(digest, _WEIGHTS, winner=res.get("winner"))
+
 
 class PolicyValue:
     """Wraps the frozen GREEN model: policy logits, V(s), and leaf deepcopy, torch hidden inside."""
@@ -473,6 +496,10 @@ class PolicyValue:
 
     def deepcopy_battle(self, battle: AbstractBattle) -> AbstractBattle:
         return self._copy.deepcopy(battle)
+
+    def digest_value(self, res: dict[str, Any], shaped_coef: float) -> float | None:
+        """Not available: this leaf is ``V(s)`` from ``embed_battle``, which needs a real battle."""
+        return None
 
     def value(self, battle: AbstractBattle) -> float:
         torch = self._torch
