@@ -52,9 +52,18 @@ class _FakeDoubleBattle(DoubleBattle):
         self._teampreview = False
         self._finished = False
         self._player_role = 'p1'
-        self._opponent_active_pokemon = {}
         self._active_pokemon = {'p1a': active[0], 'p1b': active[1]}
         self._reviving = False
+        # Read by the doubles encoder (features/doubles_encoder).
+        self._opponent_team = {}
+        self._teampreview_opponent_team = []
+        self._weather = {}
+        self._fields = {}
+        self._side_conditions = {}
+        self._opponent_side_conditions = {}
+        self._turn = 3
+        self._can_tera = [None, None]
+        self._opponent_active_pokemon = {}
         self._maybe_trapped = [False, False]
         self._trapped = [False, False]
         self._force_switch = [False, False]
