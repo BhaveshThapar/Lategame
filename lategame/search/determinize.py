@@ -58,7 +58,27 @@ def _is_random_battle(battle_format: str) -> bool:
 
 
 def _actives(battle: AbstractBattle, *, ours: bool) -> list[Pokemon]:
-    """Our (or the opponent's) active Pokemon as a flat list -- 1 on singles, up to 2 on doubles."""
+    """Our (or the opponent's) Pokemon ON THE FIELD -- 1 on singles, up to 2 on doubles.
+
+    **Not simply ``battle.active_pokemon``.** poke-env's ``_get_active_pokemon`` nulls a doubles
+    slot when its occupant is *fainted*, but a fainted Pokemon is still on the field until it is
+    replaced -- so a POV mid-faint reports ``[None, None]`` while the request is still offering
+    that side four moves. Determinizing from that put the wrong two mons on the field and the
+    reconstruction came back offering exactly one joint choice, ``pass, pass``: search on a
+    position the player is not in.
+
+    The underlying ``_active_pokemon`` dict, keyed ``<role>a`` / ``<role>b``, keeps the occupant
+    either way, and ``_mon_state`` already encodes ``fainted`` so nothing is lost by placing it.
+    """
+    role = battle.player_role or "p1"
+    if not ours:
+        role = "p2" if role == "p1" else "p1"
+    raw_map = getattr(battle, "_active_pokemon" if ours else "_opponent_active_pokemon", None)
+    if isinstance(raw_map, dict):
+        slots = [raw_map.get(f"{role}a"), raw_map.get(f"{role}b")]
+        on_field = [m for m in slots if m is not None]
+        if on_field:
+            return on_field
     raw = battle.active_pokemon if ours else battle.opponent_active_pokemon
     return [m for m in (raw if isinstance(raw, list) else [raw]) if m is not None]
 
