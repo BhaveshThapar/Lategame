@@ -115,3 +115,17 @@ def factored_accuracy(logits: torch.Tensor, action: torch.Tensor) -> tuple[int, 
     per_slot = int((pred == action).sum().item())
     both = int((pred == action).all(dim=-1).sum().item())
     return both, per_slot
+
+
+def factored_cross_entropy_none(logits: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    """Per-SAMPLE summed cross-entropy, shape ``(B,)`` -- the AWR weighting unit.
+
+    AWR multiplies each sample's loss by its advantage weight, so the reduction must collapse the
+    slot axis but NOT the batch axis. Summing over slots (rather than averaging) keeps a two-slot
+    decision weighted like the two decisions it is.
+    """
+    b, s, a = logits.shape
+    per = torch.nn.functional.cross_entropy(
+        logits.reshape(b * s, a), action.reshape(b * s), reduction="none"
+    )
+    return per.reshape(b, s).sum(dim=1)
