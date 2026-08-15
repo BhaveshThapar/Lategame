@@ -66,14 +66,17 @@ _MATCHUPS: list[tuple[str, str, str, str | None]] = [
     ("offrl_green", "offrl", "heuristic", _GREEN_CKPT),
 ]
 
-# Learned p1 arms take the Build-14 ``loop_penalty`` (LoopGuard); baselines do not.
-_LEARNED_ARMS = {"bc", "offrl", "ppo"}
+# Learned p1 arms take the Build-14 ``loop_penalty`` (LoopGuard); baselines do not. `doubles`
+# is here because it carries the per-slot `DoublesLoopGuard` (B6f), not the singles one.
+_LEARNED_ARMS = {"bc", "offrl", "ppo", "doubles"}
 
 
 def _build_matchups(
     bc_ckpt: str | None,
     include_offrl_green: bool = True,
     offrl_ckpt: str | None = None,
+    learned_agent: str = "offrl",
+    bc_agent: str = "bc",
 ) -> list[tuple[str, str, str, str | None]]:
     """The fixed skill gradient, plus loop-fixed learned arms when checkpoints are given.
 
@@ -86,9 +89,9 @@ def _build_matchups(
     arms are the meaningful learned arms there."""
     matchups = [m for m in _MATCHUPS if include_offrl_green or m[0] != "offrl_green"]
     if offrl_ckpt:
-        matchups.append(("offrl_ou", "offrl", "heuristic", offrl_ckpt))
+        matchups.append(("offrl_ou", learned_agent, "heuristic", offrl_ckpt))
     if bc_ckpt:
-        matchups.append(("bc_v11", "bc", "heuristic", bc_ckpt))
+        matchups.append(("bc_v11", bc_agent, "heuristic", bc_ckpt))
     return matchups
 
 # On-record gen9-RB M1 band (results/format_ceiling_gate.json, Lever 15) for a side-by-side
@@ -349,7 +352,7 @@ async def run_m1(
     ``bc_ckpt`` appends a loop-fixed ``bc_v11`` arm (the shipped OU winner); ``loop_penalty``
     (Build 14) is applied to every learned arm so the agents are scored *with* the LoopGuard the
     live probe uses."""
-    from lategame.eval.arena import build_player, evaluate_built
+    from lategame.eval.arena import build_player, evaluate_built, policy_agent
 
     teams: list[str] | None = None
     if "randombattle" not in battle_format:
@@ -370,8 +373,16 @@ async def run_m1(
     # so it's RB-only; on OU an ``offrl_ckpt`` is scored as the explicit ``offrl_ou`` arm instead.
     include_green = "randombattle" in battle_format
     block: dict[str, Any] = {"n": n, "format": battle_format}
+    # B6f: the learned arms must be built with the agent the FORMAT wants. `bc`/`offrl` are in
+    # `arena._SINGLES_ONLY_AGENTS` and are refused outright on doubles, so hardcoding them made
+    # the stop rule's own learned arm unrunnable on the format it was written for.
+    learned = policy_agent(battle_format)
     for label, p1, p2, ckpt in _build_matchups(
-        bc_ckpt, include_offrl_green=include_green, offrl_ckpt=offrl_ckpt
+        bc_ckpt,
+        include_offrl_green=include_green,
+        offrl_ckpt=offrl_ckpt,
+        learned_agent=learned,
+        bc_agent="bc" if learned == "offrl" else learned,
     ):
         player1 = build_player(
             p1, battle_format, checkpoint_path=ckpt,

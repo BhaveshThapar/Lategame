@@ -3041,6 +3041,119 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   - **RESOLVED:** 7.6 recorded turns per episode is what a short VGC battle between weak bots looks
     like, not evidence of dropped turns. The old shard's non-loop subset was 7.1.
 
+
+- **B6f STAGE B — BC AND AWR RE-FIT ON THE CORRECTED SHARD, AND THE STOP RULE FIRES (2026-08-15).**
+  `results/format_ceiling_gate_vgc_v2.json`. New shards: `data/vgc_rl_v2.npz` (70,773 turns /
+  **9,578** episodes, against the old shard's 140,848 / 899) and `data/vgc_bc_v2.npz` (31,135
+  turns). Same architecture, same hyperparameters, same seed — only the data changed.
+
+  | | B6d/B6e (loop shard) | B6f (corrected) |
+  |---|---|---|
+  | BC val accuracy (strict, both slots) | **0.980** | **0.602** |
+  | BC val loss | 0.061 | 1.291 |
+  | AWR val accuracy | **0.975** | **0.476** |
+  | AWR value MAE | **0.341** | **1.744** |
+  | return distribution std the critic saw | **0.80** | **3.14** |
+  | value MAE ÷ return std | 0.426 | 0.555 |
+
+  - **THE ACCURACY WAS NOT MERELY INFLATED, IT WAS MEASURING A DIFFERENT PROBLEM.** 0.980 was
+    scored on a set where 96.6% of rewards were zero and the modal turn was one repeated loop
+    frame. 0.602 is a strict both-slots number over a 2×107 space with **14.0 legal actions per
+    slot**, and it is finally comparable to the singles BC's 0.42.
+  - **THE VALUE MAE WENT UP AND THAT IS THE HONEST DIRECTION.** 0.341 was measured against a
+    target with standard deviation 0.80; the corrected target has std 3.14. Normalised, the critic
+    is slightly *worse* (0.555 vs 0.426 of a standard deviation) — on a target four times wider
+    and no longer near-constant. The earlier figure was not a calibration result.
+  - **THE LADDER, n = 300 PER CELL** (B6d/B6e reported n = 100, SE ≈ 0.05; here SE ≈ 0.029):
+
+    | arm | vs `heuristic` | ci95 | B6d/B6e reported |
+    |---|---|---|---|
+    | `mirror` (sanity) | 0.503 | [0.447, 0.560] | — |
+    | `simpleheuristics` | 0.467 | [0.411, 0.523] | — |
+    | `maxbasepower` | 0.310 | [0.260, 0.364] | — |
+    | `random` | 0.023 | [0.011, 0.047] | — |
+    | **BC** | **0.453** | [0.398, 0.510] | 0.390 |
+    | **AWR** | **0.467** | [0.411, 0.523] | 0.350 |
+
+    Both learned arms are *stronger* than reported, and AWR now sits exactly on
+    `simpleheuristics`. The mirror at 0.503 says the harness is sound.
+  - **THE PRE-REGISTERED STOP RULE FIRES, AND B6d SAID IT DID NOT.** The rule, written before the
+    campaign: *"If the BC agent lands near `simpleheuristics` while `simpleheuristics` is still at
+    parity with the heuristic, that is the FORMAT_BOUND signature arriving early."* Both clauses
+    now hold — BC 0.453 against `simpleheuristics` 0.467 is 0.5 SE, indistinguishable; and
+    `simpleheuristics`'s CI [0.411, 0.523] spans 0.50. B6d adjudicated it "DOES NOT FIRE" **by eye
+    in a commit message**, on loop data, where BC read 0.390 and so looked safely *below* both
+    competent bots. The arm the rule actually names (`format_ceiling_gate --bc-checkpoint`) was
+    never run until now. Two process failures, not one: the rule was evaluated against corrupted
+    numbers, and it was evaluated informally rather than by the instrument it names.
+  - **WHAT THE RULE DOES AND DOES NOT KILL.** It was written to stop a *strength* campaign from
+    plateauing against a flat ceiling, and on the `vs_heuristic` axis it does exactly that: a NULL
+    there is now confounded with a genuinely flat VGC ceiling and cannot be read as "PPO fails on
+    doubles". It says nothing about the **mechanism** question — whether a factored policy gradient
+    improves a doubles policy at all — which is answered by the learner against its own warm start
+    and is ceiling-independent. B6f therefore proceeds with `vs_iter0` **promoted to primary** and
+    `vs_heuristic` demoted to secondary, and the fired stop rule is booked here rather than
+    discovered afterwards.
+
+- **B6f — PRE-REGISTERED (written 2026-08-15, BEFORE running).**
+
+  **Lever:** does the factored policy gradient compound past the AWR ceiling on doubles? Every
+  prior doubles result is off-policy AWR, which can only re-weight actions already present in the
+  data. PPO is on-policy: it can push probability toward actions outside the demonstrator
+  distribution. On OU this was the first method to clear the heuristic band (Build 16 onward). This
+  is the same lever on the third format, through the same core.
+
+  **DESIGN — one arm, three seeds. Nothing is being contrasted against a second hyperparameter
+  setting; the contrast is against the warm start the arm descends from.**
+
+  | field | value |
+  |---|---|
+  | init | `checkpoints/doubles_offrl_vgc_v2.pt` (corrected AWR) |
+  | format / team pool | `gen9vgc2025regi` / `teams_gen9vgc.packed` |
+  | seeds | 0, 1, 2 (sbatch array) |
+  | iters / anneal_iters | 80 / **80 (pinned)** |
+  | games_per_opp / pop_size / anchors | 48 / 2 / `simpleheuristics` |
+  | ent_coef, lr | 0.01 → 0.0, 2.5e-4 → 5e-5 |
+  | target_kl (kl_bar) | 0.03 (0.045) |
+  | loop_penalty | **0** — refused on doubles by `run_ppo`; the doubles guard is a different penalty over a different layout and is not an OU-tuned value |
+  | max_battle_turns | 300 (backstop; measured non-binding) |
+
+  **PRE-REGISTERED CONTRASTS — two, at α = 0.025 (Bonferroni over 2), both scored by
+  `scripts/seed_strength_gate.py` at n = 3000 per checkpoint, both arms in ONE invocation.**
+
+  | # | contrast | isolates | role |
+  |---|---|---|---|
+  | C1 | PPO best-iter vs its own **warm start**, head-to-head | whether the policy gradient moved the policy at all | **PRIMARY** — ceiling-independent |
+  | C2 | PPO best-iter vs `heuristic`, against AWR vs `heuristic` | strength on the fixed gradient | secondary — confounded by the fired stop rule |
+
+  C1 is primary on Build 27's own lesson: measuring only against the fixed baseline reported "no
+  effect" for search and *missed that the effect was negative*; it took scoring against its own
+  base to see it. On a format whose ceiling is in doubt, that is the only contrast that can be read.
+
+  **PRE-REGISTERED GATE.**
+
+  | C1 | C2 | verdict |
+  |---|---|---|
+  | WIN | WIN | **COMPOUNDS** — the factored policy gradient works on doubles and converts to strength |
+  | WIN | NULL | **MECHANISM CONFIRMED, STRENGTH CEILING-BOUND** — the anticipated modal outcome given the fired stop rule |
+  | NULL | any | **NULL** — no evidence the factored gradient improves a doubles policy at this budget |
+  | REGRESSION | any | **REGRESSION** |
+  | final `vs_iter0` < 0.50 late, or entropy → 0 | any | **COLLAPSE** — reported as collapse, never as a NULL |
+
+  **ATTRIBUTABILITY BAR.** A verdict is attributable only if the certificate
+  (`results/ppo_vgc_telemetry_b6f_s{N}.json`) shows: trust region not bound in the great majority
+  of iterations; `lp_drift_max` < 1e-2 (acting and training were the same distribution — measured
+  1.4e-06 on the smoke); `invalid_frac_max` < 0.05 (recorded action was the executed one); and
+  `dec_frac_min` > 0.5 (the reported KL is measured over rows that could move the policy). If any
+  fails, the outcome is reported as unattributable rather than as a verdict.
+
+  **COST, budgeted off a measured smoke rather than assumed.** 2 iterations at
+  `games_per_opp=8, pop_size=1, eval_n=20` ran in 22.5 s wall, i.e. ~96 battles/iteration at ~7.5
+  s. The arm is ~544 battles/iteration (144 rollout + 400 eval), projecting **~45 s/iteration** and
+  **~60 min per 80-iteration seed** — far cheaper than OU's 4.15 min/iteration, because a VGC
+  battle is ~7 recorded turns against OU's 19. Three seeds as one array: ~1 h wall. The n = 3000
+  strength gate adds ~6000 battles, ~15 min. No `--resume` needed at this length.
+
 ---
 
 ## 14. Risks & mitigations
