@@ -25,11 +25,18 @@ from pathlib import Path
 
 import numpy as np
 from poke_env.battle import AbstractBattle
-from poke_env.player import BattleOrder, Player, cross_evaluate
+from poke_env.player import BattleOrder, ForfeitBattleOrder, Player, cross_evaluate
 
+from lategame.agents.turn_cap import TurnCap
 from lategame.config import DEFAULT_FORMAT, LOCAL_SERVER, local_account
 from lategame.data.reward import RewardWeights, state_value
-from lategame.eval.arena import _CHECKPOINT_AGENTS, AGENTS, _unique_username
+from lategame.eval.arena import (
+    _CHECKPOINT_AGENTS,
+    _DOUBLES_LOOP_GUARD_AGENTS,
+    _LOOP_GUARD_AGENTS,
+    AGENTS,
+    _unique_username,
+)
 from lategame.features.codec import codec_for, codec_for_battle
 
 _Record = tuple[np.ndarray, int, np.ndarray]
@@ -47,11 +54,19 @@ class _RecordingMixin:
     A scalar shaped ``state_value`` is captured alongside each record (parallel
     list keyed by tag) so offline-RL collection can reconstruct per-turn rewards
     by diffing successive values. BC collection ignores it.
+
+    ``max_battle_turns`` caps decisions per battle and forfeits past the ceiling. It lives HERE,
+    on the wrapper, rather than only on the learned agents, because the demonstrator pool is
+    mostly poke-env baselines (``random``, ``maxbasepower``, ``simpleheuristics``) that have no
+    cap of their own -- and it was their loops, not a learned policy's, that put 94.2% of
+    ``data/vgc_rl.npz`` into 100 of 899 episodes. ``None`` is exact identity.
     """
 
     _reward_weights: RewardWeights = RewardWeights()
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(
+        self, *args: object, max_battle_turns: int | None = None, **kwargs: object
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.records: dict[str, list[_Record]] = {}
         self.values: dict[str, list[float]] = {}
@@ -60,8 +75,13 @@ class _RecordingMixin:
         # battle objects -- with their final .won already set -- live on here.
         self.seen_battles: dict[str, AbstractBattle] = {}
         self.dropped = 0
+        self.turn_cap = TurnCap(max_battle_turns)
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
+        # Before the demonstrator is consulted: past the ceiling there is nothing to imitate,
+        # only a re-requested state to stop paying for.
+        if self.turn_cap.hit(battle):
+            return ForfeitBattleOrder()
         order = super().choose_move(battle)  # type: ignore[misc]
         try:
             # Per-format codec, read off the battle itself: a doubles turn records a (2,)
@@ -111,6 +131,8 @@ def _build_recording_player(
     weights: RewardWeights | None = None,
     max_concurrent: int = 1,
     team: object | None = None,
+    max_battle_turns: int | None = None,
+    loop_penalty: float = 0.0,
 ) -> Player:
     if spec.name not in AGENTS:
         raise ValueError(f"Unknown agent '{spec.name}'. Choose from: {', '.join(AGENTS)}")
@@ -120,6 +142,16 @@ def _build_recording_player(
         extra["sample"] = spec.sample
         if spec.checkpoint_path is not None:
             extra["checkpoint_path"] = spec.checkpoint_path
+    # Same filtering as `eval.arena.build_player`: only the learned policies carry a guard, and
+    # 0.0 is exact identity. Collection never forwarded this at all before B6f, so a demonstrator
+    # pool could not be run WITH the guard even where the agent supported one.
+    if spec.name in _LOOP_GUARD_AGENTS or spec.name in _DOUBLES_LOOP_GUARD_AGENTS:
+        extra["loop_penalty"] = loop_penalty
+    # B6f: the ceiling lives on the RECORDING WRAPPER, so it covers every demonstrator including
+    # the poke-env baselines that have no cap of their own -- and it was their loops that put
+    # 94.2% of the first VGC shard into 100 of 899 episodes. None is exact identity.
+    if max_battle_turns is not None:
+        extra["max_battle_turns"] = max_battle_turns
     # poke-env defaults to one battle at a time; the self-play loop passes a higher
     # value so cross_evaluate keeps many battles in flight (the local server is the
     # bottleneck). Default 1 keeps M2/M3 collection behaviour unchanged.
@@ -200,6 +232,7 @@ async def collect(
     n_per_pair: int,
     battle_format: str = DEFAULT_FORMAT,
     team_pool: str | None = None,
+    max_battle_turns: int | None = None,
 ) -> Dataset:
     """Play every distinct pair in ``pool`` and return winners' ``(obs, action, mask)``."""
     if len(pool) < 2:
@@ -212,8 +245,15 @@ async def collect(
 
     make_team = _team_factory(team_pool)
     for i, (a, b) in enumerate(itertools.combinations(pool, 2)):
-        pa = _build_recording_player(PlayerSpec(a), battle_format, team=make_team(2 * i))
-        pb = _build_recording_player(PlayerSpec(b), battle_format, team=make_team(2 * i + 1))
+        pa = _build_recording_player(
+            PlayerSpec(a), battle_format, team=make_team(2 * i), max_battle_turns=max_battle_turns
+        )
+        pb = _build_recording_player(
+            PlayerSpec(b),
+            battle_format,
+            team=make_team(2 * i + 1),
+            max_battle_turns=max_battle_turns,
+        )
         await cross_evaluate([pa, pb], n_challenges=n_per_pair)
         for player in (pa, pb):
             dropped += player.dropped  # type: ignore[attr-defined]
@@ -350,6 +390,8 @@ async def collect_trajectories(
     weights: RewardWeights | None = None,
     gamma: float = 0.99,
     team_pool: str | None = None,
+    max_battle_turns: int | None = None,
+    loop_penalty: float = 0.0,
 ) -> TrajectoryDataset:
     """Play every distinct pair in ``pool`` and return all turns + shaped rewards."""
     if len(pool) < 2:
@@ -365,9 +407,21 @@ async def collect_trajectories(
 
     make_team = _team_factory(team_pool)
     for i, (a, b) in enumerate(itertools.combinations(pool, 2)):
-        pa = _build_recording_player(PlayerSpec(a), battle_format, weights, team=make_team(2 * i))
+        pa = _build_recording_player(
+            PlayerSpec(a),
+            battle_format,
+            weights,
+            team=make_team(2 * i),
+            max_battle_turns=max_battle_turns,
+            loop_penalty=loop_penalty,
+        )
         pb = _build_recording_player(
-            PlayerSpec(b), battle_format, weights, team=make_team(2 * i + 1)
+            PlayerSpec(b),
+            battle_format,
+            weights,
+            team=make_team(2 * i + 1),
+            max_battle_turns=max_battle_turns,
+            loop_penalty=loop_penalty,
         )
         await cross_evaluate([pa, pb], n_challenges=n_per_pair)
         for player in (pa, pb):
@@ -395,6 +449,7 @@ async def collect_selfplay(
     gamma: float = 0.99,
     record_opponents: bool = True,
     max_concurrent: int = 1,
+    max_battle_turns: int | None = None,
 ) -> TrajectoryDataset:
     """Play ``learner`` against each opponent; return all turns + shaped rewards.
 
@@ -415,8 +470,12 @@ async def collect_selfplay(
     dropped = 0
 
     for opp in opponents:
-        pl = _build_recording_player(learner, battle_format, weights, max_concurrent)
-        po = _build_recording_player(opp, battle_format, weights, max_concurrent)
+        pl = _build_recording_player(
+            learner, battle_format, weights, max_concurrent, max_battle_turns=max_battle_turns
+        )
+        po = _build_recording_player(
+            opp, battle_format, weights, max_concurrent, max_battle_turns=max_battle_turns
+        )
         await cross_evaluate([pl, po], n_challenges=games_per_opp)
         for player in (pl, po) if record_opponents else (pl,):
             dropped += _append_episodes(

@@ -29,12 +29,12 @@ import torch
 from poke_env.teambuilder.teambuilder import Teambuilder
 from torch import nn
 
-from lategame.config import DEFAULT_FORMAT
+from lategame.config import DEFAULT_FORMAT, is_doubles_format
 from lategame.data.collect import PlayerSpec
 from lategame.data.reward import RewardWeights
 from lategame.data.rollout import RolloutBuffer, collect_rollout
-from lategame.eval.arena import build_player, evaluate_built
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from lategame.eval.arena import build_player, evaluate_built, policy_agent
+from lategame.features.codec import codec_for
 from lategame.model.actor_critic import (
     hl_gauss_target,
     load_actor_critic_weights,
@@ -42,7 +42,15 @@ from lategame.model.actor_critic import (
     value_support,
 )
 from lategame.model.factory import build_model, model_metadata
-from lategame.model.policy import masked_logits
+from lategame.model.policy import (
+    factored_entropy,
+    factored_has_choice,
+    factored_log_prob,
+    factored_logits,
+    factored_masked_logits,
+    masked_logits,
+    restrict_slot1_mask,
+)
 from lategame.teambuilding.pool import TeamPool
 from lategame.train.bc import select_device
 from lategame.train.offline_rl import _value_ce
@@ -108,6 +116,11 @@ class PPOConfig:
     # first attempt was OUT_OF_MEMORY at 304/320. A fresh process resets RSS, so resuming is
     # what makes an arm past ~260 iters runnable at all; it is not merely crash insurance.
     resume: bool = False
+    # B6f: per-battle decision ceiling, forfeiting past it. ``None`` is exact identity and is what
+    # every OU build ran with. It exists because a soft loop guard cannot break the absorbing
+    # forced-replacement cycle that put 94.2% of the first VGC shard into 100 of 899 episodes --
+    # see ``agents.turn_cap``.
+    max_battle_turns: int | None = None
 
     @property
     def anneal_horizon(self) -> int:
@@ -157,12 +170,66 @@ def compute_gae(
 def _policy_stats(
     model: nn.Module, obs: torch.Tensor, mask: torch.Tensor, action: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """``(new_log_prob[B], entropy[B], value_logits[B, n_bins])`` over the legal set."""
+    """``(new_log_prob[B], entropy[B], value_logits[B, n_bins])`` over the legal set.
+
+    Dispatches on the mask's rank, exactly as ``train.offline_rl._run_epoch`` does: ``(B, S, A)``
+    is a doubles turn and ``(B, A)`` a singles one. On the factored branch the joint log-prob is
+    the SUM of the two slots' log-probs, and slot 1's distribution is conditioned on slot 0's
+    choice through ``restrict_slot1_mask`` -- recomputed here from ``mask`` and ``action[:, 0]``
+    rather than stored, so there is exactly one definition of the restriction and act-time and
+    train-time cannot disagree about what the behaviour policy was.
+    """
     logits, value_logits = model(obs)
+    if mask.dim() == 3:
+        n_slots = mask.shape[1]
+        a = action.clamp(min=0)
+        restricted = restrict_slot1_mask(mask, a[:, 0])
+        log_probs = torch.log_softmax(
+            factored_masked_logits(factored_logits(logits, n_slots), restricted), dim=-1
+        )
+        return factored_log_prob(log_probs, a), factored_entropy(log_probs), value_logits
     log_probs = torch.log_softmax(masked_logits(logits, mask), dim=1)
     new_log_prob = log_probs.gather(1, action.unsqueeze(1)).squeeze(1)
     entropy = -(log_probs.exp() * log_probs).sum(dim=1)
     return new_log_prob, entropy, value_logits
+
+
+def _surrogate_weights(buffer: RolloutBuffer) -> torch.Tensor | None:
+    """Per-row policy-gradient weight for a FACTORED buffer, or ``None`` on singles.
+
+    THREE kinds of row carry no usable policy gradient and must not sit in the denominator of the
+    reported policy loss, entropy, approx-KL or clip fraction:
+
+    * **No decision.** Every slot had exactly one legal action, so ``log pi`` is identically 0 and
+      the surrogate is a constant in the parameters. On the first VGC shard these were 43% of all
+      turns; a plain ``.mean()`` over them divides the policy gradient, scales ``ent_coef`` down
+      by the same factor, and -- worst -- shrinks ``approx_kl`` so ``target_kl`` never binds while
+      ``scripts/ppo_telemetry`` still certifies "trust region clean, 100% full epochs".
+    * **Not executed as recorded.** The doubles decoder fell back to a random legal order, so the
+      played action is not the recorded one and the ratio's denominator describes a different
+      action.
+    * **Illegal under its own (restricted) mask.** Its logit sits at ``NEG_INF``, so the ratio
+      explodes; the AWR path hit the same rows for 719,296 of actor loss (``train.offline_rl``).
+
+    Zeroed, never dropped: ``compute_gae`` scans a flat contiguous buffer and resets on ``done``,
+    so deleting rows would splice unrelated turns together. Singles returns ``None`` and keeps the
+    plain means it has always reported -- applying this there would silently rescale every
+    published OU number.
+    """
+    if buffer.mask.dim() != 3:
+        return None
+    a = buffer.action.clamp(min=0)
+    restricted = restrict_slot1_mask(buffer.mask, a[:, 0])
+    legal = torch.gather(restricted, 2, a.unsqueeze(-1)).squeeze(-1).all(dim=1)
+    ok = factored_has_choice(buffer.mask) & buffer.executed_mask() & legal
+    return ok.to(torch.float32)
+
+
+def _wmean(x: torch.Tensor, w: torch.Tensor | None) -> torch.Tensor:
+    """``x.mean()``, or the weighted mean over ``w`` when a weight vector is in play."""
+    if w is None:
+        return x.mean()
+    return (x * w).sum() / w.sum().clamp(min=1.0)
 
 
 def ppo_update(
@@ -190,8 +257,32 @@ def ppo_update(
     ret = returns.to(device)
     adv = (adv - adv.mean()) / (adv.std(unbiased=False) + 1e-8)
     target = hl_gauss_target(ret.clamp(centers[0], centers[-1]), centers, sigma)
+    weights = _surrogate_weights(buffer)
+    if weights is not None:
+        weights = weights.to(device)
 
     n = int(obs.shape[0])
+    # THE CANARY. `ppo_update` runs in eval mode and the acting agent read the very checkpoint
+    # these weights were saved from, so recomputing log pi over the buffer BEFORE any gradient
+    # step must reproduce what the agent recorded to floating-point noise. Any real drift means
+    # the acting distribution and the training distribution are not the same function -- a
+    # different mask convention, a post-hoc action rewrite, a device mismatch -- and every ratio
+    # in the update is then wrong in a way no loss curve would show.
+    lp_drift = 0.0
+    with torch.no_grad():
+        check = weights > 0 if weights is not None else torch.ones(n, dtype=torch.bool)
+        if bool(check.any()):
+            idx = check.nonzero(as_tuple=True)[0]
+            lp_now, _, _ = _policy_stats(model, obs[idx], mask[idx], action[idx])
+            lp_drift = float((lp_now - old_log_prob[idx]).abs().max().item())
+    if lp_drift > _MAX_LP_DRIFT:
+        raise RuntimeError(
+            f"acting/training log-prob mismatch: max|new - old| = {lp_drift:.4g} before any "
+            f"gradient step (ceiling {_MAX_LP_DRIFT:g}). The behaviour policy and the policy "
+            f"being updated are not the same function, so every importance ratio in this update "
+            f"is wrong. Check the masking convention and the action recorded vs. executed."
+        )
+
     sums = {"policy": 0.0, "value": 0.0, "entropy": 0.0, "kl": 0.0, "clip": 0.0, "vmae": 0.0}
     steps = 0
     epochs_run = 0
@@ -201,6 +292,7 @@ def ppo_update(
         epoch_kls: list[float] = []
         for start in range(0, n, config.minibatch):
             mb = perm[start : start + config.minibatch]
+            w = None if weights is None else weights[mb]
             new_log_prob, entropy, value_logits = _policy_stats(
                 model, obs[mb], mask[mb], action[mb]
             )
@@ -208,9 +300,11 @@ def ppo_update(
             a = adv[mb]
             surr1 = ratio * a
             surr2 = ratio.clamp(1.0 - config.clip_eps, 1.0 + config.clip_eps) * a
-            policy_loss = -torch.min(surr1, surr2).mean()
+            policy_loss = -_wmean(torch.min(surr1, surr2), w)
+            # The critic wants EVERY state, including the ones that offered no choice -- they are
+            # real positions with real returns. Only the actor's reductions are weighted.
             value_loss = _value_ce(value_logits, target[mb])
-            entropy_mean = entropy.mean()
+            entropy_mean = _wmean(entropy, w)
             loss = policy_loss + config.value_coef * value_loss - config.ent_coef * entropy_mean
 
             optimizer.zero_grad()
@@ -220,8 +314,10 @@ def ppo_update(
 
             with torch.no_grad():
                 logratio = new_log_prob - old_log_prob[mb]
-                approx_kl = float(((ratio - 1.0) - logratio).mean().item())
-                clip_frac = float((ratio - 1.0).abs().gt(config.clip_eps).float().mean().item())
+                approx_kl = float(_wmean((ratio - 1.0) - logratio, w).item())
+                clip_frac = float(
+                    _wmean((ratio - 1.0).abs().gt(config.clip_eps).float(), w).item()
+                )
                 vmae = float((value_from_logits(value_logits, centers) - ret[mb]).abs().mean())
             sums["policy"] += float(policy_loss.item())
             sums["value"] += float(value_loss.item())
@@ -235,7 +331,7 @@ def ppo_update(
             break  # KL early-stop: the policy has moved far enough this rollout
 
     steps = max(steps, 1)
-    return {
+    stats = {
         "policy_loss": sums["policy"] / steps,
         "value_loss": sums["value"] / steps,
         "entropy": sums["entropy"] / steps,
@@ -249,24 +345,36 @@ def ppo_update(
         "ent_coef": config.ent_coef,
         "lr": float(optimizer.param_groups[0]["lr"]),
     }
+    if weights is not None:
+        # Factored-only extras, APPENDED to the dict (and to the log line) so an OU run's stats
+        # and its telemetry regex are byte-identical to every build before this one.
+        stats["n_decision"] = float(weights.sum().item())
+        stats["dec_frac"] = float(weights.mean().item())
+        stats["invalid_frac"] = float((~buffer.executed_mask()).float().mean().item())
+        stats["lp_drift"] = lp_drift
+    return stats
 
 
 def _save_checkpoint(
     model: nn.Module, path: str, battle_format: str, v_min: float, v_max: float, n_bins: int
 ) -> None:
     meta = model_metadata(model)
+    # Dims come from the FORMAT'S codec, not from the singles encoder's module constants. Stamping
+    # `v5-`/761 onto a doubles checkpoint would not fail here -- it fails later, in `DoublesAgent`'s
+    # fingerprint check, after an iteration of rollout has already been paid for.
+    codec = codec_for(battle_format)
     torch.save(
         {
             "state_dict": model.state_dict(),
             "model_type": meta["model_type"],
             "arch": meta["arch"],
-            "input_dim": OBS_DIM,
+            "input_dim": codec.obs_dim,
             "hidden_dim": meta["hidden_dim"],
             "n_actions": meta["n_actions"],
             "n_bins": n_bins,
             "v_min": v_min,
             "v_max": v_max,
-            "obs_version": OBS_VERSION,
+            "obs_version": codec.obs_version,
             "battle_format": battle_format,
             "metrics": {},
         },
@@ -278,6 +386,12 @@ def _save_checkpoint(
 #: from ``iter_NN.pt`` on purpose: those are loaded by the agents and by every gate, so widening
 #: their schema to carry optimizer state would change an artifact the whole project reads.
 _RESUME_FILE = "resume_state.pt"
+
+#: Ceiling on ``max|log pi_new - log pi_old|`` measured before any gradient step. The acting agent
+#: read the checkpoint these weights were saved from and ``ppo_update`` runs in eval mode, so the
+#: honest value is floating-point noise (~1e-7 on CPU). Set well above that but far below any real
+#: policy difference, so it catches a convention mismatch without tripping on device arithmetic.
+_MAX_LP_DRIFT = 1e-2
 
 
 def _save_resume_state(
@@ -337,7 +451,7 @@ def _load_resume_state(out_dir: Path, iters: int) -> dict | None:
 
 
 def _print_stats(iteration: int, n_turns: int, stats: dict[str, float]) -> None:
-    print(
+    line = (
         f"  ppo iter {iteration:>3}  turns {n_turns}  "
         f"pi_loss {stats['policy_loss']:.4f}  v_loss {stats['value_loss']:.4f}  "
         f"entropy {stats['entropy']:.3f}  approx_kl {stats['approx_kl']:.4f}  "
@@ -345,6 +459,15 @@ def _print_stats(iteration: int, n_turns: int, stats: dict[str, float]) -> None:
         f"vmae {stats['vmae']:.3f}  epochs {int(stats['epochs_run'])}  "
         f"ent_coef {stats['ent_coef']:.4f}  lr {stats['lr']:.2e}"
     )
+    # APPENDED, and only on the factored path. `scripts/ppo_telemetry.STATS` matches up to `lr`
+    # with `.search`, so an OU log line stays byte-identical and every historical certificate
+    # still parses; a VGC line simply carries four more fields after it.
+    if "dec_frac" in stats:
+        line += (
+            f"  dec_frac {stats['dec_frac']:.4f}  n_decision {int(stats['n_decision'])}  "
+            f"invalid_frac {stats['invalid_frac']:.4f}  lp_drift {stats['lp_drift']:.2e}"
+        )
+    print(line)
 
 
 async def _eval_point(
@@ -355,21 +478,23 @@ async def _eval_point(
 ) -> CurvePoint:
     """Win-rate of the iteration's checkpoint (greedy) vs each baseline + vs iter 0.
 
-    The PPO checkpoint is a standard actor-critic checkpoint, so the M3 ``offrl`` agent
-    loads it directly -- no separate eval agent needed. ``team`` (a shared pool) is passed
-    to every player for teambuilt formats; the learner arms carry ``config.loop_penalty`` so
-    eval matches the acting policy (baselines ignore it via ``build_player``).
+    The PPO checkpoint is a standard actor-critic checkpoint, so the format's own greedy agent
+    loads it directly -- ``offrl`` on singles, ``doubles`` on doubles (``arena.policy_agent``);
+    no separate eval agent needed. ``team`` (a shared pool) is passed to every player for
+    teambuilt formats; the learner arms carry ``config.loop_penalty`` so eval matches the acting
+    policy (baselines ignore it via ``build_player``).
     """
     point: CurvePoint = {"iter": iteration}
     for base in config.eval_baselines:
         learner = build_player(
-            "offrl",
+            policy_agent(config.battle_format),
             config.battle_format,
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
             team=team,
             loop_penalty=config.loop_penalty,
+            max_battle_turns=config.max_battle_turns,
         )
         opponent = build_player(
             base, config.battle_format, max_concurrent_battles=config.max_concurrent, team=team
@@ -377,22 +502,24 @@ async def _eval_point(
         point[f"vs_{base}"] = round(await evaluate_built(learner, opponent, config.eval_n), 4)
     if iteration > 0:
         learner = build_player(
-            "offrl",
+            policy_agent(config.battle_format),
             config.battle_format,
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
             team=team,
             loop_penalty=config.loop_penalty,
+            max_battle_turns=config.max_battle_turns,
         )
         iter0 = build_player(
-            "offrl",
+            policy_agent(config.battle_format),
             config.battle_format,
             checkpoint_path=config.init,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
             team=team,
             loop_penalty=config.loop_penalty,
+            max_battle_turns=config.max_battle_turns,
         )
         point["vs_iter0"] = round(await evaluate_built(learner, iter0, config.eval_n), 4)
     return point
@@ -423,15 +550,38 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
     print(f"training on {device}")
 
     ckpt = torch.load(init_path, map_location="cpu", weights_only=False)
-    if ckpt.get("obs_version") != OBS_VERSION or ckpt.get("input_dim") != OBS_DIM:
-        raise ValueError("init checkpoint encoder mismatch; cannot warm-start PPO. Retrain.")
     # Rollout runs in the checkpoint's format; eval (_eval_point) runs config.battle_format.
     # If they disagree the loop would roll out one format and score another -- fail loudly.
+    # Checked FIRST, because the encoder check below is only meaningful once we know which
+    # format's codec to check against.
     battle_format = str(ckpt.get("battle_format", config.battle_format))
     if battle_format != config.battle_format:
         raise ValueError(
             f"format mismatch: init checkpoint is '{battle_format}' but config is "
             f"'{config.battle_format}'; rollout/eval would differ -- pass --format {battle_format}"
+        )
+    codec = codec_for(battle_format)
+    if (
+        ckpt.get("obs_version") != codec.obs_version
+        or ckpt.get("input_dim") != codec.obs_dim
+        or ckpt.get("n_actions") != codec.n_actions
+    ):
+        raise ValueError(
+            f"init checkpoint encoder mismatch (ckpt {ckpt.get('obs_version')}/"
+            f"{ckpt.get('input_dim')}/{ckpt.get('n_actions')} vs {codec.name} codec "
+            f"{codec.obs_version}/{codec.obs_dim}/{codec.n_actions}); cannot warm-start PPO. "
+            f"Retrain."
+        )
+    if is_doubles_format(battle_format) and config.loop_penalty != 0.0:
+        # `--loop-penalty 4.0` is on every OU invocation, so it copy-pastes into a VGC one. The
+        # doubles agents DO carry a guard, but it is `DoublesLoopGuard` with its own tuning; a
+        # value chosen against the singles 26-action layout would be recorded in the gate JSON as
+        # if it meant the same thing. Refuse rather than let an arm mislabel itself.
+        raise ValueError(
+            f"--loop-penalty {config.loop_penalty} was passed with the doubles format "
+            f"'{battle_format}'. The doubles guard (agents.loop_guard.DoublesLoopGuard) is a "
+            f"per-slot penalty over a different action layout, so an OU-tuned value does not "
+            f"carry over. Pass 0 and tune it as its own arm."
         )
     v_min, v_max, n_bins = float(ckpt["v_min"]), float(ckpt["v_max"]), int(ckpt["n_bins"])
     centers = value_support(v_min, v_max, n_bins).to(device)
@@ -483,9 +633,10 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
             f"curve {len(curve)} points | -> {config.iters}"
         )
 
+    league_agent = policy_agent(battle_format)
     for k in range(start_iter, config.iters + 1):
         opponents = [
-            PlayerSpec("offrl", checkpoint_path=p, sample=True)
+            PlayerSpec(league_agent, checkpoint_path=p, sample=True)
             for p in _sample_league(league, config.pop_size, rng)
         ]
         opponents += [PlayerSpec(a) for a in config.anchors]
@@ -503,6 +654,7 @@ async def run_ppo(config: PPOConfig) -> list[CurvePoint]:
             config.max_concurrent,
             team=team,
             loop_penalty=config.loop_penalty,
+            max_battle_turns=config.max_battle_turns,
         )
         advantages, returns = compute_gae(
             buffer.reward, buffer.value, buffer.done, config.gamma, config.gae_lambda

@@ -104,6 +104,36 @@ if [[ -n "${RESUME:-}" ]]; then
   RESUME_ARGS=(--resume)
 fi
 
+# B6f: the format axis, parameterized. Every default below reproduces an OU submission BYTE FOR
+# BYTE, so no historical arm changes -- but `--format gen9ou` and the OU team pool used to be
+# literals in the invocation, which made this file unusable for the VGC campaign and invited a
+# copy-pasted sibling that would drift.
+#
+# TAG names the results/ family (`ppo_${TAG}_gate_...`), so a VGC arm cannot silently overwrite an
+# OU one. MAX_BATTLE_TURNS is the doubles loop ceiling and is UNSET by default -- `None` is exact
+# identity, which is what every OU build ran.
+TAG="${TAG:-ou}"
+FMT="${FMT:-gen9ou}"
+TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
+LOOP_PENALTY="${LOOP_PENALTY:-4.0}"
+GAMES_PER_OPP="${GAMES_PER_OPP:-48}"
+EVAL_N="${EVAL_N:-100}"
+LADDER_N="${LADDER_N:-20}"
+MAX_BATTLE_TURNS="${MAX_BATTLE_TURNS:-}"
+
+CAP_ARGS=()
+if [[ -n "$MAX_BATTLE_TURNS" ]]; then
+  CAP_ARGS=(--max-battle-turns "$MAX_BATTLE_TURNS")
+fi
+
+# Preflight, in the search_gate.slurm idiom: name the missing file NOW rather than an hour into
+# battles. /checkpoints/ and /data/ are gitignored, so a build trained elsewhere needs staging.
+[[ -f "$INIT" ]] || { echo "[job] FATAL: INIT checkpoint missing: $INIT"; exit 2; }
+if [[ "$FMT" != *random* ]]; then
+  [[ -f "$TEAM_POOL" ]] || {
+    echo "[job] FATAL: teambuilt format $FMT needs TEAM_POOL, missing: $TEAM_POOL"; exit 2; }
+fi
+
 # The run log is append-on-resume: truncating it would throw away the first chunk's trust-region
 # certificate, which ppo_telemetry.py reads and without which a NULL is unattributable.
 TEE_ARGS=(-a)
@@ -113,20 +143,21 @@ start_showdown
 python -u scripts/ppo_continue_gate.py \
   --init          "$INIT" \
   --ckpt-prefix   "$PREFIX" \
-  --out           "results/ppo_ou_gate_${BUILD}_s${SEED}.json" \
+  --out           "results/ppo_${TAG}_gate_${BUILD}_s${SEED}.json" \
   --seeds         "$SEED" \
-  --format        gen9ou \
-  --team-pool     lategame/teambuilding/data/teams_gen9ou.packed \
-  --loop-penalty  4.0 \
+  --format        "$FMT" \
+  --team-pool     "$TEAM_POOL" \
+  --loop-penalty  "$LOOP_PENALTY" \
   --iters         "$ITERS" \
-  --games-per-opp 48 \
-  --eval-n        100 \
-  --ladder-n      20 \
+  --games-per-opp "$GAMES_PER_OPP" \
+  --eval-n        "$EVAL_N" \
+  --ladder-n      "$LADDER_N" \
   --ent-coef      0.01 --ent-coef-final 0.0 \
   --lr            2.5e-4 --lr-final 5e-5 \
   --target-kl     "$TARGET_KL" \
   ${ANNEAL_ARGS[@]+"${ANNEAL_ARGS[@]}"} \
   ${RESUME_ARGS[@]+"${RESUME_ARGS[@]}"} \
+  ${CAP_ARGS[@]+"${CAP_ARGS[@]}"} \
   2>&1 | tee "${TEE_ARGS[@]}" "$RUN_LOG"
 
 # The stdout log is gitignored (*.log) and is the ONLY source of the trust-region certificate --
@@ -137,6 +168,6 @@ python -u scripts/ppo_continue_gate.py \
 python -u scripts/ppo_telemetry.py \
   --log "$SEED" "$RUN_LOG" \
   --kl-bar "$KL_BAR" \
-  --out "results/ppo_ou_telemetry_${BUILD}_s${SEED}.json"
+  --out "results/ppo_${TAG}_telemetry_${BUILD}_s${SEED}.json"
 
 echo "[job] seed ${SEED} done"

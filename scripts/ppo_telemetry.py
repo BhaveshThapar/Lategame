@@ -36,6 +36,14 @@ STATS = re.compile(
     r"entropy\s+(?P<entropy>-?[\d.]+)\s+approx_kl\s+(?P<approx_kl>[\d.]+)\s+"
     r"clip\s+(?P<clip_frac>[\d.]+)\s+R\[.*?\]\s+vmae\s+(?P<vmae>[\d.]+)\s+"
     r"epochs\s+(?P<epochs>\d+)\s+ent_coef\s+(?P<ent_coef>[\d.]+)\s+lr\s+(?P<lr>[\d.e+-]+)"
+    # B6f: the factored (doubles) run appends four more fields. The whole group is OPTIONAL, so
+    # every OU log ever written still parses to exactly the same rows -- and a VGC certificate
+    # gains the two numbers that make it meaningful there. `dec_frac` says what fraction of the
+    # rollout could move the policy at all, and the trust region is only interpretable once the
+    # approx-KL is measured over those rows rather than diluted by forced ones; `lp_drift` says
+    # the acting and training distributions were the same function.
+    r"(?:\s+dec_frac\s+(?P<dec_frac>[\d.]+)\s+n_decision\s+(?P<n_decision>\d+)"
+    r"\s+invalid_frac\s+(?P<invalid_frac>[\d.]+)\s+lp_drift\s+(?P<lp_drift>[\d.e+-]+))?"
 )
 
 MAX_EPOCHS = 4  # PPOConfig.epochs; fewer means the KL early-stop fired (ppo.py:212)
@@ -44,6 +52,10 @@ KL_BAR = 0.045  # 1.5 * PPOConfig.target_kl (0.03) -- the bar v17-v22 all ran at
 
 _FLOATS = ("pi_loss", "v_loss", "entropy", "approx_kl", "clip_frac", "vmae", "ent_coef", "lr")
 
+#: B6f, factored runs only. Absent from every OU log line, so the group is None there and the row
+#: simply does not carry these keys -- old certificates stay byte-identical.
+_OPTIONAL_FLOATS = ("dec_frac", "invalid_frac", "lp_drift")
+
 
 def parse_log(path: str | Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -51,14 +63,16 @@ def parse_log(path: str | Path) -> list[dict[str, Any]]:
         m = STATS.search(line)
         if m:
             d = m.groupdict()
-            rows.append(
-                {
-                    "iter": int(d["iter"]),
-                    "turns": int(d["turns"]),
-                    "epochs": int(d["epochs"]),
-                    **{k: float(d[k]) for k in _FLOATS},
-                }
-            )
+            row: dict[str, Any] = {
+                "iter": int(d["iter"]),
+                "turns": int(d["turns"]),
+                "epochs": int(d["epochs"]),
+                **{k: float(d[k]) for k in _FLOATS},
+            }
+            if d.get("dec_frac") is not None:
+                row.update({k: float(d[k]) for k in _OPTIONAL_FLOATS})
+                row["n_decision"] = int(d["n_decision"])
+            rows.append(row)
     return rows
 
 
@@ -73,7 +87,7 @@ def summarize(rows: list[dict[str, Any]], kl_bar: float = KL_BAR) -> dict[str, A
     kls = [r["approx_kl"] for r in rows]
     late = [r for r in rows if r["iter"] > len(rows) // 5]  # past the opening transient
     kl_late = round(sum(r["approx_kl"] for r in late) / len(late), 4) if late else None
-    return {
+    out: dict[str, Any] = {
         "n_iters": len(rows),
         "kl_bar": kl_bar,
         "trust_region_bound_iters": [r["iter"] for r in bound],
@@ -85,6 +99,17 @@ def summarize(rows: list[dict[str, Any]], kl_bar: float = KL_BAR) -> dict[str, A
         "vmae_first": rows[0]["vmae"] if rows else None,
         "vmae_last": rows[-1]["vmae"] if rows else None,
     }
+    # B6f, factored runs only. APPENDED, so an OU certificate keeps exactly the ten keys every
+    # published one has. Both numbers are prerequisites for reading the rest of this dict on a
+    # doubles run: an approx-KL diluted by forced turns would certify a trust region that never
+    # bound, and a large `lp_drift` means the ratios those KLs summarize were meaningless.
+    if rows and "dec_frac" in rows[0]:
+        out["dec_frac_min"] = round(min(r["dec_frac"] for r in rows), 4)
+        out["dec_frac_mean"] = round(sum(r["dec_frac"] for r in rows) / len(rows), 4)
+        out["n_decision_total"] = sum(r["n_decision"] for r in rows)
+        out["invalid_frac_max"] = round(max(r["invalid_frac"] for r in rows), 4)
+        out["lp_drift_max"] = max(r["lp_drift"] for r in rows)
+    return out
 
 
 def main(argv: list[str] | None = None) -> None:
