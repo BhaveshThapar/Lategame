@@ -22,6 +22,7 @@ from lategame.features.doubles_action_space import (
     GEN9_DOUBLES_ACTION_SPACE_SIZE,
     GEN9_DOUBLES_SLOT_ACTIONS,
     action_mask,
+    action_to_order_checked,
     decode_pokemon,
     joint_switch_conflict,
     order_to_action,
@@ -53,6 +54,10 @@ class _FakeDoubleBattle(DoubleBattle):
         self._teampreview = False
         self._finished = False
         self._player_role = 'p1'
+        # Read by poke-env only on its ERROR path (`_action_to_order_individual` interpolates
+        # both into the ValueError message), so they are needed to exercise a decode FAILURE.
+        self._player_username = 'p1'
+        self._battle_tag = 'battle-gen9vgc2025regi-1'
         self._active_pokemon = {'p1a': active[0], 'p1b': active[1]}
         self._reviving = False
         # Read by the doubles encoder (features/doubles_encoder).
@@ -199,3 +204,76 @@ def test_the_mask_reads_poke_envs_per_index_flags_not_its_values():
             f"slot {pos}: we marked {int(ours[pos].sum())} legal, poke-env says {sum(raw)}"
         )
     assert ours.sum() > 8, "two healthy actives with 4 moves each must offer well over 8 actions"
+
+
+# --------------------------------------------------------------------------- #
+# B6f: two poke-env INVARIANTS the factored sampler is built on.
+#
+# Both live in poke-env's `DoublesEnv.get_action_mask_individual`, not in our code, so a
+# dependency bump could remove either without touching a line here. Pinned against poke-env
+# directly, because the sequential sampler's correctness argument assumes them.
+# --------------------------------------------------------------------------- #
+def test_every_mask_row_always_offers_at_least_one_legal_action():
+    """poke-env ends the builder with `actions = actions or [0]`, so `pass` is the floor. This is
+    what makes a dead slot unreachable through the codec -- and what makes it safe for the
+    sampler to delete slot 0's switch from slot 1's row."""
+    b = _battle()
+    mask = action_mask(b)
+    assert mask.sum(axis=1).min() >= 1
+
+    # ...including in the states that produce the degenerate rows: a partial replacement, where
+    # the slot that was NOT asked may only pass.
+    b._force_switch = [False, True]
+    partial = action_mask(b)
+    assert partial.sum(axis=1).min() >= 1
+    assert partial[0].sum() == 1 and partial[0][0], "the unasked slot may only pass"
+
+
+def test_pass_is_legal_in_the_one_state_where_restricting_could_empty_slot_one():
+    """`all(force_switch)` with a single available switch is the only state where deleting slot
+    0's switch from slot 1's row could leave it empty. poke-env already makes `pass` legal there
+    (`switch_space + [0]`), so the restricted row is `{0}` and the resulting order is legal."""
+    b = _battle()
+    b._force_switch = [True, True]
+    lone = [b.available_switches[0][0]]
+    b._s = [lone, lone]
+    mask = action_mask(b)
+    assert mask[1][0], "pass must be legal, or the sequential draw has nothing left"
+    assert mask[1].sum() == 2, "exactly the lone switch plus pass"
+
+
+def test_the_only_mask_legal_pair_that_cannot_execute_is_the_joint_switch_conflict():
+    """`action_to_order` falls back to a random legal order on a decode failure, SILENTLY. For an
+    on-policy update that silence is a correctness hole -- the recorded action is then not the one
+    played, so log pi_old describes something that never happened -- and the legality check cannot
+    catch it, because the action WAS legal under its own mask.
+
+    Swept over every mask-legal pair, the failures are EXACTLY the joint-switch conflicts. That is
+    the design claim stated as a measurement: the factored mask expresses all legality except the
+    one constraint coupling the slots, which is why `sample_factored_action` deletes slot 0's
+    switch from slot 1's row -- and why, once it does, `invalid_frac` becoming non-zero is
+    evidence of a NEW unmodelled constraint rather than a known tolerable loss.
+    """
+    b = _battle()
+    mask = action_mask(b)
+    checked = 0
+    for a0 in np.where(mask[0])[0]:
+        for a1 in np.where(mask[1])[0]:
+            pair = np.array([a0, a1])
+            _, executed = action_to_order_checked(pair, b)
+            assert executed is not joint_switch_conflict(pair, b), (
+                f"pair {pair.tolist()}: executed={executed} but "
+                f"conflict={joint_switch_conflict(pair, b)}"
+            )
+            checked += 1
+    assert checked > 20, "the sweep must actually cover the legal set"
+
+
+def test_action_to_order_behaviour_is_unchanged_by_the_split():
+    """The non-strict public entry point must still never raise -- every BC/AWR/eval caller
+    depends on a mis-predicting policy not hanging a battle."""
+    from lategame.features.doubles_action_space import action_to_order
+
+    b = _battle()
+    assert action_to_order(np.array([3, 4]), b) is not None  # decodes
+    assert action_to_order(np.array([3, 3]), b) is not None  # falls back rather than raising

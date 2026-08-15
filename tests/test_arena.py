@@ -172,3 +172,74 @@ def test_the_vgc_format_constant_exists_in_the_vendored_simulator():
         for name in re.findall(r'name:\s*"([^"]+)"', formats.read_text())
     }
     assert VGC_FORMAT in ids, f"{VGC_FORMAT!r} is not a format the pinned simulator has"
+
+
+# --------------------------------------------------------------------------- #
+# B6f: the doubles rollout agent, and the dispatch that keeps the singles guard intact.
+# --------------------------------------------------------------------------- #
+def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
+    from lategame.eval.arena import (
+        _CHECKPOINT_AGENTS,
+        _DOUBLES_SAFE_AGENTS,
+        _LOOP_GUARD_AGENTS,
+        _SINGLES_ONLY_AGENTS,
+        AGENTS,
+    )
+
+    assert "doubles_ppo" in AGENTS
+    assert "doubles_ppo" in _CHECKPOINT_AGENTS, "it is loaded from a checkpoint"
+    assert "doubles_ppo" in _DOUBLES_SAFE_AGENTS
+    # NOT in the singles guard set: its members are handed `LoopGuard`, a 26-wide vector
+    # penalizing indices 0-5, which on the doubles layout would penalize PASS and five of the six
+    # switches. Two sets so the mistake is a build-time KeyError, not a plausible penalty vector.
+    assert "doubles_ppo" not in _LOOP_GUARD_AGENTS
+    assert "doubles" not in _LOOP_GUARD_AGENTS
+    # Pinned literally: widening this set is how a singles agent silently reaches a doubles format
+    # and gets scored as "very weak" while the server plays its moves on the timer.
+    assert _SINGLES_ONLY_AGENTS == {"bc", "offrl", "ppo", "search"}
+
+
+def test_agent_dispatch_returns_a_usable_name_for_every_format():
+    """`train.ppo` and `scripts/ppo_continue_gate` must ASK which agent to build rather than
+    hardcode `offrl`, which `build_player` refuses on a doubles format."""
+    from lategame.config import is_doubles_format
+    from lategame.eval.arena import (
+        AGENTS,
+        _singles_only_agents,
+        policy_agent,
+        rollout_agent,
+    )
+
+    for fmt in ("gen9randombattle", "gen9ou", "gen9vgc2025regi", "gen9doublesou"):
+        for name in (policy_agent(fmt), rollout_agent(fmt)):
+            assert name in AGENTS, f"{name} is not registered"
+            if is_doubles_format(fmt):
+                assert name not in _singles_only_agents(), f"{name} would be refused on {fmt}"
+
+    assert policy_agent("gen9ou") == "offrl" and rollout_agent("gen9ou") == "ppo"
+    assert policy_agent("gen9vgc2025regi") == "doubles"
+    assert rollout_agent("gen9vgc2025regi") == "doubles_ppo"
+
+
+def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypatch):
+    """The ceiling is meaningful only where the loop was measured, and `None` is exact identity,
+    so a singles build must not even receive the kwarg."""
+    import lategame.eval.arena as arena
+
+    seen: dict[str, dict] = {}
+
+    class Dummy:
+        def __init__(self, **kwargs):
+            seen.clear()
+            seen.update(kwargs)
+
+    monkeypatch.setitem(arena.AGENTS, "doubles_ppo", Dummy)
+    monkeypatch.setitem(arena.AGENTS, "random", Dummy)
+
+    arena.build_player(
+        "doubles_ppo", "gen9vgc2025regi", checkpoint_path="x.pt", max_battle_turns=99
+    )
+    assert seen["max_battle_turns"] == 99 and seen["loop_penalty"] == 0.0
+
+    arena.build_player("random", "gen9vgc2025regi", max_battle_turns=99)
+    assert "max_battle_turns" not in seen

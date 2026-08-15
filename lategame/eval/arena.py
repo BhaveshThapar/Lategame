@@ -23,6 +23,7 @@ from poke_env.teambuilder.teambuilder import Teambuilder
 
 from lategame.agents.bc_agent import BCAgent
 from lategame.agents.doubles_agent import DoublesAgent
+from lategame.agents.doubles_ppo_agent import DoublesPPORecordingAgent
 from lategame.agents.heuristic_agent import HeuristicAgent
 from lategame.agents.offline_rl_agent import OfflineRLAgent
 from lategame.agents.ppo_agent import PPORecordingAgent
@@ -46,16 +47,33 @@ AGENTS: dict[str, type[Player]] = {
     # checkpoint fingerprint (d1-/888) makes loading the wrong one an error, not a
     # silent mis-encode.
     "doubles": DoublesAgent,
+    # B6f: the doubles ROLLOUT agent -- `doubles` plus the on-policy signals (joint log-prob,
+    # critic value, executed flag). Registered separately from `ppo` rather than as a mode of it,
+    # for the same reason `doubles` is separate from `offrl`: a different encoder, a different
+    # codec, and a fingerprint that makes loading the wrong checkpoint an error.
+    "doubles_ppo": DoublesPPORecordingAgent,
 }
 
 # Agents backed by a trained checkpoint accept ``checkpoint_path``/``sample`` kwargs;
 # the fixed baselines do not. Shared with ``data.collect`` so both build the same way.
-_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search", "doubles"}
+_CHECKPOINT_AGENTS = {"bc", "offrl", "ppo", "search", "doubles", "doubles_ppo"}
 
 # Learned-policy agents whose constructors accept a Build-14 ``loop_penalty`` (LoopGuard);
 # ``search`` is checkpoint-backed but has no LoopGuard. ``LoopGuard(0.0)`` is exact identity,
 # so forwarding the default 0.0 is a no-op for every existing caller.
+#
+# THE DOUBLES AGENTS ARE DELIBERATELY NOT IN THIS SET. They take a `loop_penalty` too, but they
+# build a `DoublesLoopGuard` -- a `(2, 107)` per-slot penalty over the 1-6 switch range -- where
+# the members below build the singles `LoopGuard`, a 26-wide vector penalizing indices 0-5. On
+# the doubles layout index 0 is PASS, so a singles guard there penalizes passing and five of the
+# six switches, which is not a weaker guard but a differently-wrong one. Kept as two sets so the
+# mistake is a KeyError at build time rather than a plausible-looking penalty vector.
 _LOOP_GUARD_AGENTS = {"bc", "offrl", "ppo"}
+_DOUBLES_LOOP_GUARD_AGENTS = {"doubles", "doubles_ppo"}
+
+# Agents accepting the B6f per-battle decision ceiling (`agents.turn_cap`). `None` is exact
+# identity, so forwarding the default changes nothing for a caller that does not opt in.
+_TURN_CAP_AGENTS = {"doubles", "doubles_ppo"}
 
 # SINGLES-ONLY, AND THE FAILURE ON DOUBLES IS SILENT RATHER THAN LOUD.
 #
@@ -103,6 +121,26 @@ def _singles_only_agents() -> set[str]:
 _DOUBLES_SAFE_AGENTS = tuple(sorted(set(AGENTS) - _SINGLES_ONLY_AGENTS))
 
 
+def policy_agent(battle_format: str) -> str:
+    """Registry name of the GREEDY learned agent for ``battle_format``.
+
+    Used for eval points and for frozen league opponents. The singles name is refused on a doubles
+    format by ``build_player``, so the two PPO-side call sites (``train.ppo._eval_point`` and the
+    league spec) have to ask rather than hardcode ``offrl``.
+
+    Lives here, not on ``features.codec.FormatCodec``: that object's contract is "how to encode a
+    POV, label an order, and mask legality" -- feature-layer and agent-free -- and it is what
+    datasets and checkpoints fingerprint against. Registry names belong to the module that owns
+    the registry.
+    """
+    return "doubles" if is_doubles_format(battle_format) else "offrl"
+
+
+def rollout_agent(battle_format: str) -> str:
+    """Registry name of the RECORDING learner for ``battle_format`` (on-policy rollouts)."""
+    return "doubles_ppo" if is_doubles_format(battle_format) else "ppo"
+
+
 @dataclass
 class EvalResult:
     p1_name: str
@@ -133,6 +171,7 @@ def build_player(
     max_concurrent_battles: int | None = None,
     team: str | Teambuilder | None = None,
     loop_penalty: float = 0.0,
+    max_battle_turns: int | None = None,
 ) -> Player:
     if name not in AGENTS:
         raise ValueError(f"Unknown agent '{name}'. Choose from: {', '.join(AGENTS)}")
@@ -154,9 +193,13 @@ def build_player(
         if checkpoint_path is not None:
             extra["checkpoint_path"] = checkpoint_path
     # Build-14 decision-time anti-repetition. Only the learned policies carry a LoopGuard;
-    # 0.0 is exact identity so this changes nothing unless a caller opts in.
-    if name in _LOOP_GUARD_AGENTS:
+    # 0.0 is exact identity so this changes nothing unless a caller opts in. The doubles agents
+    # take the same kwarg but build the per-slot guard (see _DOUBLES_LOOP_GUARD_AGENTS).
+    if name in _LOOP_GUARD_AGENTS or name in _DOUBLES_LOOP_GUARD_AGENTS:
         extra["loop_penalty"] = loop_penalty
+    # B6f per-battle decision ceiling; None is exact identity.
+    if name in _TURN_CAP_AGENTS:
+        extra["max_battle_turns"] = max_battle_turns
     # poke-env defaults to one battle at a time; PPO rollouts/eval pass a higher value
     # so cross_evaluate keeps many battles in flight (the local server is the bottleneck).
     if max_concurrent_battles is not None:

@@ -46,8 +46,13 @@ GEN9_DOUBLES_SLOT_ACTIONS: int = DoublesEnv.get_action_space_size(9)
 GEN9_DOUBLES_ACTION_SPACE_SIZE: int = 2 * GEN9_DOUBLES_SLOT_ACTIONS
 
 #: Slot-layout constants, named rather than spelled as magic numbers at the call sites.
+#: ``SWITCH_BASE``/``N_SWITCHES`` are PUBLIC because "this action is a voluntary switch" is a
+#: question three modules outside this one have to ask -- the doubles loop guard, the factored
+#: sampler's joint-conflict restriction, and ``agents.doubles_agent`` -- and a second copy of the
+#: literals 1 and 6 is exactly how a layout change becomes a silent mislabel.
 _PASS = 0
-_SWITCH_BASE = 1
+SWITCH_BASE = 1
+N_SWITCHES = 6
 _MOVE_BASE = 7
 _N_TARGETS = 5
 _N_MOVES = 4
@@ -134,23 +139,48 @@ def order_to_action(order: BattleOrder, battle: AbstractBattle) -> np.ndarray:
     return normalize_half_default(out)
 
 
+def _order_from_action(action: np.ndarray, battle: AbstractBattle) -> BattleOrder:
+    """Strict decode: the ``DoubleBattleOrder`` for ``action``, or raise.
+
+    Split out of ``action_to_order`` so a caller that needs to know whether the fallback fired
+    can ask, rather than inferring it. See ``action_to_order_checked``.
+    """
+    b = cast(DoubleBattle, battle)
+    pe = np.array(
+        [_reindex_move_action(int(action[i]), b, i, to_canonical=False) for i in (0, 1)],
+        dtype=np.int64,
+    )
+    return DoublesEnv.action_to_order(pe, b, strict=True)
+
+
+def action_to_order_checked(
+    action: np.ndarray, battle: AbstractBattle
+) -> tuple[BattleOrder, bool]:
+    """``(order, executed_as_recorded)`` -- the fallback made observable.
+
+    The fallback below is silent by design (a mis-predicting policy must never hang a battle),
+    but for an ON-POLICY update that silence is a correctness hole: the recorded action is then
+    not the action that was played, so ``log pi_old(a|s)`` is the density of something that never
+    happened. The legality check cannot catch it either -- the action WAS sampled from the mask;
+    it is the joint decode that failed. So the flag is returned explicitly and PPO zero-weights
+    those rows (``train.ppo.ppo_update``) rather than training on a ratio it cannot compute.
+    """
+    from poke_env.player import Player
+
+    b = cast(DoubleBattle, battle)
+    try:
+        return _order_from_action(action, b), True
+    except (ValueError, IndexError, AssertionError):
+        return Player.choose_random_doubles_move(b), False
+
+
 def action_to_order(action: np.ndarray, battle: AbstractBattle) -> BattleOrder:
     """Convert a per-slot action pair back into a ``DoubleBattleOrder``.
 
     Non-strict, like the singles codec: an out-of-context action falls back to a random legal
     doubles order rather than raising, so a mis-predicting policy never hangs a battle.
     """
-    from poke_env.player import Player
-
-    b = cast(DoubleBattle, battle)
-    try:
-        pe = np.array(
-            [_reindex_move_action(int(action[i]), b, i, to_canonical=False) for i in (0, 1)],
-            dtype=np.int64,
-        )
-        return DoublesEnv.action_to_order(pe, b, strict=True)
-    except (ValueError, IndexError, AssertionError):
-        return Player.choose_random_doubles_move(b)
+    return action_to_order_checked(action, battle)[0]
 
 
 def action_mask(battle: AbstractBattle) -> np.ndarray:
@@ -183,17 +213,17 @@ def joint_switch_conflict(action: np.ndarray, battle: AbstractBattle) -> bool:
     than an error, so an unchecked conflict is a silently lost turn.
     """
     a0, a1 = int(action[0]), int(action[1])
-    switch = range(_SWITCH_BASE, _SWITCH_BASE + 6)
+    switch = range(SWITCH_BASE, SWITCH_BASE + N_SWITCHES)
     return a0 in switch and a1 in switch and a0 == a1
 
 
 def decode_pokemon(action: int, battle: AbstractBattle) -> Pokemon | None:
     """The Pokemon a switch action names, or ``None`` if the action is not a switch."""
     b = cast(DoubleBattle, battle)
-    if not _SWITCH_BASE <= action < _SWITCH_BASE + 6:
+    if not SWITCH_BASE <= action < SWITCH_BASE + N_SWITCHES:
         return None
     team = list(b.team.values())
-    idx = action - _SWITCH_BASE
+    idx = action - SWITCH_BASE
     return team[idx] if idx < len(team) else None
 
 
@@ -201,8 +231,11 @@ __all__ = [
     "GEN9_DOUBLES_ACTION_SPACE_SIZE",
     "normalize_half_default",
     "GEN9_DOUBLES_SLOT_ACTIONS",
+    "N_SWITCHES",
+    "SWITCH_BASE",
     "action_mask",
     "action_to_order",
+    "action_to_order_checked",
     "decode_pokemon",
     "joint_switch_conflict",
     "order_to_action",

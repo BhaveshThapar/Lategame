@@ -105,7 +105,15 @@ async def _run_collect_rl(args: argparse.Namespace) -> None:
         status_value=args.status_value,
         victory_value=args.victory_value,
     )
-    dataset = await collect_trajectories(pool, args.n, args.battle_format, weights, args.gamma)
+    dataset = await collect_trajectories(
+        pool,
+        args.n,
+        args.battle_format,
+        weights,
+        args.gamma,
+        team_pool=args.team_pool,
+        max_battle_turns=args.max_battle_turns,
+    )
     save_rl(dataset, args.out)
 
 
@@ -179,6 +187,16 @@ async def _run_ppo(args: argparse.Namespace) -> None:
         init=args.init,
         out_dir=args.out_dir,
         battle_format=args.battle_format,
+        # Populated at last: a teambuilt format (gen9ou, VGC) was previously unrunnable through
+        # this subcommand -- `PPOConfig.team_pool` existed but nothing here ever set it, so every
+        # real PPO run had to go through scripts/ppo_continue_gate.py.
+        team_pool=args.team_pool,
+        loop_penalty=args.loop_penalty,
+        max_battle_turns=args.max_battle_turns,
+        ent_coef_final=args.ent_coef_final,
+        lr_final=args.lr_final,
+        anneal_iters=args.anneal_iters,
+        resume=args.resume,
         iters=args.iters,
         games_per_opp=args.games_per_opp,
         pop_size=args.pop_size,
@@ -522,6 +540,20 @@ def build_parser() -> argparse.ArgumentParser:
     collect_rl.add_argument("--status-value", type=float, default=0.1, help="Shaping: status")
     collect_rl.add_argument("--victory-value", type=float, default=1.0, help="Terminal win/loss")
 
+    collect_rl.add_argument(
+        "--team-pool",
+        dest="team_pool",
+        default=None,
+        help="Packed-team pool for teambuilt formats (gen9ou, VGC); omit for Random Battles",
+    )
+    collect_rl.add_argument(
+        "--max-battle-turns",
+        dest="max_battle_turns",
+        type=int,
+        default=None,
+        help="Forfeit a battle past this many recorded decisions (omit = no ceiling)",
+    )
+
     train_rl = sub.add_parser("train-rl", help="Train the offline-RL (value+AWR) policy")
     train_rl.add_argument("--data", default="data/gen9rb_rl.npz", help="Dataset .npz path")
     train_rl.add_argument(
@@ -646,6 +678,55 @@ def build_parser() -> argparse.ArgumentParser:
     ppo.add_argument("--seed", type=int, default=0)
     ppo.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
+
+    # B6f: flags PPOConfig has carried for several builds that this subcommand never exposed, so
+    # a teambuilt or scheduled run was reproducible only through scripts/ppo_continue_gate.py.
+    ppo.add_argument(
+        "--team-pool",
+        dest="team_pool",
+        default=None,
+        help="Packed-team pool for teambuilt formats (gen9ou, VGC); omit for Random Battles",
+    )
+    ppo.add_argument(
+        "--loop-penalty",
+        dest="loop_penalty",
+        type=float,
+        default=0.0,
+        help="Build-14 LoopGuard penalty on the learner/learned opponents (0 = off)",
+    )
+    ppo.add_argument(
+        "--max-battle-turns",
+        dest="max_battle_turns",
+        type=int,
+        default=None,
+        help="Forfeit a battle past this many decisions (omit = no ceiling, the OU behavior)",
+    )
+    ppo.add_argument(
+        "--ent-coef-final",
+        type=float,
+        default=None,
+        help="Build-19: anneal ent_coef linearly to this by the final iter (omit = constant)",
+    )
+    ppo.add_argument(
+        "--lr-final",
+        type=float,
+        default=None,
+        help="Build-19: anneal lr linearly to this by the final iter (omit = constant)",
+    )
+    ppo.add_argument(
+        "--anneal-iters",
+        dest="anneal_iters",
+        type=int,
+        default=None,
+        help="Anneal lr/ent_coef over this many iters instead of --iters; past it both hold at "
+        "their finals (omit = anneal over --iters)",
+    )
+    ppo.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue from --out-dir's last completed iteration instead of starting over; "
+        "requires --anneal-iters so the schedule spans the same horizon in every chunk",
     )
 
     live = sub.add_parser(

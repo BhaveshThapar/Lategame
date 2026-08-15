@@ -23,10 +23,13 @@ from pathlib import Path
 
 import numpy as np
 from poke_env.battle import AbstractBattle
-from poke_env.player import BattleOrder, Player
+from poke_env.player import BattleOrder, ForfeitBattleOrder, Player
 
+from lategame.agents.loop_guard import DoublesLoopGuard
+from lategame.agents.turn_cap import TurnCap
 from lategame.features.doubles_action_space import (
-    _SWITCH_BASE,
+    N_SWITCHES,
+    SWITCH_BASE,
     action_mask,
     action_to_order,
     joint_switch_conflict,
@@ -54,7 +57,7 @@ def resolve_switch_conflict(
     move 1 is ordinary play -- so the conflict test is the codec's own `_SWITCH_RANGE` one rather
     than "the two actions are equal", which would silently rewrite a perfectly legal double attack.
     """
-    if not (_SWITCH_BASE <= int(action[0]) < _SWITCH_BASE + 6 and action[0] == action[1]):
+    if not (SWITCH_BASE <= int(action[0]) < SWITCH_BASE + N_SWITCHES and action[0] == action[1]):
         return action
     ranked = np.argsort(-logits[1])
     for candidate in ranked:
@@ -73,6 +76,8 @@ class DoublesAgent(Player):
         *args: object,
         checkpoint_path: str | Path | None = None,
         sample: bool = False,
+        loop_penalty: float = 0.0,
+        max_battle_turns: int | None = None,
         **kwargs: object,
     ) -> None:
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
@@ -105,9 +110,15 @@ class DoublesAgent(Player):
         self._torch = torch
         self._model = model
         self._sample = sample
+        self._loop_guard = DoublesLoopGuard(loop_penalty)
+        self._turn_cap = TurnCap(max_battle_turns)
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
         torch = self._torch
+        # Checked before anything else: past the ceiling this battle is a loop, and every further
+        # decision is another wasted request rather than a game state worth encoding.
+        if self._turn_cap.hit(battle):
+            return ForfeitBattleOrder()
         n = slot_actions(battle)
         mask = action_mask(battle)
         if not mask.any():
@@ -120,6 +131,11 @@ class DoublesAgent(Player):
         # Mask BEFORE choosing, per slot. -inf rather than a large negative so a fully-masked row
         # cannot be picked by arithmetic accident.
         logits = np.where(mask, logits, -np.inf)
+        # Subtracted AFTER masking, as singles does: -inf - penalty is still -inf, so the guard
+        # can never make an illegal action reachable or a legal one unreachable.
+        pen = self._loop_guard.penalty_vector(battle)
+        if pen.any():
+            logits = logits - pen[:, :n]
 
         action = np.zeros(2, dtype=np.int64)
         for slot in (0, 1):
@@ -131,10 +147,16 @@ class DoublesAgent(Player):
                 probs = np.exp(row - row.max())
                 probs[~np.isfinite(row)] = 0.0
                 probs = probs / probs.sum()
-                action[slot] = int(np.random.default_rng().choice(len(probs), p=probs))
+                # Sampled through torch's GLOBAL rng, not a fresh `np.random.default_rng()` per
+                # decision. An unseeded generator built at every call made `--seed` a no-op for
+                # every doubles rollout and league opponent -- nothing about a doubles run was
+                # reproducible -- which a three-seed protocol cannot tolerate. The distribution is
+                # unchanged; only the stream is. Singles already samples through torch.
+                action[slot] = int(torch.multinomial(torch.from_numpy(probs).float(), 1).item())
             else:
                 action[slot] = int(np.argmax(row))
 
         if joint_switch_conflict(action, battle):
             action = resolve_switch_conflict(logits, mask, action)
+        self._loop_guard.record(battle, action)
         return action_to_order(action, battle)
