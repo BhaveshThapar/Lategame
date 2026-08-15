@@ -27,9 +27,22 @@ from __future__ import annotations
 
 from poke_env.battle import AbstractBattle
 
-#: Generous by construction: ~6x the longest OU episode ever recorded (205 turns), and ~10x the
-#: longest non-loop VGC one. A run that trips this is reporting a loop, not a long game.
-DEFAULT_MAX_BATTLE_TURNS = 1200
+#: A BACKSTOP, not the fix. The doubles loop's actual cause was a one-line bug in
+#: ``agents.heuristic_agent._choose_doubles_move`` -- an idle slot emitted ``DefaultBattleOrder``
+#: (``/choose default``, poke-env's WHOLE-order sentinel) instead of ``PassBattleOrder``, so the
+#: joined message was the malformed ``/choose default, move X``, the server rejected it, and
+#: poke-env re-requested forever. With that fixed, measured over four battles per pair:
+#:
+#:     heuristic vs heuristic      1153 choose_move calls/battle  ->   9  (battle.turn 7)
+#:     random vs heuristic         4001                           ->  14  (battle.turn 12)
+#:     random vs random              19  (unchanged -- poke-env's baselines never looped)
+#:
+#: So this ceiling should never fire on a healthy run. It is kept because the failure mode it
+#: guards is silent and expensive, and because a SECOND such bug -- in a future agent, or in a
+#: poke-env bump -- would otherwise be discovered the same way this one was: by finding 94% of a
+#: shard inside 11% of its episodes, after training on it. 300 is ~15x a normal VGC battle and
+#: above the longest OU episode ever recorded (205), so tripping it is a report, not a truncation.
+DEFAULT_MAX_BATTLE_TURNS = 300
 
 
 class TurnCap:
