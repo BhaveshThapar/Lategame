@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from poke_env.battle import Move, Pokemon, Status
 from poke_env.battle.double_battle import DoubleBattle
-from poke_env.player import DefaultBattleOrder, DoubleBattleOrder
+from poke_env.player import DefaultBattleOrder, DoubleBattleOrder, PassBattleOrder
 
 from lategame.agents.heuristic_agent import HeuristicAgent, best_target, doubles_pick
 
@@ -156,8 +156,8 @@ def test_an_absent_slot_defaults_rather_than_crashing():
         switches=[[], []],
     )
     order = _decide(battle)
-    assert isinstance(order.second_order, DefaultBattleOrder)
-    assert not isinstance(order.first_order, DefaultBattleOrder)
+    assert isinstance(order.second_order, PassBattleOrder)
+    assert not isinstance(order.first_order, PassBattleOrder)
 
 
 def test_a_fainted_foe_is_not_targeted():
@@ -228,3 +228,64 @@ def test_an_ordinary_turn_is_unaffected_by_the_force_switch_guard():
     )
     picks = doubles_pick(battle)
     assert all(p is not None and isinstance(p[0], Move) for p in picks)
+
+
+# --------------------------------------------------------------------------- #
+# B6f: the doubles loop, and the one-line cause.
+# --------------------------------------------------------------------------- #
+def test_an_idle_slot_emits_pass_and_the_joined_message_is_a_legal_command():
+    """THE doubles loop, as one assertion.
+
+    `DefaultBattleOrder` is poke-env's WHOLE-ORDER sentinel (`/choose default`), and
+    `DoubleBattleOrder.message` joins by string surgery -- `first.message + ", " +
+    second.message[8:]` -- so half a default produced `/choose default, move earthquake 1`, not a
+    legal Showdown command. The server rejected it, poke-env re-requested the identical state, and
+    the agent answered identically forever: measured at 4,001 choose_move calls across battle turns
+    1-7, against 19 for poke-env's own RandomPlayer over 17 turns.
+
+    That is what put 94.2% of `data/vgc_rl.npz` into 100 of its 899 episodes -- this agent is in
+    every collection pool. The per-slot "do nothing" is `pass`.
+    """
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), None],
+        opponent_active=[Pokemon(9, species="pikachu"), None],
+        moves=[[Move("earthquake", 9)], []],
+        switches=[[], []],
+    )
+    order = _decide(battle)
+    assert isinstance(order.second_order, PassBattleOrder)
+    assert order.second_order.message == "/choose pass"
+    # The joined command is what actually reaches the server, so assert on THAT, not the parts.
+    assert "default" not in order.message, f"half-default resurrected: {order.message!r}"
+    assert order.message.startswith("/choose ") and order.message.count("/choose") == 1
+
+
+def test_both_slots_idle_is_still_a_whole_default():
+    """`default` is correct when it describes the WHOLE order -- that is what it means. Only half
+    of one is malformed."""
+    battle = _FakeDoubleBattle(
+        active=[None, None],
+        opponent_active=[Pokemon(9, species="pikachu"), None],
+        moves=[[], []],
+        switches=[[], []],
+    )
+    order = _decide(battle)
+    assert isinstance(order, DefaultBattleOrder)
+    assert order.message == "/choose default"
+
+
+def test_a_partial_replacement_sends_pass_for_the_unasked_slot():
+    """The state that dominated the shard: slot 0 may only pass, slot 1 must switch. 51.9% of all
+    recorded VGC turns carried this signature."""
+    bench = [Pokemon(9, species="tangrowth"), Pokemon(9, species="arcanine")]
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), None],
+        opponent_active=[Pokemon(9, species="pikachu"), None],
+        moves=[[Move("earthquake", 9)], []],
+        switches=[bench, bench],
+        force=[False, True],
+    )
+    order = _decide(battle)
+    assert isinstance(order.first_order, PassBattleOrder)
+    assert "default" not in order.message
+    assert order.message.startswith("/choose pass, switch ")

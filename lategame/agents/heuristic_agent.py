@@ -19,8 +19,8 @@ from poke_env.battle import AbstractBattle, Move, Pokemon
 from poke_env.battle.double_battle import DoubleBattle
 from poke_env.player import (
     BattleOrder,
-    DefaultBattleOrder,
     DoubleBattleOrder,
+    PassBattleOrder,
     Player,
     SingleBattleOrder,
 )
@@ -227,16 +227,42 @@ class HeuristicAgent(Player):
         return self.create_order(pick[1])
 
     def _choose_doubles_move(self, battle: DoubleBattle) -> BattleOrder:
-        """The same rule, once per slot, joined into a ``DoubleBattleOrder``."""
+        """The same rule, once per slot, joined into a ``DoubleBattleOrder``.
+
+        A SLOT WITH NO DECISION EMITS `pass`, NOT `default`, AND THE DIFFERENCE IS THE WHOLE
+        DOUBLES LOOP (B6f). `DefaultBattleOrder` is poke-env's WHOLE-ORDER sentinel: its message
+        is `/choose default`, and `DoubleBattleOrder.message` joins by string surgery
+        (`f"{first.message}, {second.message[8:]}"`), so half a default produced
+        `/choose default, move woodhammer 1` -- not a legal Showdown command. The server rejected
+        it, poke-env re-requested the same state, and the agent answered identically forever.
+
+        Measured before the fix, four battles per pair on gen9vgc2025regi:
+
+            random vs random                    max  19 choose_move calls/battle (turn 17)
+            simpleheuristics vs simpleheuristics max   9                          (turn  8)
+            maxbasepower vs maxbasepower         max   8                          (turn  6)
+            random vs HEURISTIC                 max 4001 calls, battle.turn 1..7
+            HEURISTIC vs HEURISTIC              max 1153 calls, battle.turn 1..4
+
+        poke-env's own baselines never loop; this agent did, and it is in every collection pool,
+        which is why 94.2% of `data/vgc_rl.npz` came from 100 of 899 episodes.
+
+        This is the WRITE side of the error B6d already fixed on the READ side:
+        `doubles_action_space.normalize_half_default` exists because poke-env maps a half default
+        to -2, its whole-order sentinel, when the per-slot layout says "this slot does nothing" is
+        action 0, `pass`. The labelling was corrected then; the emission was not.
+
+        Both slots idle IS the whole-order case, so that still answers `/choose default`.
+        """
         picks = doubles_pick(battle)
         orders: list[SingleBattleOrder] = [
-            DefaultBattleOrder()
+            PassBattleOrder()
             if p is None
             else self.create_order(p[0])
             if isinstance(p[0], Pokemon)
             else self.create_order(p[0], move_target=p[1])
             for p in picks
         ]
-        if all(isinstance(order, DefaultBattleOrder) for order in orders):
+        if all(isinstance(order, PassBattleOrder) for order in orders):
             return self.choose_default_move()
         return DoubleBattleOrder(orders[0], orders[1])

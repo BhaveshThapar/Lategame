@@ -254,7 +254,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--cap",
         type=int,
-        default=1200,
+        default=300,
         help="Decision ceiling for the FIXED arm (agents.turn_cap.DEFAULT_MAX_BATTLE_TURNS)",
     )
     # The guard is a no-op for the poke-env baselines (they carry none), so it only moves the
