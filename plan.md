@@ -2946,6 +2946,101 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     independent mechanisms (gradient, depth-1, depth-2, curriculum, real-opponent-model search, and
     now depth-2-with-exact-model on a format with headroom).
 
+
+- **BUILD 28 / B6 — THE VGC CAMPAIGN, AND THE SHARD THAT WAS 94% ONE BUG (2026-08-14 → 2026-08-15).**
+  G4 was booked MET at `4303803` on the "playable end-to-end without rewriting the core" criterion.
+  This build is the *strength* campaign that criterion deliberately did not require: BC → offline
+  RL → PPO on `gen9vgc2025regi`, reusing `train/` and the `ppo_continue_gate` /
+  `seed_strength_gate` / `merge_gate_seeds` toolchain. It is recorded here in one entry because
+  B6a–B6e landed as commits without a notebook section, and because B6f's first act was to
+  invalidate two of them.
+
+  - **B6a — THE DOUBLES ACTION CODEC IS FACTORED, 2×107, NOT A JOINT 11,449** (`b27c16a`).
+    `DoublesEnv` is 107 actions *per slot* and a turn commits both, so the joint space is
+    107² = 11,449 outputs almost none of which are ever legal together. The head emits 214 logits
+    read as two independent distributions — which is also the shape poke-env's own converters
+    speak. One constraint COUPLES the slots and a factored mask cannot express it: both slots may
+    not switch to the same benched Pokémon. Showdown answers such an order with a default move
+    rather than an error, so it is a silently lost turn; `joint_switch_conflict` is the separate
+    check every decoder and sampler has to apply. Build 5's canonical-move-order divergence is
+    carried across unchanged.
+  - **B6b — THE DOUBLES ENCODER, AND THE SINGLES LAYOUT FROZEN** (`9b196a1`). `OBS_DIM_DOUBLES`
+    888 / `d1-09831e17c378`: the singles blocks reused verbatim, with move blocks per *active
+    slot* (8 rather than 4) and a 12-scalar global block carrying `force_switch`, `maybe_trapped`,
+    `first_turn` and the four targeting-context flags. `EntityTransformer._layout_for` selects the
+    layout from `input_dim` alone, which is the seam that lets one architecture serve three
+    formats.
+  - **B6c — G4 MET: THREE FORMATS PLAY END TO END THROUGH ONE CORE** (`4303803`). The learned
+    doubles agent, the arena's doubles-safety guard, and the exit criterion booked.
+  - **B6d / B6e — BC AND FACTORED AWR ON VGC** (`550c524`, `1c28dec`). Six data-path defects found
+    by measurement, each of which would have produced a trained model rather than an error: the
+    ignored `force_switch` on a partial replacement; the "no mon here" guard rejecting the one slot
+    being asked to act; the half-default read as poke-env's whole-order `-2` sentinel; the action
+    mask read by VALUE instead of by index (a 2-legal-action mask on a turn with 4 moves and 2
+    switches, driving BC's loss to 9.4e8); forced single-legal-action turns trained on as if they
+    were decisions; and illegal-label rows dominating the AWR actor loss at 719,296.
+  - **THESE TWO RESULTS ARE WITHDRAWN, AND B6f's FIRST ACT WAS FINDING OUT WHY.** See the next
+    entry. The defect list above stands; the numbers those commits reported do not.
+
+- **B6f STAGE A — 94.2% OF THE VGC SHARD CAME FROM 100 OF ITS 899 EPISODES, AND THE CAUSE WAS ONE
+  LINE OF OURS (2026-08-15).** `results/vgc_loop_probe.json`. Before porting the policy gradient to
+  a factored head, the shard it would warm-start from was measured directly. It should have been
+  measured before B6d.
+
+  | | `vgc_rl.npz` | `gen9ou_v7_rl.npz` |
+  |---|---|---|
+  | turns / episode, median | 7 | 19 |
+  | turns / episode, max | **12,795** | 205 |
+  | max ÷ median | **1,827.9** | 10.8 |
+  | top-decile turn share | **0.922** | 0.239 |
+  | episode-length Gini | **0.901** | 0.304 |
+  | unique observations ÷ turns | **0.0033** | 1.000 |
+
+  - **THE LONGEST EPISODE CARRIES 12,795 RECORDED TURNS OVER SEVEN UNIQUE OBSERVATION VECTORS.**
+    51.9% of all turns are one signature — slot 0's legal set is `{pass}`, slot 1's is two switches
+    — and 96.6% of all rewards are exactly zero.
+  - **SPLIT BY EPISODE LENGTH THE PICTURE INVERTS.** The non-loop episodes (≤40 turns) are 5,553
+    turns at decision density **0.906** and 14.71 legal actions per slot, against the whole shard's
+    0.571 and 2.62. So VGC doubles is a normal, decision-DENSE format — denser per slot than OU's
+    7.67 — and the "98.4% of recorded turns had exactly one legal action per slot" note written
+    into `data/collect.py` measured the loop, not the format. Corrected in place.
+  - **WHICH AGENT LOOPS, MEASURED RATHER THAN ASSUMED.** Four battles per pair, counting
+    `choose_move` calls against the `battle.turn` actually reached:
+
+        random           vs random               19 calls   turn 17
+        simpleheuristics vs simpleheuristics      9 calls   turn  8
+        maxbasepower     vs maxbasepower          8 calls   turn  6
+        random           vs HEURISTIC           4001 calls   turns 1..7
+        HEURISTIC        vs HEURISTIC           1153 calls   turns 1..4
+
+    poke-env's own baselines never loop. Ours did — and `heuristic` is in every collection pool,
+    which is the entire explanation.
+  - **THE BUG.** `heuristic_agent._choose_doubles_move` gave a slot with no decision a
+    `DefaultBattleOrder()`. That is poke-env's WHOLE-order sentinel: its message is
+    `/choose default`, and `DoubleBattleOrder.message` joins by string surgery, so half a default
+    serialised to `/choose default, move woodhammer 1` — not a legal Showdown command. The server
+    rejected it, poke-env re-requested the identical state, and the agent answered identically,
+    forever. The per-slot "do nothing" is `PassBattleOrder` (`/choose pass`).
+  - **IT IS THE WRITE SIDE OF A BUG B6d FIXED ON THE READ SIDE.**
+    `doubles_action_space.normalize_half_default` exists because poke-env *labels* a half default
+    with `-2`, its whole-order sentinel, where the per-slot layout says "this slot does nothing" is
+    action 0. B6d corrected how a half-default is read and never checked how one is written. The
+    same sentence was the fix in both places, and the second half went unlooked-at for two builds.
+  - **AFTER: `heuristic` vs `heuristic` 1153 → 9 calls; `random` vs `heuristic` 4001 → 14.** Every
+    pair now sits within ~2 calls of `battle.turn`, matching poke-env's baselines. Collection got
+    ~90× faster as a side effect — the loop was the cost.
+  - **STAGE A GATE: LOOP_CLOSED**, on two pre-registered clauses whose bars are set from the two
+    real shards rather than chosen: top-DECILE turn share ≤ 0.45 (top-*ten* is not comparable
+    across shards, since with E episodes it cannot fall below 10/E) and unique-observations ÷ turns
+    ≥ 0.90.
+  - **READ HONESTLY: THE LOOP GUARD AND THE TURN CAP ARE NOT WHAT CLOSED THIS.** Both were built
+    first, on the theory that the loop was a property of forced-replacement states; the capped and
+    uncapped arms are the same shard to within noise (top-decile 0.173 vs 0.160). They are kept as
+    backstops, at exact-identity defaults, and their docstrings say so — because this failure mode
+    is silent and expensive and a second instance would otherwise be found the same way.
+  - **RESOLVED:** 7.6 recorded turns per episode is what a short VGC battle between weak bots looks
+    like, not evidence of dropped turns. The old shard's non-loop subset was 7.1.
+
 ---
 
 ## 14. Risks & mitigations

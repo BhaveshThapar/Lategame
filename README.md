@@ -992,6 +992,64 @@ separately versioned (`d1-`, 888-d) on both fields, so a cross-format shard is r
 *Not claimed:* the doubles checkpoint is randomly initialised. G4's exit is "playable end to end";
 VGC strength is a separate question and the 0.667 is 6 battles of an untrained policy.
 
+### Build 28 / B6f — the VGC shard was 94% one bug, and it was ours
+
+The VGC *strength* campaign (BC -> offline RL -> PPO) is the work G4's exit criterion deliberately
+did not require. Its first act was to measure the shard everything downstream warm-starts from,
+which is a thing that should have happened two builds earlier.
+
+| | `data/vgc_rl.npz` | `data/gen9ou_v7_rl.npz` |
+|---|---|---|
+| turns / episode, median | 7 | 19 |
+| turns / episode, max | **12,795** | 205 |
+| top-decile turn share | **0.922** | 0.239 |
+| episode-length Gini | **0.901** | 0.304 |
+| unique observations / turns | **0.0033** | 1.000 |
+
+**The longest episode carried 12,795 recorded turns over seven unique observation vectors** — the
+same states re-requested thousands of times. 94.2% of the shard came from 100 of its 899 episodes,
+and 96.6% of all rewards were exactly zero.
+
+**Which agent loops was measured, not assumed.** Four battles per pair, counting `choose_move`
+calls against the `battle.turn` actually reached:
+
+| pair | calls / battle | turn reached |
+|---|---|---|
+| `random` vs `random` | 19 | 17 |
+| `simpleheuristics` vs `simpleheuristics` | 9 | 8 |
+| `maxbasepower` vs `maxbasepower` | 8 | 6 |
+| `random` vs **`heuristic`** | **4,001** | spanned 1..7 |
+| **`heuristic`** vs **`heuristic`** | **1,153** | spanned 1..4 |
+
+poke-env's own baselines never loop. Ours did, and `heuristic` is in every collection pool.
+
+**The bug was one line.** A doubles slot with no decision emitted `DefaultBattleOrder()` — poke-env's
+*whole-order* sentinel, message `/choose default`. `DoubleBattleOrder.message` joins by string
+surgery, so half a default serialised to `/choose default, move woodhammer 1`, which is not a legal
+Showdown command. The server rejected it, poke-env re-requested the identical state, and the agent
+answered identically forever. The per-slot "do nothing" is `PassBattleOrder` (`/choose pass`).
+
+**It is the write side of a bug the previous build fixed on the read side.**
+`normalize_half_default` exists because poke-env *labels* a half default with `-2`, its whole-order
+sentinel, where the per-slot layout says "this slot does nothing" is action 0. The labelling was
+corrected; the emission was never looked at.
+
+After the fix, `heuristic` vs `heuristic` goes 1,153 -> 9 calls and every pair sits within ~2 calls
+of `battle.turn`. Collection got ~90x faster as a side effect — the loop was the cost.
+
+**What this corrects.** VGC doubles is a normal, decision-*dense* format: 0.923 decision density and
+14.0 legal actions per slot on a decision turn, against OU's 0.9998 and 7.67. The "98.4% of recorded
+turns carry no decision" note in the collection code measured the loop, not the format. And the
+critic's target was compressed ~4x by zero-reward loop frames (return std 0.80 against the corrected
+shard's 3.14), so the previously reported doubles value-MAE was measured against a near-constant
+target. The BC/AWR figures from those builds are withdrawn and re-run on a corrected shard.
+
+*Read honestly:* a loop guard and a per-battle turn cap were built first, on the theory that this
+was a property of forced-replacement states. They are not what closed it — capped and uncapped arms
+are the same shard to within noise. Both are kept as backstops at exact-identity defaults, because
+the failure mode is silent and a second instance would otherwise be found the same way: by noticing
+94% of a shard inside 11% of its episodes, after training on it.
+
 ## Setup
 
 ```bash
