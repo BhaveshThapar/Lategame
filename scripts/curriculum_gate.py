@@ -268,7 +268,13 @@ def _print_table(summary: dict, verd: str) -> None:
 # --------------------------------------------------------------------------------------
 # Gate C -- confirmatory ladder on the single best checkpoint.
 # --------------------------------------------------------------------------------------
-async def _ladder(ckpt: str, fmt: str, n: int, team_pool: str | None = None) -> dict[str, float]:
+async def _ladder(
+    ckpt: str,
+    fmt: str,
+    n: int,
+    team_pool: str | None = None,
+    max_battle_turns: int | None = None,
+) -> dict[str, float]:
     """Gate C. THE THIRD collection site in this file that needed the pool and did not have it.
 
     Gate A collects, the self-play loop collects, and this ladder builds its own players -- three
@@ -277,6 +283,12 @@ async def _ladder(ckpt: str, fmt: str, n: int, team_pool: str | None = None) -> 
 
     Both sides draw from the same pool with different seeds, as the ceiling gate does, so the
     matchup varies and the mirror stays fair in expectation.
+
+    IT MUST ALSO RUN THE ARM'S CONFIGURATION, and it did not. `_eval_point` passes
+    `max_battle_turns` to all four of its builds and this ladder passed none, so the first VGC
+    capability record read the SAME checkpoint at 0.383 on the curve and 0.600 on the ladder --
+    0.22 apart, against an n=60 standard error of ~0.063. A confirmatory ladder that confirms a
+    different game than the one it is confirming is worse than no ladder.
     """
     def _team(seed: int) -> object | None:
         if not team_pool:
@@ -291,10 +303,12 @@ async def _ladder(ckpt: str, fmt: str, n: int, team_pool: str | None = None) -> 
             policy_agent(fmt), fmt, checkpoint_path=ckpt,
             max_concurrent_battles=_EVAL_CONCURRENCY,
             team=_team(0),  # type: ignore[arg-type]
+            max_battle_turns=max_battle_turns,
         )
         opponent = build_player(
             base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY,
             team=_team(1),  # type: ignore[arg-type]
+            max_battle_turns=max_battle_turns,
         )
         out[base] = round(await evaluate_built(learner, opponent, n), 4)
     return out
@@ -371,7 +385,8 @@ async def run_gate(args: argparse.Namespace) -> dict:
     if verd != "AMBER" or summary["best_vs_heuristic"]["mean"] >= _AMBER_VS_ITER0:
         print(f"\nconfirmatory ladder (n={args.ladder_n}) on {overall_best['best_checkpoint']}")
         ladder = await _ladder(
-            overall_best["best_checkpoint"], args.battle_format, args.ladder_n, args.team_pool
+            overall_best["best_checkpoint"], args.battle_format, args.ladder_n, args.team_pool,
+            max_battle_turns=args.max_battle_turns,
         )
         print("  " + "  ".join(f"{k} {v:.3f}" for k, v in ladder.items()))
         result["confirmatory_ladder"] = ladder

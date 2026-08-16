@@ -102,3 +102,23 @@ def test_verdict_green_amber_red():
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(red)) == "RED"
+
+
+def test_the_confirmatory_ladder_runs_the_arms_own_configuration():
+    """A ladder that confirms a DIFFERENT game than the one it confirms is worse than no ladder.
+
+    The first VGC capability record read `iter_01.pt` at 0.383 on the per-iteration curve and 0.600
+    on the confirmatory ladder -- 0.22 apart, against an n=60 standard error of ~0.063. Cause:
+    `_eval_point` passes `max_battle_turns` to all four of its builds and `_ladder` passed none, so
+    the two reads capped battles differently. Pinned by signature, because the failure produces a
+    plausible number rather than an error.
+    """
+    import inspect
+
+    params = inspect.signature(gate._ladder).parameters
+    assert "team_pool" in params, "three build sites needed the pool; this was the third"
+    assert "max_battle_turns" in params
+    src = inspect.getsource(gate._ladder)
+    # Both sides, not just the learner.
+    assert src.count("max_battle_turns=max_battle_turns") == 2
+    assert src.count("team=_team(") == 2
