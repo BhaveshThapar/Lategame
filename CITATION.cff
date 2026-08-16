@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+type: software
+title: "Lategame"
+abstract: >-
+  A competitive Pokemon Showdown battle agent: behaviour cloning, offline RL,
+  and PPO self-play across gen9randombattle, gen9ou, and gen9vgc, with every
+  claim gated on a pre-registered evaluation.
+authors:
+  - family-names: "Thapar"
+    given-names: "Bhavesh"
+    affiliation: "University of Maryland"
+version: "0.1.0"
+date-released: "2026-08-15"
+license: MIT
+url: "https://github.com/BhaveshThapar/Lategame"
+repository-code: "https://github.com/BhaveshThapar/Lategame"
+keywords:
+  - reinforcement-learning
+  - pokemon-showdown
+  - self-play
+  - ppo
+  - offline-rl
