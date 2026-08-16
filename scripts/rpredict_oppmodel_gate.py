@@ -307,6 +307,16 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
         "format": fmt,
         "team_pool": args.team_pool,
         "loop_penalty": args.loop_penalty,
+        # WHICH LEAF PRODUCED THIS, recorded rather than inferable only from the caller's shell.
+        # `ShapedOnlyPolicy` (HP/faints, no encoder, no priors) is a WEAKER instrument than a
+        # trained value head, and `expectimax.ShapedOnlyPolicy` pre-registers the asymmetry that
+        # follows: a WIN is decisive, a NULL is suggestive only, because a shallower leaf could
+        # produce it on its own. A reader comparing this record to the RB one needs to know which
+        # they are looking at, and until now the flag lived only in the environment.
+        "search_leaf": (
+            "shaped_only" if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1"
+            else "policy_value"
+        ),
         "base_vs_heuristic": round(base_vs_heur, 4),
         "arms": arms,
     }
