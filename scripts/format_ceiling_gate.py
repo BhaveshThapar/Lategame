@@ -579,7 +579,13 @@ def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
     """Score the teambuilt M1 smoke: is the harness clean and the band at least as wide as RB?
 
     Deliberately does not apply the RB BAND_TOP/HEADROOM thresholds -- poke-env's bots sit far
-    below OU's skill ceiling and there's no OU near-optimal reference yet (M2/M3 deferred)."""
+    below OU's skill ceiling and there is no OU near-optimal reference.
+
+    STILL M1-ONLY, and still not a verdict, even now that a teambuilt run can reach
+    `compute_verdict` -- this stays the harness read it always was. The OTHER two legs are no
+    longer unavailable-in-principle for every teambuilt format: gen9vgc2025regi has both. Whether a
+    given run has them is a property of that run, so the note is built from the record rather than
+    asserted."""
     rate = {k: m1[k]["rate"] for k in _RB_BAND if k in m1 and "rate" in m1[k]}
     mirror_ok = abs(rate.get("mirror", 0.5) - 0.5) <= MIRROR_TOL
     gradient_ok = (
@@ -633,7 +639,10 @@ def assess_ou(m1: dict[str, Any]) -> dict[str, Any]:
         ou_verdict["model_gap"] = competent - primary["rate"]
 
     return {
-        "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+        "note": (
+            "M1 teambuilt harness read, not a verdict. The three-leg FORMAT/MODEL rule is "
+            "`decision` (compute_verdict), present only when M2 and M3 are also in this record."
+        ),
         "mirror_sanity_ok": mirror_ok,
         "gradient_ok": gradient_ok,
         "harness_ok": harness_ok,

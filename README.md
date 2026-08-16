@@ -35,8 +35,18 @@ withdrawn reads, published in
 corrected data, factored PPO beats its own warm start
 **0.530** [0.519, 0.540] over 9,000 battles (all three seeds individually clear 0.50) but is
 **NULL** against the fixed heuristic — a format whose competent bots sit at parity with each
-other, so the pre-registered stop rule fires and the strength axis is ceiling-bound. That leaves
-**G5**, as *demonstrated* rather than merely implemented capability.
+other, so the pre-registered stop rule fires and the strength axis is ceiling-bound.
+
+**G5 is MET** (`results/g5_capability_gate.json`), and it needed an exit criterion before it could
+be: the goal was stated once and referenced twice as open, with no threshold, no gate and no record
+anywhere — so "demonstrated rather than merely implemented" was itself merely written. The criterion
+now is that each of the four capabilities names a gate that runs, a number from a committed results
+file, and **that gate's own** pre-registered pass criterion, met — no bar is introduced after the
+fact. State estimation reads 0.999952 / 1.000 / 0.9991 across all three formats, opponent modelling
+1.000 POV fidelity at 0.9582 action agreement, damage math 1.000 over 9,734 transitions, and
+win-condition planning runs at n = 2500/arm. *Not claimed:* that any of it raises win rate —
+planning's pre-registered verdict is **NULL** (p = 0.762), and it is in the record rather than
+dropped, because dropping it is the claim G5 exists to replace.
 
 **Key finding: a learned method finally clears the heuristic plateau.** For eight levers
 every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
