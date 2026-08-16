@@ -44,16 +44,20 @@ def test_the_manifest_covers_one_runnable_weight_per_format():
 
 
 @pytest.mark.skipif(not _MANIFEST.exists(), reason="manifest not generated")
-def test_the_committed_manifest_matches_a_fresh_derivation():
-    """Regenerating must reproduce the committed file except for the hashes, which need the actual
-    weights present. Compare the structure, not the digests."""
+def test_the_committed_manifest_lists_exactly_what_the_headlines_cite():
+    """The drift check, and it must run WHERE THE WEIGHTS ARE NOT -- which is CI, and a clone.
+
+    The first version of this compared the committed file to `build_manifest()`, which skips
+    checkpoints absent from disk. That passes only on the machine holding the weights and fails on
+    every bare clone, so it tested the environment rather than the manifest. `_cited_by_headlines`
+    reads committed `results/` alone and needs no checkpoint present, so the comparison is the one
+    actually worth making: does the shipped list still match the claims it is derived from?
+    """
     ra = _mod()
     committed = json.loads(_MANIFEST.read_text())
-    fresh = ra.build_manifest()
-    assert [a["path"] for a in fresh["assets"]] == [a["path"] for a in committed["assets"]]
-    assert {a["path"]: a["backs"] for a in fresh["assets"]} == {
-        a["path"]: a["backs"] for a in committed["assets"]
-    }
+    assert sorted(a["path"] for a in committed["assets"]) == sorted(ra._cited_by_headlines())
+    for a in committed["assets"]:
+        assert a["backs"] == ra._cited_by_headlines()[a["path"]]
 
 
 @pytest.mark.skipif(not _MANIFEST.exists(), reason="manifest not generated")
