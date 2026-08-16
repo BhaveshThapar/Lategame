@@ -268,14 +268,34 @@ def _print_table(summary: dict, verd: str) -> None:
 # --------------------------------------------------------------------------------------
 # Gate C -- confirmatory ladder on the single best checkpoint.
 # --------------------------------------------------------------------------------------
-async def _ladder(ckpt: str, fmt: str, n: int) -> dict[str, float]:
+async def _ladder(ckpt: str, fmt: str, n: int, team_pool: str | None = None) -> dict[str, float]:
+    """Gate C. THE THIRD collection site in this file that needed the pool and did not have it.
+
+    Gate A collects, the self-play loop collects, and this ladder builds its own players -- three
+    independent paths, and threading the pool into `SelfPlayConfig` reached exactly one of them.
+    `build_player` refuses a teamless teambuilt build now, so a fourth site cannot be added quietly.
+
+    Both sides draw from the same pool with different seeds, as the ceiling gate does, so the
+    matchup varies and the mirror stays fair in expectation.
+    """
+    def _team(seed: int) -> object | None:
+        if not team_pool:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool.from_packed_file(team_pool, seed=seed)
+
     out: dict[str, float] = {}
     for base in _LADDER:
         learner = build_player(
             policy_agent(fmt), fmt, checkpoint_path=ckpt,
             max_concurrent_battles=_EVAL_CONCURRENCY,
+            team=_team(0),  # type: ignore[arg-type]
         )
-        opponent = build_player(base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY)
+        opponent = build_player(
+            base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY,
+            team=_team(1),  # type: ignore[arg-type]
+        )
         out[base] = round(await evaluate_built(learner, opponent, n), 4)
     return out
 
@@ -350,7 +370,9 @@ async def run_gate(args: argparse.Namespace) -> dict:
     result["best_checkpoint"] = overall_best["best_checkpoint"]
     if verd != "AMBER" or summary["best_vs_heuristic"]["mean"] >= _AMBER_VS_ITER0:
         print(f"\nconfirmatory ladder (n={args.ladder_n}) on {overall_best['best_checkpoint']}")
-        ladder = await _ladder(overall_best["best_checkpoint"], args.battle_format, args.ladder_n)
+        ladder = await _ladder(
+            overall_best["best_checkpoint"], args.battle_format, args.ladder_n, args.team_pool
+        )
         print("  " + "  ".join(f"{k} {v:.3f}" for k, v in ladder.items()))
         result["confirmatory_ladder"] = ladder
 

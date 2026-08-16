@@ -38,8 +38,10 @@ def test_build_player_forwards_loop_penalty_only_to_learned_agents(monkeypatch):
     monkeypatch.setitem(arena.AGENTS, "bc", _fake("bc"))
     monkeypatch.setitem(arena.AGENTS, "random", _fake("random"))
 
-    build_player("bc", "gen9ou", checkpoint_path="x.pt", loop_penalty=4.0)
-    build_player("random", "gen9ou", loop_penalty=4.0)
+    # Teams are passed because `build_player` now refuses a teamless teambuilt build; the
+    # subject of this test is kwarg forwarding, and a real caller has to supply one anyway.
+    build_player("bc", "gen9ou", checkpoint_path="x.pt", loop_penalty=4.0, team="T")
+    build_player("random", "gen9ou", loop_penalty=4.0, team="T")
 
     assert captured["bc"]["loop_penalty"] == 4.0
     assert "loop_penalty" not in captured["random"]
@@ -144,14 +146,35 @@ def test_poke_envs_own_baselines_are_allowed_on_doubles(monkeypatch):
 
     for name in ("random", "maxbasepower", "simpleheuristics", "heuristic"):
         monkeypatch.setitem(arena.AGENTS, name, lambda **kw: object())
-        build_player(name, "gen9vgc2025regi")  # must not raise
+        build_player(name, "gen9vgc2025regi", team="T")  # must not raise
+
+
+def test_a_teambuilt_format_is_refused_without_a_team(monkeypatch):
+    """Forgetting the team is not an error anywhere else, which is why it is one here.
+
+    Showdown answers a teamless challenge on a teambuilt format with a popup -- "Your team was
+    rejected ... This format requires you to use your own team" -- that poke-env logs at WARNING.
+    Nothing raises; the player simply never battles, and the arm reads as a run that produced no
+    wins rather than one that never started. THREE independent call sites in
+    `scripts/curriculum_gate.py` had this defect at once (Gate A's collection, the self-play loop,
+    and Gate C's ladder), each found only by watching a cluster job's log. `build_player` is the
+    one choke point where it can be caught before a node is claimed.
+    """
+    import lategame.eval.arena as arena
+
+    monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
+    for fmt in ("gen9ou", "gen9vgc2025regi"):
+        with pytest.raises(ValueError, match="needs a `team`"):
+            build_player("heuristic", fmt)
+    # Random Battles must NOT require one -- the server supplies the teams there.
+    build_player("heuristic", "gen9randombattle")
 
 
 def test_the_singles_agents_are_still_fine_on_singles(monkeypatch):
     import lategame.eval.arena as arena
 
     monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
-    build_player("heuristic", "gen9ou")
+    build_player("heuristic", "gen9ou", team="T")
     build_player("heuristic", "gen9randombattle")
 
 
@@ -272,9 +295,9 @@ def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypat
     monkeypatch.setitem(arena.AGENTS, "random", Dummy)
 
     arena.build_player(
-        "doubles_ppo", "gen9vgc2025regi", checkpoint_path="x.pt", max_battle_turns=99
+        "doubles_ppo", "gen9vgc2025regi", checkpoint_path="x.pt", max_battle_turns=99, team="T"
     )
     assert seen["max_battle_turns"] == 99 and seen["loop_penalty"] == 0.0
 
-    arena.build_player("random", "gen9vgc2025regi", max_battle_turns=99)
+    arena.build_player("random", "gen9vgc2025regi", max_battle_turns=99, team="T")
     assert "max_battle_turns" not in seen
