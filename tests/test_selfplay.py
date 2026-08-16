@@ -82,6 +82,45 @@ def test_selfplay_config_has_the_teambuilt_and_cap_fields():
     assert cfg.max_battle_turns is None
 
 
+def test_run_selfplay_rejects_format_mismatch(tmp_path):
+    """Collection reads the checkpoint's format, eval reads the config's; a mismatch means the
+    two measure different games. `run_ppo` has refused this since Build 26; M4 did not."""
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "rb_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9randombattle", -3.0, 3.0, 11
+    )
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9ou")
+    with pytest.raises(ValueError, match="format mismatch"):
+        asyncio.run(run_selfplay(cfg))
+
+
+def test_run_selfplay_rejects_an_encoder_mismatched_warm_start(tmp_path):
+    """A singles-dimension checkpoint tagged as VGC clears the format check and must die on the
+    codec fingerprint -- otherwise it reaches the fine-tune step as a shape error, one full
+    iteration of collection later."""
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "fake_vgc_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9vgc2025regi", -3.0, 3.0, 11
+    )
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9vgc2025regi")
+    with pytest.raises(ValueError, match="encoder mismatch"):
+        asyncio.run(run_selfplay(cfg))
+
+
 def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
     """`_eval_point` was the first thing a VGC self-play run hit, and it hardcoded `offrl`.
 
