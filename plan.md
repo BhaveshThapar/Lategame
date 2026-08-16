@@ -3233,6 +3233,55 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     both sides — a large part of VGC skill the policy cannot express, adding variance to every
     number above.
 
+- **RELEASE FOLLOW-UPS — M4 RUNS ON DOUBLES, THE CORRECTED LADDER IS PUBLISHED, AND THE B6f
+  INTERMEDIATES ARE PRUNED (2026-08-15).** Four items closed after the release-readiness merge.
+
+  - **CI WAS RED ON EVERY PUSH, INCLUDING THE PUSH THAT ADDED IT.** The workflow runs a bare
+    `pytest -q`; four test modules do `from tests.conftest import ...`; `tests/` is not a package
+    and `[tool.setuptools.packages.find] include = ["lategame*"]` makes the editable install
+    finder-based, so nothing puts the repo root on `sys.path` for that invocation. The failure is
+    at COLLECTION — `Interrupted: 4 errors during collection`, 0 tests run. The reported-green
+    708/6 was measured through `python -m pytest`, the one form that hides it. `pythonpath = ["."]`
+    makes both forms equivalent.
+
+  - **M4 DOUBLES: THE DIAGNOSIS WAS WRONG AND THE REPAIR WAS BIGGER.** `"offrl"` in
+    `train/selfplay.py` is an agent-registry name, not a format string; `battle_format` was already
+    threaded correctly. The kill is `build_player` refusing a singles-only name on a doubles format
+    (Build 26, deliberate). Beyond the five name sites: `_eval_point` passed `team=` to *none* of
+    its four `build_player` calls, `collect_selfplay` had no `team_pool` parameter at all, and
+    `run_selfplay` did none of `run_ppo`'s warm-start checks. `SelfPlayConfig` gains `team_pool`
+    and `max_battle_turns`, both `None`-default; **not** `loop_penalty`, whose only honest doubles
+    value is 0.0. `tests/test_arena.py`'s dispatch test already enumerated the modules that must
+    ask rather than hardcode — `train.selfplay` was the one missing from that list.
+
+  - **THE n = 300 BC/AWR RE-MEASURE WAS ALREADY DONE; THE README JUST NEVER SHOWED IT.** The table
+    above (BC 0.453, AWR 0.467) has been in `results/format_ceiling_gate_vgc_v2.json` since
+    `85a3a01`, and in this file, while the README said "withdrawn and re-run" and stopped there.
+    Published now, with the withdrawn n = 100 reads printed as provenance rather than as a delta.
+    The record itself carried no checkpoint paths and labels its learned rows `bc_v11` / `offrl_ou`
+    (OU-era schema keys that describe nothing on a VGC run), so `_arm_record` now records the path
+    going forward and a top-level `_provenance` block back-fills it, flagged three ways as
+    hand-added. Only then could the ladder be promoted to a `check_artifacts.py` headline: against
+    the pre-back-fill record that promotion fails `test_every_headline_maps_to_a_gate_file_that_
+    cites_something` on `assert 0` — a headline that reports OK while checking nothing.
+
+  - **G4's VGC COLUMN WAS A PRE-LOOP-FIX READ PRESENTED AS CURRENT.** Measured in `4647bb0`, three
+    days before `18fe55c` found the loop, on the instrument whose output got BC/AWR withdrawn. All
+    four of its cells were re-measured at the same n = 300 afterwards (mirror 0.523 → 0.503,
+    `simpleheuristics` 0.527 → 0.467, `maxbasepower` 0.300 → 0.310, `random` 0.017 → 0.023). Now
+    marked superseded. The INSUFFICIENT verdict is unaffected — the corrected competent bot sits
+    *further* below the 0.58 headroom threshold, not nearer it.
+
+  - **PRUNE APPLIED: 234 files, 705,479,112 B.** `checkpoints/` 2,183,910,041 → 1,478,430,929 B;
+    361 → 127 files. Only the three `ppo_b6f_s{0,1,2}` arms had anything to delete; every other arm
+    was already at its retention set. Each b6f arm kept exactly three files — `curve.json`, the
+    gate-declared terminal `iter_80.pt`, and the cited best (`s0/iter_62`, `s1/iter_63`,
+    `s2/iter_57`). `check_artifacts.py --json` is byte-identical across the prune apart from the
+    headline entry added in the preceding commit: 121 cited, 63 present, 58 missing, 52 files
+    citing a missing path, 4/4 headlines OK. A moved digit there would have meant the retention
+    rules deleted something a result cites, since rule 1 keeps anything cited. The post-prune dry
+    run reports `TOTAL 0 0.00G`.
+
 ---
 
 ## 14. Risks & mitigations
