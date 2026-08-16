@@ -157,6 +157,13 @@ def _check_warm_start(ckpt: dict, config: SelfPlayConfig) -> None:
     counterpart here on purpose: ``SelfPlayConfig`` carries no ``loop_penalty``. Its only honest
     doubles value would be 0.0, since ``DoublesLoopGuard`` is a per-slot penalty over a different
     action layout, so the field would be a knob with one correct setting.
+
+    The value-support check is a THIRD one this function did not originally have, and its absence
+    reproduced the exact failure the other two exist to prevent. ``doubles_bc_vgc_v2.pt``
+    clears the format and encoder checks and then dies one line into ``run_selfplay`` on
+    ``KeyError: 'v_min'``: a BC checkpoint stamps ``n_bins`` but no value support, because BC never
+    fits a critic. A bare KeyError one statement past a guard whose whole job is naming the refusal
+    is the same defect the guard was written for.
     """
     # Checked FIRST: the encoder check below is only meaningful once we know which format's codec
     # to check against. A checkpoint with no `battle_format` key is a legacy RB warm start and
@@ -179,6 +186,14 @@ def _check_warm_start(ckpt: dict, config: SelfPlayConfig) -> None:
             f"{ckpt.get('input_dim')}/{ckpt.get('n_actions')} vs {codec.name} codec "
             f"{codec.obs_version}/{codec.obs_dim}/{codec.n_actions}); cannot warm-start "
             f"self-play. Retrain."
+        )
+    missing = [k for k in ("v_min", "v_max", "n_bins") if ckpt.get(k) is None]
+    if missing:
+        raise ValueError(
+            f"init checkpoint carries no value support ({', '.join(missing)} missing or None); "
+            f"self-play warm-starts AC -> AC each iteration and pins the critic's support to the "
+            f"init, so there is nothing to pin to. This is what a BC checkpoint looks like -- "
+            f"warm-start from the offline-RL one trained on top of it instead."
         )
 
 

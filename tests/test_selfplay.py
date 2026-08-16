@@ -121,6 +121,38 @@ def test_run_selfplay_rejects_an_encoder_mismatched_warm_start(tmp_path):
         asyncio.run(run_selfplay(cfg))
 
 
+def test_run_selfplay_rejects_a_warm_start_with_no_value_support(tmp_path):
+    """The guard's own blind spot: a BC checkpoint clears format AND encoder, then dies on
+    `KeyError: 'v_min'` one statement later.
+
+    `checkpoints/doubles_bc_vgc_v2.pt` is exactly this -- `n_bins` 51, no `v_min`/`v_max`, because
+    BC fits no critic. Self-play pins the value support to its init, so there is nothing to pin to;
+    the point of a pre-flight guard is that this says so by name instead of raising a bare KeyError
+    from a dict access.
+    """
+    import asyncio
+
+    import torch
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "bc_shaped_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9randombattle", -3.0, 3.0, 11
+    )
+    # Strip the support the way `train_bc` never writes it in the first place.
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    del ckpt["v_min"], ckpt["v_max"]
+    torch.save(ckpt, path)
+
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9randombattle")
+    with pytest.raises(ValueError, match="no value support"):
+        asyncio.run(run_selfplay(cfg))
+
+
 def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
     """`_eval_point` was the first thing a VGC self-play run hit, and it hardcoded `offrl`.
 
