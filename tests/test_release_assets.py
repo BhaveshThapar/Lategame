@@ -70,3 +70,52 @@ def test_every_asset_carries_a_digest_and_a_size():
     for a in m["assets"]:
         assert len(a["sha256"]) == 64 and int(a["sha256"], 16) >= 0
         assert a["bytes"] > 0
+
+
+def _manifest_fixture(tmp_path, runnable_present, runnable_corrupt=False, provenance_present=False):
+    """A miniature manifest plus files on disk, so verify's semantics can be checked directly."""
+    import hashlib
+
+    ra = _mod()
+    good = tmp_path / "good.pt"
+    good.write_bytes(b"weights")
+    digest = hashlib.sha256(b"weights").hexdigest()
+    assets = [
+        {"path": str(good), "bytes": 7, "sha256": digest, "backs": ["x"], "runnable": "gen9ou"},
+        {"path": str(tmp_path / "prov.pt"), "bytes": 7, "sha256": digest,
+         "backs": ["x"], "runnable": None},
+    ]
+    if not runnable_present:
+        good.unlink()
+    elif runnable_corrupt:
+        good.write_bytes(b"tampered")
+    if provenance_present:
+        (tmp_path / "prov.pt").write_bytes(b"weights")
+    return ra, {"assets": assets}
+
+
+def test_absent_provenance_is_not_a_failure(tmp_path, capsys):
+    """A fresh clone has none of the 15 provenance checkpoints and that is the correct state. The
+    first version of verify checked all 18 and told such a user `0/18 verified`, which reads as a
+    broken download."""
+    ra, m = _manifest_fixture(tmp_path, runnable_present=True)
+    assert ra.verify(m) == 0
+    out = capsys.readouterr().out
+    assert "1/1 release assets present and verified" in out
+    assert "absent is normal and is not an error" in out
+
+
+def test_an_undownloaded_release_asset_is_not_a_failure_either(tmp_path, capsys):
+    """Before the weights are published, every user is in this state. It must exit 0 and say what
+    to do, not look like corruption."""
+    ra, m = _manifest_fixture(tmp_path, runnable_present=False)
+    assert ra.verify(m) == 0
+    assert "none downloaded yet" in capsys.readouterr().out
+
+
+def test_a_present_but_tampered_asset_always_fails(tmp_path, capsys):
+    """The case the digest exists for. `torch.load` runs code out of this file."""
+    ra, m = _manifest_fixture(tmp_path, runnable_present=True, runnable_corrupt=True)
+    assert ra.verify(m) == 1
+    out = capsys.readouterr().out
+    assert "MISMATCH" in out and "do not load these" in out

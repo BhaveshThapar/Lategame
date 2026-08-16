@@ -29,21 +29,30 @@ and usage prior, the pinned simulator rev — and the gate scripts that re-deriv
 [Artifacts & reproducibility](#artifacts--reproducibility) for what a clean clone can and cannot
 reproduce.
 
-**The weights ship with the release, not the clone.** Three checkpoints are attached to the
-[v1.0.0 release](https://github.com/BhaveshThapar/Lategame/releases/tag/v1.0.0) — 23 MiB total, one
-playable policy per teambuilt format. Drop them under `checkpoints/` and point the CLI at one:
+**What a fresh clone can do today, exactly.** The rule-based baseline and poke-env's bots play
+immediately — that is the command above, and it needs no weights. Every learned agent (`offrl`,
+`ppo`, `bc`, `doubles`) needs a checkpoint, and **no weights are published yet**:
+[Releases](https://github.com/BhaveshThapar/Lategame/releases) is empty, so a learned agent fails
+with a `FileNotFoundError` naming the file it wanted. Two honest options until then — train one
+(`lategame train-rl`, see [Run](#run)), or open an issue asking for the assets.
+
+**What will be published, and how to check it.** `results/release_assets.json` already names the
+three checkpoints intended for the release — 23 MiB, one playable policy per teambuilt format — with
+the sha256 and byte length of each. It is derived from `check_artifacts.HEADLINE` rather than
+hand-kept, so it cannot drift from the claims those weights back. Once they are attached, drop them
+under `checkpoints/` and:
 
 ```bash
-python scripts/release_assets.py --verify        # sha256 every file against the committed manifest
+python scripts/release_assets.py --verify        # what you have, and whether it is the right file
 
 python -m lategame.cli evaluate --p1 offrl --p1-checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
   --p2 heuristic --n 100 --format gen9ou         # the gen9ou ladder top vs the fixed baseline
 ```
 
 **Verify before you load.** A checkpoint is a pickle and `torch.load` executes code from it, so
-`results/release_assets.json` carries the sha256 and byte length of every asset — checked into git,
-derived from `check_artifacts.HEADLINE` rather than hand-kept, and re-checkable offline with the
-command above. "Trust the file on the release page" is not a security posture.
+"trust the file on the release page" is not a security posture. `--verify` gates on the release
+assets only; the other checkpoints the manifest lists are provenance for published curves and were
+never going to be on your machine, so it says so rather than reporting them as a failed download.
 
 ## Where it stands
 
