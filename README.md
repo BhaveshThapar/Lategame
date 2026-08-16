@@ -5,6 +5,52 @@ server — with the whole pipeline built and reported on **Gen 9 Random Battles*
 Lever 15 measured that format's ceiling and forced the pivot (see Status). See [plan.md](plan.md)
 for the full PRD and roadmap.
 
+---
+
+## Quickstart
+
+```bash
+conda env create -f environment.yml && conda activate lategame
+bash scripts/setup_server.sh          # vendored Showdown, pinned rev, builds dist/
+bash scripts/run_server.sh &          # ws://localhost:8000
+
+python -m lategame.cli evaluate --p1 heuristic --p2 random --n 20 --format gen9ou
+```
+
+That runs the rule-based baseline against `random` on a local server and prints a win rate — no
+weights, no GPU, no network. The team pool is defaulted per format (`--team-pool` overrides);
+Random Battles needs none. `python -m lategame.cli --help` lists the rest — [Run](#run) has the
+training and evaluation pipelines, [Develop](#develop) has the test / lint / type bar.
+
+**A clone contains no trained weights.** `checkpoints/` and `data/` are gitignored, so every number
+below came from files that live only on the machine that produced them. What ships is the
+*evidence*: 236 `results/*.json` gate summaries, the validator-checked team pools, the encoder vocab
+and usage prior, the pinned simulator rev — and the gate scripts that re-derive it. See
+[Artifacts & reproducibility](#artifacts--reproducibility) for what a clean clone can and cannot
+reproduce.
+
+## Where it stands
+
+| goal | status | headline |
+|---|---|---|
+| **G1** live play | built + verified | `lategame/live/`, behind an explicit opt-in |
+| **G2** strong-human on one format | **met, both halves** | gen9ou **0.7513** vs the heuristic; agent-only ladder **Glicko 1776.3 / GXE 0.7434** |
+| **G3** continual improvement | **booked** | five-dose self-play curve, monotone on both reads (80 → 320 updates) |
+| **G4** ≥3 formats through one core | **met** | `gen9randombattle`, `gen9ou`, `gen9vgc2025regi` end to end |
+| **G5** skill stack as testable capability | **met** | four capabilities, each on its own gate's criterion |
+
+**Two of the three formats measure as ceiling-bound, and that is a result rather than a shortfall.**
+gen9-RB and VGC both return `FORMAT_BOUND` from the three-leg ceiling probe — nothing competent
+beats the fixed heuristic there, near-optimal search included — so the project's own instruments say
+not to spend more on their strength axes. gen9ou is where headroom was proven and where the strength
+result lives.
+
+**Not claimed:** no public *ranked* ladder play (NG3), so the Glicko figure is measured against a
+bot field and is **not** comparable to a Showdown GXE against humans; and only the self-play axis of
+G3 has a dose-response curve, not the replay-data axis.
+
+---
+
 ## Status
 
 A complete experimental pipeline is built and verified — rule-based baseline → behavior
@@ -29,11 +75,24 @@ end to end through one core, and Build 28 then ran the *strength* campaign on th
 (`gen9vgc2025regi`) that G4's exit criterion deliberately did not require: BC → offline RL →
 factored PPO. That campaign's headline is a **correction**, not a win: the VGC shards it started
 from were 94% frames from one looping bug of ours, so the previously reported doubles BC/AWR
-numbers are withdrawn and re-run. On corrected data, factored PPO beats its own warm start
+numbers were withdrawn and re-run at n = 300 — **BC 0.453**, **AWR 0.467**, both stronger than the
+withdrawn reads, published in
+[the corrected ladder below](#build-28--b6f--the-vgc-shard-was-94-one-bug-and-it-was-ours). On
+corrected data, factored PPO beats its own warm start
 **0.530** [0.519, 0.540] over 9,000 battles (all three seeds individually clear 0.50) but is
 **NULL** against the fixed heuristic — a format whose competent bots sit at parity with each
-other, so the pre-registered stop rule fires and the strength axis is ceiling-bound. That leaves
-**G5**, as *demonstrated* rather than merely implemented capability.
+other, so the pre-registered stop rule fires and the strength axis is ceiling-bound.
+
+**G5 is MET** (`results/g5_capability_gate.json`), and it needed an exit criterion before it could
+be: the goal was stated once and referenced twice as open, with no threshold, no gate and no record
+anywhere — so "demonstrated rather than merely implemented" was itself merely written. The criterion
+now is that each of the four capabilities names a gate that runs, a number from a committed results
+file, and **that gate's own** pre-registered pass criterion, met — no bar is introduced after the
+fact. State estimation reads 0.999952 / 1.000 / 0.9991 across all three formats, opponent modelling
+1.000 POV fidelity at 0.9582 action agreement, damage math 1.000 over 9,734 transitions, and
+win-condition planning runs at n = 2500/arm. *Not claimed:* that any of it raises win rate —
+planning's pre-registered verdict is **NULL** (p = 0.762), and it is in the record rather than
+dropped, because dropping it is the claim G5 exists to replace.
 
 **Key finding: a learned method finally clears the heuristic plateau.** For eight levers
 every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
@@ -953,6 +1012,14 @@ neither M2 nor M3 exists here. **G4 is therefore neither greenlit nor descoped**
 that on doubles the cheap probe is *not decisive*, because every agent cheap enough to run before
 building the pipeline is a singles policy applied per slot.
 
+> **SUPERSEDED (2026-08-16): both missing legs exist now, and the tie is broken.** The doubles
+> forward model runs under `ShapedOnlyPolicy`, and VGC replays turn out to need no forward model at
+> all for M3 — a teambuilt format declares both rosters in `|poke|` lines before turn 1. M2 lands at
+> **0.373** (n = 300) and M3 at **0.520** (n = 997), and the three-leg rule returns
+> **`FORMAT_BOUND`**. See [the three-leg verdict below](#the-vgc-ceiling-stands-on-three-legs-now--format_bound).
+> The `INSUFFICIENT` above is not withdrawn — it was the correct verdict on one leg — but it is no
+> longer the current one.
+
 ### Build 27 / Gate B — search does not compound on OU either, and the h2h says it is harmful
 
 L11–L14 retired test-time search at parity, but all of it was measured on gen9-RB — which Lever 15
@@ -1137,11 +1204,128 @@ ratios are real), `invalid_frac_max` <= 0.031 against a 0.05 ceiling, `dec_frac_
 Without the decision-row denominator the same run would have reported a KL an order of magnitude
 smaller and certified a trust region that never bound.
 
+### Team preview is modelled now, and it does not move the VGC verdict
+
+Every VGC number above was measured with `Player.random_teampreview` picking 4 of 6 uniformly at
+random on **both** sides, and plan.md has carried that as an open caveat — "a large part of VGC
+skill the policy cannot express, adding variance to every number above". `lategame/agents/
+teampreview.py` now scores the bring: our known moves into their previewed six for offense, their
+STAB types into ours for threat, combined multiplicatively so a mon that cannot damage anything
+scores zero however well it resists. It is applied by `eval.arena.build_player` to **every** player
+on a doubles format, poke-env's own baselines included — a preview policy on our arm alone would
+have let it bring a better four and had that read as play strength.
+
+**The contrast, n = 300 per cell, both halves run back to back in one session against one server
+and one team pool** (`results/format_ceiling_gate_vgc_v3.json`, `..._v3_nopreview.json`):
+
+| arm | preview OFF | preview ON | ON − OFF |
+|---|---|---|---|
+| mirror (sanity) | 0.497 [0.440, 0.553] | 0.497 [0.440, 0.553] | +0.000 |
+| `simpleheuristics` | 0.520 [0.464, 0.576] | 0.493 [0.437, 0.550] | −0.027 |
+| `maxbasepower` | 0.280 [0.232, 0.333] | 0.290 [0.242, 0.344] | +0.010 |
+| `random` | 0.057 [0.036, 0.089] | 0.013 [0.005, 0.034] | −0.043 |
+| **AWR** (`doubles_offrl_vgc_v2.pt`) | 0.387 [0.333, 0.443] | **0.447** [0.391, 0.503] | **+0.060** |
+| **BC** (`doubles_bc_vgc_v2.pt`) | 0.467 [0.411, 0.523] | 0.453 [0.398, 0.510] | −0.013 |
+
+Each cell is *both* sides gaining a preview, so a delta is the NET of the arm's gain against the
+heuristic's. Read that way the ordering is the expected one: `random` drops the most (−0.043) because
+preview skill compounds with play skill and it has none to compound with, and the learned AWR arm
+gains the most (+0.060) — a policy that can use a favourable bring is the one a bring helps.
+
+**What it does not do is move the verdict.** Harness sanity is unchanged (mirror 0.497, gradient
+ordered, both `harness_ok`), and the competent bot reads 0.520 OFF / 0.493 ON against a HEADROOM
+threshold of 0.58 — `INSUFFICIENT` either way, and not close. So the caveat was real and is now
+retired rather than inherited: modelling preview does **not** rescue the doubles ceiling, and the
+published BC/AWR ladder above is not invalidated by having been measured without it.
+
+*The reason both halves had to be run in one session.* Against the on-record v2 ladder — the same
+configuration, a different day — the preview-OFF rerun drifts by up to **0.080** (`offrl_ou` 0.467 →
+0.387, `simpleheuristics` 0.467 → 0.520). That cross-run band is **larger than the largest preview
+effect measured**. Comparing v3-ON against the v2 record would have attributed run-to-run noise to
+team preview and gotten a bigger, cleaner-looking answer than the truth.
+
+### The VGC ceiling stands on three legs now — FORMAT_BOUND
+
+The doubles ceiling probe has reported `INSUFFICIENT` since it was built, and that was never a
+finding about VGC: it is `assess_ou` saying it cannot tell, from **M1 alone**, on a path that
+structurally could not return `FORMAT_BOUND` at all. Lever 15's RB verdict needed three legs.
+Doubles has three (`results/format_ceiling_gate_vgc_v3.json`):
+
+| leg | what it measures | value | instrument |
+|---|---|---|---|
+| **M1** | best competent bot vs `heuristic` | **0.493** | n=300/cell, mirror 0.497, gradient ordered |
+| **M2** | near-optimal depth-2 search vs `heuristic` | **0.373** | n=300 pooled over 10 shards, sanity vs `random` 0.94 |
+| **M3** | team-strength → winner AUC | **0.520** [0.482, 0.556] | n=997 human replays |
+
+`competent = max(0.493, 0.373, 0.453) = 0.493 ≤ BAND_TOP 0.53` →
+**`FORMAT_BOUND` → `stop_strength_axis`.** Not `ou_pivot`: that branch is advice for a format
+measured *before* the OU pivot, and handing it to a format reached long after is an instruction to
+redo finished work.
+
+**M2 is the weaker leg, and the caveat was written before the run.** It evaluates leaves with
+`ShapedOnlyPolicy` — shaped state value from HP and faints, no encoder, no priors — because that is
+the only mode in which `search` is admitted to a doubles format at all. `expectimax.py` pre-registers
+what follows: *a WIN is decisive, a NULL is suggestive only, because a shallower leaf could produce
+a null on its own.* RB's M2 used GREEN's trained value head, so **VGC's FORMAT_BOUND is less
+strongly evidenced than RB's**, and the verdict carries `m2_leaf` so that travels with the branch
+rather than living in a docstring two modules away.
+
+**M3 corroborates the mechanism and cannot gate the branch** — pinned since Lever 15 by
+`test_verdict_format_bound_even_with_low_auc`. Its *meaning* changes on a teambuilt format, though,
+and the note now says so instead of repeating RB's: nobody assigned these teams, so a low AUC is a
+claim about the metagame's breadth rather than about server-side level equalisation. It also scores
+the brought **six**, not the played **four**, and the sample is **unrated** — the replay index
+reports no rating for this format at all, where RB's M3 used a rated ≥ 1200 sample.
+
+*The Random Battles record is untouched, and that was checked rather than assumed.* An absent
+`format` key means gen9-RB — `run_m1` only began writing that field when teambuilt support landed,
+so the record carrying the original FORMAT_BOUND verdict has none. Re-deriving its decision from its
+own M1/M2/M3 reproduces verdict, branch, reason, mirror sanity and the M3 note identically.
+
+
+### M4 runs on doubles as a build — a capability record, not a strength claim
+
+`run_selfplay` writes a curve to `<out_dir>` and nothing to `results/`, so every M4 run before this
+one left an artifact `check_artifacts` could not see and a later build could not cite. The one
+bridge from the loop to `results/` is `scripts/curriculum_gate.py`, and it was singles-hardcoded
+three ways; `scripts/cluster/selfplay_gate.slurm` is new, because there was no cluster job for
+self-play at all. `results/curriculum_gate_m4_vgc_cap.json`:
+
+| stage | reads |
+|---|---|
+| Gate A pre-flight | **PASS** — 160 episodes, 80 win / 80 loss, return gap 6.86, 1,124 turns |
+| curve (iter 0 → 2) | vs `random` 0.950 → 0.983, vs `heuristic` 0.500 → 0.367 |
+| Gate C ladder | `random` 0.967, `maxbasepower` 0.733, `simpleheuristics` 0.567, `heuristic` 0.600 |
+
+**One seed, two iterations, on purpose.** The three-leg verdict above is `FORMAT_BOUND →
+stop_strength_axis`; spending a full three-seed arm on a format whose own ceiling probe says there
+is no headroom is exactly what the Lever-15 idiom exists to prevent. This run exists to show the
+doubles M4 path runs end to end and produces a citable record.
+
+**Its two `vs heuristic` reads must not be compared, and that is measured rather than asserted.**
+The curve says 0.367 and the ladder 0.600 for the same checkpoint. Two plausible causes were tested
+and both fail: the asymmetric turn cap (learner-capped-only 0.4167 vs neither-capped 0.4167 — a VGC
+battle never reaches 60 decisions) and sharing one `TeamPool` across both players (means 0.490 vs
+0.457, inside both spreads). What is left is the spread itself — ten independent n = 60 reads of one
+checkpoint against one opponent range **0.367 – 0.550**:
+
+```
+separate pools, 5 seed pairs   0.5167  0.4167  0.3667  0.4833  0.5000   spread 0.150
+shared pool,    5 seeds        0.4833  0.5167  0.5500  0.4833  0.4167   spread 0.133
+```
+
+n = 60 on a ten-team pool cannot support a comparison between two reads. plan.md already records the
+same clustering caveat for the OU ladder at n = 150 — battles cluster by team matchup, so the
+effective sample is well under n — and VGC with ten teams is worse. The 0.600 sits just above the
+observed range, so this is mostly but not provably entirely sampling noise, and no cause is claimed
+for the remainder. The record carries all of it under `_read_as`.
+
+
 ## Artifacts & reproducibility
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every number above was produced from files that exist only on the machine that ran
-them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 221
+them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 236
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`lategame/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`lategame/features/data/`), and the pinned simulator rev.
@@ -1155,12 +1339,13 @@ a gate can be re-pinned and a result file cannot:
 | Glicko **1776.3** / GXE **0.7434** | `results/eval_ladder_gen9ou_v26.json` |
 | VGC B6f C1 **0.530** | `results/ppo_vgc_gate_b6f{,_s0,_s1,_s2}.json`, `results/seed_strength_gate_b6f_c1.json`, `results/awr_vgc_arm_b6f.json` |
 | VGC corrected ladder **BC 0.453** / **AWR 0.467** | `results/format_ceiling_gate_vgc_v2.json` |
+| **G5 MET** — four capabilities, each on its own gate's criterion | `results/g5_capability_gate.json` |
 
 Every checkpoint those records name is present on the machine that produced them, and none of them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
-**58 of the 121 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-221 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+**58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
+236 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
@@ -1336,15 +1521,35 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 724 tests, 0 skipped with the env active (node) + a local server up
-                  #   LATEGAME_LIVE_TEST=1 also enables the opt-in live-client smoke
-                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 15 self-skip
-                  #   and 709 pass. That is what CI runs; a 16th skip is a regression, not noise.
+pytest            # 769 tests. With the env active (node ON PATH) + a local server up: 768 pass,
+                  #   1 skip -- the opt-in live-client smoke, which LATEGAME_LIVE_TEST=1 enables
+                  #   for 769/0. `node` on PATH is load-bearing: without it six simulator tests
+                  #   self-skip even with dist/ built.
+                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
+                  #   and 753 pass. That is what CI runs; a 17th skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form.
 ruff check .
-mypy lategame     # scoped to lategame/ on purpose: scripts/ carries 2 known pre-existing errors
+mypy lategame scripts   # both trees; CI runs the same two arguments
 ```
+
+**Reading the CI result without `gh`.** There is no `gh` on the dev host, which is a large part of
+why a red CI went unnoticed for eleven commits. It does not need one — the runs are public and the
+REST API is unauthenticated:
+
+```bash
+# last 5 runs: which branch, which commit, red or green
+curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs?per_page=5" \
+  | python -m json.tool | grep -E '"(run_number|head_branch|head_sha|conclusion)"'
+
+# per-step conclusions for one run (is it `pytest -q` that failed, or `mypy`?)
+curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs/<RUN_ID>/jobs" \
+  | python -m json.tool | grep -E '"(name|conclusion)"'
+```
+
+Only the log *text* needs a token (the download 403s anonymously), so the pass/skip split is not
+readable remotely — the step conclusion is. Check this after every push. A local run of the same
+command is a reproduction, not an observation, and the distinction is exactly what went wrong.
 
 ## Layout
 

@@ -13,7 +13,7 @@ move is weak AND a bench Pokemon offers a clearly better matchup.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from poke_env.battle import AbstractBattle, Move, Pokemon
 from poke_env.battle.double_battle import DoubleBattle
@@ -203,6 +203,43 @@ def doubles_pick(battle: DoubleBattle) -> list[DoublesPick]:
     return out
 
 
+def doubles_order(
+    battle: DoubleBattle,
+    create_order: Callable[..., SingleBattleOrder],
+    choose_default_move: Callable[[], BattleOrder],
+) -> BattleOrder:
+    """The M1 rule per slot, joined into a ``DoubleBattleOrder``. See ``_choose_doubles_move``.
+
+    A FREE FUNCTION because ``SearchAgent`` needs it too and is not a ``HeuristicAgent``. In
+    shaped-only mode the search has no trained policy to fall back on, so it falls back to the M1
+    rule -- and it was falling back to ``heuristic_pick``, the SINGLES one, which on a
+    ``DoubleBattle`` is handed ``available_moves`` as a list of per-slot lists and dies on
+    ``'list' object has no attribute 'base_power'``.
+
+    That failure is silent, which is why it survived being written down as fixed. poke-env
+    dispatches protocol messages through a detached task, so the AttributeError is logged and
+    swallowed, the agent never answers, and the SERVER plays a default move on the timer. An arm in
+    that state reads as a very weak agent rather than a broken one -- the exact hazard
+    ``arena._SINGLES_ONLY_AGENTS`` exists to refuse at build time, reappearing on the one path that
+    is allowed through the refusal.
+
+    Only ``create_order`` and ``choose_default_move`` are needed from the player, and both are
+    ``Player`` methods, so nothing here assumes which agent is asking.
+    """
+    picks = doubles_pick(battle)
+    orders: list[SingleBattleOrder] = [
+        PassBattleOrder()
+        if p is None
+        else create_order(p[0])
+        if isinstance(p[0], Pokemon)
+        else create_order(p[0], move_target=p[1])
+        for p in picks
+    ]
+    if all(isinstance(order, PassBattleOrder) for order in orders):
+        return choose_default_move()
+    return DoubleBattleOrder(orders[0], orders[1])
+
+
 class HeuristicAgent(Player):
     """M1 baseline. Singles is the original rule; doubles applies the same rule per slot.
 
@@ -254,15 +291,4 @@ class HeuristicAgent(Player):
 
         Both slots idle IS the whole-order case, so that still answers `/choose default`.
         """
-        picks = doubles_pick(battle)
-        orders: list[SingleBattleOrder] = [
-            PassBattleOrder()
-            if p is None
-            else self.create_order(p[0])
-            if isinstance(p[0], Pokemon)
-            else self.create_order(p[0], move_target=p[1])
-            for p in picks
-        ]
-        if all(isinstance(order, PassBattleOrder) for order in orders):
-            return self.choose_default_move()
-        return DoubleBattleOrder(orders[0], orders[1])
+        return doubles_order(battle, self.create_order, self.choose_default_move)

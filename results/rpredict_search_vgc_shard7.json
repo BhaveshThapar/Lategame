@@ -1,0 +1,21 @@
+{
+  "gate": "rpredict_oppmodel_gate_b",
+  "init": "checkpoints/doubles_offrl_vgc_v2.pt",
+  "n": 30,
+  "sanity_n": 10,
+  "depth": 2,
+  "seed": 7,
+  "format": "gen9vgc2025regi",
+  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "loop_penalty": 0.0,
+  "base_vs_heuristic": 0.3,
+  "arms": {
+    "whitebox": {
+      "search_vs_random": 0.8,
+      "search_vs_heuristic": 0.36666666666666664,
+      "search_vs_base": 0.43333333333333335,
+      "delta_vs_base_at_heuristic": 0.0667,
+      "verdict": "RED"
+    }
+  }
+}

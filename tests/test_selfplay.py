@@ -121,6 +121,38 @@ def test_run_selfplay_rejects_an_encoder_mismatched_warm_start(tmp_path):
         asyncio.run(run_selfplay(cfg))
 
 
+def test_run_selfplay_rejects_a_warm_start_with_no_value_support(tmp_path):
+    """The guard's own blind spot: a BC checkpoint clears format AND encoder, then dies on
+    `KeyError: 'v_min'` one statement later.
+
+    `checkpoints/doubles_bc_vgc_v2.pt` is exactly this -- `n_bins` 51, no `v_min`/`v_max`, because
+    BC fits no critic. Self-play pins the value support to its init, so there is nothing to pin to;
+    the point of a pre-flight guard is that this says so by name instead of raising a bare KeyError
+    from a dict access.
+    """
+    import asyncio
+
+    import torch
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "bc_shaped_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9randombattle", -3.0, 3.0, 11
+    )
+    # Strip the support the way `train_bc` never writes it in the first place.
+    ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    del ckpt["v_min"], ckpt["v_max"]
+    torch.save(ckpt, path)
+
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9randombattle")
+    with pytest.raises(ValueError, match="no value support"):
+        asyncio.run(run_selfplay(cfg))
+
+
 def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
     """`_eval_point` was the first thing a VGC self-play run hit, and it hardcoded `offrl`.
 
@@ -159,18 +191,10 @@ def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
         assert all(kw.get("team") == "POOL" for _n, kw in calls)
 
 
-def test_the_selfplay_loop_never_hardcodes_the_singles_agent_name():
-    """Pinned literally, because the behavioural test above cannot reach the `PlayerSpec`
-    construction inside `run_selfplay` without torch and a real checkpoint.
-
-    The quoted form deliberately does not match `SelfPlayConfig.init`'s default checkpoint PATH,
-    `"checkpoints/offrl_gen9randombattle.pt"`, which is not a registry name.
-    """
-    import inspect
-
-    from lategame.train import selfplay as sp
-
-    assert '"offrl"' not in inspect.getsource(sp)
+# The literal "never hardcodes `offrl`" pin for this module now lives in
+# `tests/test_arena.py::test_no_dispatch_module_hardcodes_the_singles_learner`, which checks the
+# same thing for every module that builds a learned player from a caller-supplied format. Keeping a
+# selfplay-only copy is how the enumeration drifted in the first place.
 
 
 def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
@@ -313,3 +337,57 @@ def test_load_actor_critic_weights_shape_mismatch_raises():
     dst = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=21)  # value head shape differs
     with pytest.raises(RuntimeError):
         load_actor_critic_weights(dst, src.state_dict())
+
+
+def test_curriculum_gate_scopes_its_paths_to_the_arm():
+    """`arm`, `checkpoints/<arm>_s<seed>/` and `data/` were the literal `curriculum_et_prior`, so a
+    VGC arm would have overwritten the Random Battles one in place and produced a record whose
+    `arm` field named the wrong experiment."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "curriculum_gate.py"
+    spec = importlib.util.spec_from_file_location("curriculum_gate", path)
+    assert spec is not None and spec.loader is not None
+    cg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cg)
+
+    assert cg._out_dir("m4_vgc", 1) == "checkpoints/m4_vgc_s1"
+    # The Random Battles arm keeps its historical paths byte for byte.
+    assert cg._out_dir("curriculum_et_prior", 0) == "checkpoints/curriculum_et_prior_s0"
+
+
+def test_collect_selfplay_refuses_a_teambuilt_format_with_no_team_pool():
+    """Without a pool the failure is NOT an error, which is why it needs to be made one.
+
+    Showdown answers a teamless challenge on a teambuilt format with a popup -- "Your team was
+    rejected ... This format requires you to use your own team" -- that poke-env logs as a WARNING.
+    Collection then gathers nothing while every surface reads as running. The first VGC M4 job died
+    exactly this way, after claiming its node, because `curriculum_gate`'s Gate A collects through
+    its own `collect_selfplay` call and the pool had only been threaded into `SelfPlayConfig`.
+    """
+    import asyncio
+
+    for fmt in ("gen9vgc2025regi", "gen9ou"):
+        with pytest.raises(ValueError, match="needs a `team_pool`"):
+            asyncio.run(
+                collect.collect_selfplay(PlayerSpec("doubles"), [PlayerSpec("random")], 1, fmt)
+            )
+
+
+def test_curriculum_gate_preflight_takes_the_pool_and_the_turn_cap():
+    """Gate A is a separate collection from the self-play loop's, so `SelfPlayConfig` carrying the
+    pool does nothing for it. Pinned by signature so the two cannot drift apart again."""
+    import importlib.util
+    import inspect
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "curriculum_gate.py"
+    spec = importlib.util.spec_from_file_location("curriculum_gate", path)
+    assert spec is not None and spec.loader is not None
+    cg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cg)
+
+    params = inspect.signature(cg.run_preflight).parameters
+    assert "team_pool" in params and "max_battle_turns" in params
+    assert "team_pool=team_pool" in inspect.getsource(cg.run_preflight)

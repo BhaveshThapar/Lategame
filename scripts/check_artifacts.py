@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from prune_checkpoints import (  # type: ignore[import-not-found]
+from prune_checkpoints import (
     _CKPT_RE,
     referenced_checkpoints,
 )
@@ -65,6 +65,13 @@ HEADLINE: dict[str, tuple[str, ...]] = {
     # checkpoint paths, so before that this entry would have registered as vacuously OK over an
     # empty checkpoint set -- a headline that checks nothing.
     "VGC corrected ladder BC 0.453 / AWR 0.467": ("format_ceiling_gate_vgc_v2.json",),
+    # G5 is an ASSEMBLY of gates that already ran, so the checkpoint it cites is the one the
+    # weakest leg stands on -- the pooled OU search init. If that weight is gone, the planning
+    # capability cannot be re-measured and the G5 verdict is not re-derivable, which is exactly
+    # what a headline is supposed to catch.
+    "G5 MET -- four capabilities, each on its own gate's pass criterion": (
+        "g5_capability_gate.json",
+    ),
 }
 
 

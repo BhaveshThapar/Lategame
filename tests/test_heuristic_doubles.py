@@ -289,3 +289,49 @@ def test_a_partial_replacement_sends_pass_for_the_unasked_slot():
     assert isinstance(order.first_order, PassBattleOrder)
     assert "default" not in order.message
     assert order.message.startswith("/choose pass, switch ")
+
+
+# --------------------------------------------------------------------------- #
+# The search agent's shaped-only fallback reaches doubles too.
+# --------------------------------------------------------------------------- #
+def test_the_search_fallback_uses_the_doubles_rule_not_the_singles_one():
+    """`SearchAgent`'s shaped-only fallback called `heuristic_pick`, the SINGLES rule.
+
+    On a DoubleBattle poke-env hands back `available_moves` as a list of per-slot lists, so that
+    call raised `'list' object has no attribute 'base_power'` -- and raised it inside poke-env's
+    detached message task, where it is logged and swallowed. The agent then never answers and the
+    server plays a default move on the timer, which reads as a very weak arm rather than a broken
+    one. This is the one path `_SINGLES_ONLY_AGENTS` deliberately lets through to doubles
+    (LATEGAME_SEARCH_SHAPED_ONLY=1, the VGC M2 ceiling probe), and `arena._singles_only_agents`
+    claimed in its own docstring that the fallback was doubles-capable while it was not.
+    """
+    from lategame.agents.search_agent import SearchAgent
+
+    battle = _FakeDoubleBattle(
+        active=[Pokemon(9, species="garchomp"), Pokemon(9, species="rillaboom")],
+        opponent_active=[Pokemon(9, species="pikachu"), Pokemon(9, species="charizard")],
+        moves=[[Move("earthquake", 9)], [Move("woodhammer", 9)]],
+        switches=[[], []],
+    )
+
+    agent = SearchAgent.__new__(SearchAgent)
+    # Shaped-only: no trained policy, so `choose_move` reaches the M1 fallback. `_pv` with no
+    # `greedy_order` is what that mode actually builds.
+    agent._pv = object()
+    agent._fm = None
+    agent._search = lambda *a, **kw: None  # search returns no order -> fall through
+
+    order = SearchAgent.choose_move(agent, battle)
+    assert isinstance(order, DoubleBattleOrder)
+    assert order.message.startswith("/choose move ")
+
+
+def test_the_doubles_join_is_one_function_shared_by_both_agents():
+    """Pinned so the fallback cannot drift back to a second copy of the rule. Duplicating it is how
+    the singles version survived in `search_agent` after the doubles path was built."""
+    import inspect
+
+    from lategame.agents import heuristic_agent, search_agent
+
+    assert "doubles_order" in inspect.getsource(search_agent.SearchAgent.choose_move)
+    assert "doubles_order" in inspect.getsource(heuristic_agent.HeuristicAgent._choose_doubles_move)

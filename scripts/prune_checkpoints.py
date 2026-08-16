@@ -33,7 +33,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -231,4 +230,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # `main` returns None -- every failure path already raises SystemExit itself, so wrapping the
+    # call in `sys.exit` only ever passed None (exit 0) and hid that from the type checker.
+    main()

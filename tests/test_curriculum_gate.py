@@ -75,7 +75,7 @@ def _curve(start: float, per_iter: list[tuple[float, float]]) -> list[dict]:
 
 def test_seed_record_picks_best_iter_and_final_iter0():
     curve = _curve(0.45, [(0.50, 0.52), (0.58, 0.61), (0.54, 0.55)])
-    rec = gate._seed_record("checkpoints/green.pt", 0, curve)
+    rec = gate._seed_record("checkpoints/green.pt", 0, curve, "curriculum_et_prior")
     assert rec["start_vs_heuristic"] == pytest.approx(0.45)
     assert rec["best_iter"] == 2  # 0.58 is the best vs_heuristic
     assert rec["best_vs_heuristic"] == pytest.approx(0.58)
@@ -86,19 +86,39 @@ def test_seed_record_picks_best_iter_and_final_iter0():
 
 def test_verdict_green_amber_red():
     green = [
-        gate._seed_record("g", s, _curve(0.46, [(0.57, 0.58), (0.60, 0.62)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.57, 0.58), (0.60, 0.62)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(green)) == "GREEN"
 
     amber = [
-        gate._seed_record("g", s, _curve(0.46, [(0.47, 0.49), (0.46, 0.48)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.47, 0.49), (0.46, 0.48)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(amber)) == "AMBER"
 
     red = [
-        gate._seed_record("g", s, _curve(0.46, [(0.33, 0.30), (0.31, 0.28)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.33, 0.30), (0.31, 0.28)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(red)) == "RED"
+
+
+def test_the_confirmatory_ladder_runs_the_arms_own_configuration():
+    """A ladder that confirms a DIFFERENT game than the one it confirms is worse than no ladder.
+
+    The first VGC capability record read `iter_01.pt` at 0.383 on the per-iteration curve and 0.600
+    on the confirmatory ladder -- 0.22 apart, against an n=60 standard error of ~0.063. Cause:
+    `_eval_point` passes `max_battle_turns` to all four of its builds and `_ladder` passed none, so
+    the two reads capped battles differently. Pinned by signature, because the failure produces a
+    plausible number rather than an error.
+    """
+    import inspect
+
+    params = inspect.signature(gate._ladder).parameters
+    assert "team_pool" in params, "three build sites needed the pool; this was the third"
+    assert "max_battle_turns" in params
+    src = inspect.getsource(gate._ladder)
+    # Both sides, not just the learner.
+    assert src.count("max_battle_turns=max_battle_turns") == 2
+    assert src.count("team=_team(") == 2
