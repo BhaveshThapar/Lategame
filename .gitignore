@@ -38,8 +38,6 @@ slurm-*.out
 .vscode/
 .idea/
 
-# Claude Code personal/local settings
-.claude/settings.local.json
 
 # Build-6 behavioral probe bulk artifacts (JSON summary + transcripts are committed)
 /results/behavior_probe_decisions.jsonl

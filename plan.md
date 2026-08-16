@@ -1307,7 +1307,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     identical machinery. `LoopGuard(0)` is exact identity. Chosen mechanism (per user): a **soft escalating logit
     penalty**, not a hard mask (a finite penalty can never make the only legal action unreachable → no
     forced-switch hang, and it leaves attacks untouched so the argmax is pushed toward attacking).
-  - **Two mechanism iterations (CLAUDE.md re-plan discipline).** (1) *return-only* — penalize just the switch-back
+  - **Two mechanism iterations (re-plan discipline).** (1) *return-only* — penalize just the switch-back
     action (mirror `two_cycle_rows`). Live it merely converted the tight A→B→A into a longer roster-cycle via
     **fresh-mon escape** (ping_pong 0.44→0.13 but `max_run` 17→26, switch mass flat, win 0) → **ruled out**
     (fresh-mon escape is structural to a return-only penalty; no window/magnitude fixes it). (2) *streak* —
