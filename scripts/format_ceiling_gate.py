@@ -171,23 +171,42 @@ def roc_auc(scores: np.ndarray, labels: np.ndarray) -> float:
 def auc_bootstrap_ci(
     scores: np.ndarray, labels: np.ndarray, n_boot: int = 2000, seed: int = 0
 ) -> tuple[float, float]:
-    """Percentile 95% CI for ``roc_auc`` by resampling battles with replacement."""
+    """Percentile 95% CI for ``roc_auc`` by resampling battles with replacement.
+
+    ``roc_auc`` returns NaN for a single-class sample, and on a small or lopsided set EVERY
+    resample can come back single-class -- which left nothing to take a percentile of and raised
+    `IndexError` out of numpy rather than reporting an undefined interval. A sample with one class
+    has no AUC and no interval; say so.
+    """
     rng = np.random.default_rng(seed)
     n = len(scores)
+    if n == 0 or math.isnan(roc_auc(scores, labels)):
+        return (float("nan"), float("nan"))
     boots = np.empty(n_boot, dtype=np.float64)
     for b in range(n_boot):
         idx = rng.integers(0, n, size=n)
         boots[b] = roc_auc(scores[idx], labels[idx])
     boots = boots[~np.isnan(boots)]
+    if boots.size == 0:
+        return (float("nan"), float("nan"))
     return (float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5)))
 
 
 def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) -> dict[str, Any]:
     """Decide FORMAT vs MODEL bound. M1 (skill band) + M2 (inference ceiling) are primary;
     M3 (team-strength AUC) corroborates the *mechanism* but does not gate the branch -- a
-    hand-crafted strength proxy can't cleanly prove play-dominance, so it must not force one."""
+    hand-crafted strength proxy can't cleanly prove play-dominance, so it must not force one.
+
+    THE LEARNED ARM IS LOOKED UP BY ALIAS, not by one literal key. `run_m1` labels it `offrl_green`
+    on Random Battles and `offrl_ou` on a teambuilt format, and drops the green arm entirely off RB
+    (`include_green`). Those names are the ON-DISK schema of every record ever written, so renaming
+    them would make old and new gates incomparable; an alias list reads all of them and leaves the
+    files alone. A format with no learned arm at all contributes nothing to `competent` rather than
+    raising KeyError -- M1's baseline band and M2 still decide the branch.
+    """
     s = m1["simpleheuristics"]["rate"]
-    g = m1["offrl_green"]["rate"]
+    learned = [m1[k]["rate"] for k in ("offrl_green", "offrl_ou", "bc_v11") if k in m1]
+    g = max(learned, default=0.0)
     w = m2["search_vs_heuristic"]
     a = m3["auc"]
     mirror = m1["mirror"]["rate"]
@@ -264,15 +283,145 @@ def _winner_side(log: str, p1_name: str, p2_name: str) -> str | None:
     return None
 
 
-def run_m3(limit: int) -> dict[str, Any]:
-    """Recover both teams + the winner per replay; AUC of (team-strength diff -> p1 wins)."""
+def _preview_teams(log: str) -> tuple[list[str], list[str]]:
+    """Both full rosters from the log's ``|poke|`` lines, as poke-env species ids.
+
+    ``|poke|p1|Dragonite, L50, F|`` -- the species is everything before the first comma. On a
+    teambuilt format with a preview screen this is the WHOLE team, declared before turn 1, which is
+    why the doubles path needs no inputlog and no re-sim.
+    """
+    from poke_env import to_id_str
+
+    sides: dict[str, list[str]] = {"p1": [], "p2": []}
+    for line in log.split("\n"):
+        if not line.startswith("|poke|"):
+            continue
+        parts = line.split("|")
+        if len(parts) < 4 or parts[2] not in sides:
+            continue
+        sides[parts[2]].append(to_id_str(parts[3].split(",")[0]))
+    return sides["p1"], sides["p2"]
+
+
+def _log_player_names(log: str) -> tuple[str | None, str | None]:
+    """p1/p2 usernames from the log's ``|player|`` lines (the inputlog's role, without one)."""
+    names: dict[str, str] = {}
+    for line in log.split("\n"):
+        if not line.startswith("|player|"):
+            continue
+        parts = line.split("|")
+        if len(parts) >= 4 and parts[2] in ("p1", "p2") and parts[3]:
+            names.setdefault(parts[2], parts[3])
+    return names.get("p1"), names.get("p2")
+
+
+def run_m3_preview(files: list[str], team_size: int = 6) -> dict[str, Any]:
+    """M3 off the TEAM PREVIEW lines alone -- no ``inputlog``, no node, no re-sim.
+
+    Public Showdown replays do not carry an inputlog (measured: the VGC 2025 Reg I index returns
+    none with one), so the RB path cannot run on them at all. It does not need to. RB has no preview
+    screen and balances via level, which is why recovering real level-adjusted stats there was worth
+    a full re-sim. A teambuilt doubles format declares both complete rosters in ``|poke|`` lines
+    before turn 1 and every mon is L50, so the level-blind base-stat z-sum -- the RB path's
+    *robustness* proxy -- is the primary and only defensible measure here.
+
+    Two limits travel with this number and belong in the record, not in a reader's head:
+
+      * The brought SIX is scored, not the played FOUR. The bring-4 decision is exactly the skill
+        this measurement cannot see, so a real preview effect biases the AUC toward 0.5.
+      * The available VGC replays are UNRATED -- the search index reports no rating for this format
+        at all -- where RB's M3 used a rated >= 1200 sample. Skill level is unknown, not filtered.
+    """
+    bst_z = _species_strength_table()
+    vocab_index = _species_index_fn()
+
+    diffs: list[float] = []
+    p1_wins: list[int] = []
+    oov = 0
+    scanned = 0
+    for f in files:
+        d = json.load(open(f))
+        log = d.get("log")
+        if not log:
+            continue
+        scanned += 1
+        p1_name, p2_name = _log_player_names(log)
+        if not p1_name or not p2_name:
+            continue
+        winner = _winner_side(log, p1_name, p2_name)
+        if winner is None:  # tie, forfeit-without-win, or a name we cannot match
+            continue
+        p1_team, p2_team = _preview_teams(log)
+        if len(p1_team) != team_size or len(p2_team) != team_size:
+            continue  # a preview screen that did not show all six is not a comparable sample
+        totals = []
+        for team in (p1_team, p2_team):
+            total = 0.0
+            for species in team:
+                idx = vocab_index(species)
+                if idx == 0:
+                    oov += 1
+                total += float(bst_z[idx])
+            totals.append(total)
+        diffs.append(totals[0] - totals[1])
+        p1_wins.append(1 if winner == "p1" else 0)
+
+    labels = np.array(p1_wins, dtype=np.int64)
+    arr = np.array(diffs, dtype=np.float64)
+    used = len(p1_wins)
+    auc = roc_auc(arr, labels) if used else float("nan")
+    lo, hi = auc_bootstrap_ci(arr, labels) if used else (float("nan"), float("nan"))
+    return {
+        "n_replays_scanned": scanned,
+        "n_battles_used": used,
+        "oov_species": oov,
+        "p1_win_frac": float(labels.mean()) if used else float("nan"),
+        "auc": float(auc),
+        "auc_ci95": [lo, hi],
+        "auc_bst_z": float(auc),  # same quantity; kept so the schema matches the RB record
+        "strength_proxy": "raw base-stat z-sum over the BROUGHT SIX, from |poke| preview lines",
+        "mode": "preview",
+        "caveats": [
+            "scores the brought six, not the played four -- blind to the bring-4 decision",
+            "UNRATED sample: the replay index reports no rating for this format",
+        ],
+    }
+
+
+def run_m3(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
+    """Recover both teams + the winner per replay; AUC of (team-strength diff -> p1 wins).
+
+    Dispatches on the DATA rather than on the format string: replays carrying an ``inputlog`` get
+    the re-sim path (real level-adjusted stats), and replays carrying only a log get the preview
+    path. Mixing the two proxies inside one AUC would compare incomparable numbers, so the whole
+    batch takes one mode and the record says which.
+    """
+    files = sorted(glob.glob(replay_glob or _REPLAY_GLOB))[:limit]
+    if not files:
+        raise SystemExit(
+            f"no replays under '{replay_glob or _REPLAY_GLOB}'. Fetch them first:\n"
+            f"  python -c \"from lategame.data.replays import fetch_replays; \"\n"
+            f"  \"fetch_replays(battle_format=FMT, cache_dir=..., require_rating=False)\""
+        )
+    with_inputlog = sum(1 for f in files if json.load(open(f)).get("inputlog"))
+    if with_inputlog * 2 < len(files):
+        print(
+            f"[M3] {with_inputlog}/{len(files)} replays carry an inputlog -- using the TEAM "
+            f"PREVIEW path (species-level strength, no re-sim)."
+        )
+        return run_m3_preview(files)
+    return _run_m3_resim(limit, replay_glob)
+
+
+def _run_m3_resim(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
+    """The original RB path: node re-sim of the inputlog to recover level-adjusted real stats."""
     from lategame.data.resim import _parse_inputlog_meta, _reconstruct_pov_resim, run_driver
     from lategame.data.reward import RewardWeights
 
     bst_z = _species_strength_table()  # raw base-stat z-sum (ignores RB level-balancing)
     vocab_index = _species_index_fn()
 
-    files = sorted(glob.glob(_REPLAY_GLOB))[:limit]
+    files = sorted(glob.glob(replay_glob or _REPLAY_GLOB))[:limit]
     raw = []
     for f in files:
         d = json.load(open(f))
@@ -342,6 +491,7 @@ def run_m3(limit: int) -> dict[str, Any]:
         "auc_ci95": [lo, hi],
         "auc_bst_z": float(roc_auc(bstz_arr, labels)),  # robustness: level-blind base-stat sum
         "strength_proxy": "sum of level-adjusted real stats (mon.stats), per team",
+        "mode": "resim",
     }
 
 
@@ -528,16 +678,30 @@ def _print_ou_summary(a: dict[str, Any]) -> None:
 # --------------------------------------------------------------------------- #
 # M2 -- reuse the L14 white-box upper bound.
 # --------------------------------------------------------------------------- #
-def load_m2() -> dict[str, Any]:
-    data = json.loads(_M2_WHITEBOX.read_text())
+def load_m2(path: Path | None = None) -> dict[str, Any]:
+    """Echo a `rpredict_oppmodel_gate --gate b --arms whitebox` record as this gate's M2 leg.
+
+    The path used to be the hardcoded RB `_M2_WHITEBOX`, which is what kept M2 an RB-only concept:
+    the producer has taken `--format` for a while, but nothing here could read a record it wrote for
+    any other format.
+    """
+    src = path or _M2_WHITEBOX
+    if not src.exists():
+        raise SystemExit(
+            f"no M2 record at '{src}'. Produce one first:\n"
+            f"  LATEGAME_SEARCH_SHAPED_ONLY=1 python scripts/rpredict_oppmodel_gate.py "
+            f"--gate b --arms whitebox --depth 2 --format FMT --out {src}"
+        )
+    data = json.loads(src.read_text())
     wb = data["arms"]["whitebox"]
     return {
-        "source": str(_M2_WHITEBOX),
+        "source": str(src),
         "n": data["n"],
         "depth": data["depth"],
+        "format": data.get("format"),
         "base_vs_heuristic": data["base_vs_heuristic"],
         "search_vs_heuristic": wb["search_vs_heuristic"],
-        "note": "L14 depth-2 expectimax, near-perfect white-box opponent (ceiling from above)",
+        "note": "depth-2 expectimax, near-perfect white-box opponent (ceiling from above)",
     }
 
 
@@ -580,7 +744,11 @@ def main() -> None:
                     help="OU BC checkpoint; adds a loop-fixed bc_v11 arm to the teambuilt M1 sweep")
     ap.add_argument("--loop-penalty", type=float, default=0.0,
                     help="Build-14 LoopGuard penalty applied to learned M1 arms (0 = off)")
-    ap.add_argument("--limit", type=int, default=300, help="M3 replays to re-sim")
+    ap.add_argument("--limit", type=int, default=300, help="M3 replays to score")
+    ap.add_argument("--replay-glob", default=None,
+                    help="M3 replay cache (default replays/<format>/*.json)")
+    ap.add_argument("--m2-record", default=None,
+                    help="rpredict_oppmodel_gate --gate b record to echo as the M2 leg")
     args = ap.parse_args()
 
     fmt = args.battle_format
@@ -589,31 +757,53 @@ def main() -> None:
         Path(args.out) if args.out
         else (Path("results/format_ceiling_gate_ou.json") if teambuilt else _RESULTS)
     )
+    replay_glob = args.replay_glob or f"replays/{fmt}/*.json"
+    m2_record = Path(args.m2_record) if args.m2_record else None
 
     data = _load(out)
     data["format"] = fmt
 
     if teambuilt:
-        # OU path: M1-only smoke that de-risks the teambuilt harness (legal teams, mirror ~0.50,
-        # skill gradient). M2 (OU near-optimal search) and M3 (OU replays) don't exist yet, so no
-        # RB FORMAT/MODEL verdict is forced -- see assess_ou.
-        print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt; M1-only smoke)...")
-        data["m1"] = asyncio.run(
-            run_m1(
-                args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint,
-                bc_ckpt=args.bc_checkpoint, loop_penalty=args.loop_penalty,
+        # THE TEAMBUILT PATH USED TO RETURN HERE, before M2 or M3 could run, so no teambuilt format
+        # could ever reach the three-leg verdict `compute_verdict` implements -- only `assess_ou`,
+        # which reads M1 alone and cannot return FORMAT_BOUND at all. That was honest while the
+        # other two legs did not exist for any teambuilt format. They exist now: the M2 producer
+        # takes --format and runs on doubles under LATEGAME_SEARCH_SHAPED_ONLY=1, and M3 reads team
+        # preview lines rather than an inputlog. So the M1-only assessment still runs and is still
+        # recorded, and the run falls through to whichever other legs are actually available.
+        print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt)...")
+        if args.stage in ("m1", "all"):
+            data["m1"] = asyncio.run(
+                run_m1(
+                    args.n, args.concurrency, fmt, args.team_pool, args.offrl_checkpoint,
+                    bc_ckpt=args.bc_checkpoint, loop_penalty=args.loop_penalty,
+                )
             )
-        )
-        data["ou_assessment"] = assess_ou(data["m1"])
-        _print_ou_summary(data["ou_assessment"])
+        if "m1" in data:
+            data["ou_assessment"] = assess_ou(data["m1"])
+            _print_ou_summary(data["ou_assessment"])
+
+    if teambuilt:
+        # Opt-in, because these two legs exist for doubles and not for OU: ask for them by pointing
+        # at the record / the replay cache, rather than failing a run that only wanted M1.
+        if m2_record is not None:
+            data["m2"] = load_m2(m2_record)
+            print(f"[M2] white-box search vs heuristic {data['m2']['search_vs_heuristic']:.3f} "
+                  f"(n={data['m2']['n']}, from {data['m2']['source']})")
+        if args.stage in ("m3", "all") and glob.glob(replay_glob):
+            print(f"[M3] team-strength AUC from {replay_glob} ...")
+            data["m3"] = run_m3(args.limit, replay_glob)
+            print(f"  M3 AUC {data['m3']['auc']:.3f} ci95 {data['m3']['auc_ci95']} "
+                  f"(n={data['m3']['n_battles_used']}, mode={data['m3']['mode']})")
+        _maybe_decide(data)
         _save(data, out)
         return
 
-    data.setdefault("m2", load_m2())  # always cheap; keep it fresh
+    data.setdefault("m2", load_m2(m2_record))  # always cheap; keep it fresh
 
     if args.stage in ("m3", "all"):
         print("[M3] team-RNG variance decomposition (node re-sim, no server)...")
-        data["m3"] = run_m3(args.limit)
+        data["m3"] = run_m3(args.limit, args.replay_glob)
         print(f"  M3 AUC {data['m3']['auc']:.3f} ci95 {data['m3']['auc_ci95']} "
               f"(n={data['m3']['n_battles_used']})")
         _save(data, out)

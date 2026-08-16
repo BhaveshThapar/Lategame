@@ -237,3 +237,119 @@ def test_the_recorded_checkpoint_is_visible_to_the_artifact_scanner():
     rec = gate._arm_record("doubles", "heuristic", 0.45, 300, "checkpoints/doubles_bc_vgc_v2.pt")
     found = _CKPT_RE.findall(json.dumps(rec))
     assert found == ["checkpoints/doubles_bc_vgc_v2.pt"]
+
+
+# --------------------------------------------------------------------------- #
+# The learned arm is read by ALIAS, so a teambuilt record reaches the verdict.
+# --------------------------------------------------------------------------- #
+def test_verdict_reads_the_teambuilt_learned_arm_names():
+    """`run_m1` labels the learned arm `offrl_green` on RB and `offrl_ou` on a teambuilt format,
+    and drops the green arm off RB entirely. `compute_verdict` used to read `offrl_green` by
+    literal key, so a VGC record could not reach it at all -- KeyError, not a verdict.
+
+    The names are the on-disk schema of every record ever written, so they are aliased rather
+    than renamed; renaming would make old and new gates incomparable.
+    """
+    m1 = {
+        "simpleheuristics": {"rate": 0.49},
+        "offrl_ou": {"rate": 0.47},
+        "bc_v11": {"rate": 0.45},
+        "mirror": {"rate": 0.50},
+    }
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.50}, {"auc": 0.50})
+    assert d["verdict"] == "FORMAT_BOUND"
+    assert d["signals"]["offrl_green_g"] == 0.47, "the best learned arm present, by any alias"
+
+
+def test_verdict_survives_a_record_with_no_learned_arm_at_all():
+    """A first-look format has baselines and no trained policy. That must contribute nothing to
+    `competent` rather than raising -- M1's band and M2 still decide the branch."""
+    m1 = {"simpleheuristics": {"rate": 0.62}, "mirror": {"rate": 0.50}}
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.50}, {"auc": 0.50})
+    assert d["signals"]["offrl_green_g"] == 0.0
+    assert d["verdict"] == "MODEL_BOUND"  # driven by simpleheuristics 0.62 >= HEADROOM
+
+
+# --------------------------------------------------------------------------- #
+# M3 off team-preview lines: no inputlog, no node.
+# --------------------------------------------------------------------------- #
+def _replay(p1_team, p2_team, winner, p1="alice", p2="bob"):
+    lines = [f"|player|p1|{p1}|1|", f"|player|p2|{p2}|2|"]
+    lines += [f"|poke|p1|{s}, L50, F|" for s in p1_team]
+    lines += [f"|poke|p2|{s}, L50, F|" for s in p2_team]
+    lines += ["|teampreview", "|start", f"|win|{winner}"]
+    return {"log": "\n".join(lines)}
+
+
+def test_preview_teams_reads_both_full_rosters_as_species_ids():
+    d = _replay(["Flutter Mane"] * 6, ["Iron Hands"] * 6, "alice")
+    p1, p2 = gate._preview_teams(d["log"])
+    assert p1 == ["fluttermane"] * 6
+    assert p2 == ["ironhands"] * 6
+
+
+def test_preview_teams_strips_level_and_gender():
+    """`|poke|p1|Dragonite, L50, F|` -- the species is everything before the FIRST comma. Keeping
+    the rest would make every mon an out-of-vocabulary lookup scoring 0."""
+    p1, _ = gate._preview_teams("|poke|p1|Dragonite, L50, F|")
+    assert p1 == ["dragonite"]
+
+
+def test_log_player_names_pairs_the_sides():
+    p1, p2 = gate._log_player_names(_replay(["Ditto"], ["Ditto"], "alice")["log"])
+    assert (p1, p2) == ("alice", "bob")
+
+
+def test_m3_preview_scores_only_complete_six_mon_previews(tmp_path):
+    """A preview screen that did not show all six is not a comparable sample, and a replay with no
+    resolvable winner (tie, disconnect) is not a label. Both are dropped, and `n_battles_used`
+    says how many survived -- the number a reader needs to judge the AUC."""
+    import json as _json
+
+    strong = ["Miraidon"] * 6
+    weak = ["Sunkern"] * 6
+    files = []
+    for i, d in enumerate(
+        [
+            _replay(strong, weak, "alice"),          # kept
+            _replay(weak, strong, "bob"),            # kept
+            _replay(strong[:4], weak, "alice"),      # dropped: only 4 shown
+            _replay(strong, weak, "nobody"),         # dropped: winner matches neither player
+        ]
+    ):
+        p = tmp_path / f"r{i}.json"
+        p.write_text(_json.dumps(d))
+        files.append(str(p))
+
+    out = gate.run_m3_preview(sorted(files))
+    assert out["n_replays_scanned"] == 4
+    assert out["n_battles_used"] == 2
+    assert out["mode"] == "preview"
+    # Both kept battles are won by the stronger side, so the proxy separates them perfectly.
+    assert out["auc"] == 1.0
+    assert out["caveats"], "the unrated sample and the brought-six limit travel with the number"
+
+
+def test_m3_dispatches_to_the_preview_path_when_no_inputlog_is_present(tmp_path):
+    """Public replays carry no inputlog, so the re-sim path cannot run on them. Dispatch is on the
+    DATA rather than the format string, and one mode is chosen for the whole batch -- mixing a
+    level-adjusted proxy with a species-level one inside one AUC compares incomparable numbers."""
+    import json as _json
+
+    for i in range(3):
+        (tmp_path / f"r{i}.json").write_text(
+            _json.dumps(_replay(["Miraidon"] * 6, ["Sunkern"] * 6, "alice"))
+        )
+    out = gate.run_m3(10, str(tmp_path / "*.json"))
+    assert out["mode"] == "preview"
+
+
+def test_auc_bootstrap_ci_reports_undefined_instead_of_crashing_on_one_class():
+    """Every resample of a single-class sample is itself single-class, so the NaN filter emptied
+    the array and numpy raised IndexError from inside a percentile. An undefined interval is a
+    result; a traceback out of a helper is not."""
+    lo, hi = gate.auc_bootstrap_ci(np.array([1.0, 2.0, 3.0]), np.array([1, 1, 1]))
+    assert math.isnan(lo) and math.isnan(hi)
+    # NaN != NaN, so the empty case is checked the same way rather than by tuple equality.
+    elo, ehi = gate.auc_bootstrap_ci(np.array([]), np.array([]))
+    assert math.isnan(elo) and math.isnan(ehi)
