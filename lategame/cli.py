@@ -56,11 +56,33 @@ def _print_result(result: EvalResult) -> None:
     )
 
 
+def _default_team_pool(battle_format: str, explicit: str | None) -> str | None:
+    """The committed pool for ``battle_format``, unless the caller named one.
+
+    `build_player` refuses a teamless build on a teambuilt format, which made `lategame evaluate
+    --format gen9ou` unrunnable -- and before that refusal it was silently WORSE, since Showdown
+    rejected every challenge with a popup and the command reported a 0.000 win rate. Both pools are
+    committed, so there is one sensible answer per format and no reason to make every invocation
+    spell it out.
+    """
+    from lategame.config import is_doubles_format
+    from lategame.teambuilding.pool import DEFAULT_OU_POOL, DEFAULT_VGC_POOL
+
+    if explicit:
+        return explicit
+    if "randombattle" in battle_format:
+        return None  # the server supplies the teams; passing a pool would be wrong
+    return str(DEFAULT_VGC_POOL if is_doubles_format(battle_format) else DEFAULT_OU_POOL)
+
+
 async def _run_eval(args: argparse.Namespace) -> None:
     for who in (args.p1, args.p2):
         if who not in AGENTS:
             raise SystemExit(f"Unknown agent '{who}'. Choose from: {', '.join(AGENTS)}")
-    result = await evaluate(args.p1, args.p2, args.n, args.battle_format)
+    result = await evaluate(
+        args.p1, args.p2, args.n, args.battle_format,
+        team_pool=_default_team_pool(args.battle_format, args.team_pool),
+    )
     _print_result(result)
 
 
@@ -447,7 +469,13 @@ def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
     parser.add_argument("--p2", required=True, help=f"Agent for player 2 ({agents})")
     parser.add_argument("--n", type=int, default=default_n, help="Number of battles")
     parser.add_argument(
-        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+        "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown string format"
+    )
+    parser.add_argument(
+        "--team-pool",
+        default=None,
+        help="packed team pool; REQUIRED on a teambuilt format and defaulted per format "
+             "(gen9ou / VGC pools are committed under lategame/teambuilding/data/)",
     )
 
 

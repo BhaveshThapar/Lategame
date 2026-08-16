@@ -301,3 +301,32 @@ def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypat
 
     arena.build_player("random", "gen9vgc2025regi", max_battle_turns=99, team="T")
     assert "max_battle_turns" not in seen
+
+
+def test_the_cli_defaults_a_team_pool_per_format():
+    """`lategame evaluate --format gen9ou` was broken and reported a NUMBER, which is why nobody
+    noticed: Showdown rejected every challenge with a team-required popup, no battle finished, and
+    `evaluate_built` returned 0.0 for an empty denominator. `build_player`'s refusal turned that
+    into an error; this turns it into a working command.
+
+    Random Battles must stay None -- the server supplies the teams there and passing a pool is
+    wrong, not merely unnecessary.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "lategame_cli", Path(__file__).resolve().parent.parent / "lategame" / "cli.py"
+    )
+    assert spec is not None and spec.loader is not None
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+
+    assert cli._default_team_pool("gen9randombattle", None) is None
+    assert cli._default_team_pool("gen9ou", None).endswith("teams_gen9ou.packed")
+    assert cli._default_team_pool("gen9vgc2025regi", None).endswith("teams_gen9vgc.packed")
+    # An explicit choice always wins, on any format.
+    assert cli._default_team_pool("gen9ou", "custom.packed") == "custom.packed"
+    # Every default the CLI can hand out must actually exist in the tree.
+    for fmt in ("gen9ou", "gen9vgc2025regi"):
+        assert Path(cli._default_team_pool(fmt, None)).exists()
