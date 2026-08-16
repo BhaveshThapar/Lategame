@@ -101,6 +101,21 @@ def test_the_checkpoints_root_is_honoured_not_assumed(tmp_path, one_headline):
     assert audit(tmp_path / "results", staged)["headlines"]["synthetic claim"]["ok"]
 
 
+def test_every_headline_maps_to_a_gate_file_that_cites_something():
+    """The half of the check that survives a bare clone, and so the half CI can run.
+
+    `results/` is committed and `checkpoints/` is not, so a runner cannot ask whether the weights
+    exist -- but it can ask whether each headline still names a gate file that is present and cites
+    at least one checkpoint. That catches the quiet failure: a renamed or deleted record empties the
+    citation set, and an empty set would otherwise satisfy every "nothing missing" assertion.
+    """
+    report = audit(ROOT / "results", ROOT / "checkpoints")
+
+    for claim, h in report["headlines"].items():
+        assert not h["missing_records"], f"{claim}: gate file(s) gone: {h['missing_records']}"
+        assert h["checkpoints"], f"{claim}: its records cite no checkpoint at all"
+
+
 @pytest.mark.skipif(not (ROOT / "checkpoints").is_dir(), reason="no local checkpoint tree")
 def test_every_published_headline_resolves_against_the_real_tree():
     """The integration read, and the one the README's Artifacts section is only true because of."""

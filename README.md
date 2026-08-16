@@ -1289,10 +1289,10 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 713 tests, 0 skipped with the env active (node) + a local server up
+pytest            # 714 tests, 0 skipped with the env active (node) + a local server up
                   #   LATEGAME_LIVE_TEST=1 also enables the opt-in live-client smoke
                   #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 15 self-skip
-                  #   and 698 pass. That is the CI configuration; a 16th skip is a regression.
+                  #   and 699 pass. That is what CI runs; a 16th skip is a regression, not noise.
 ruff check .
 mypy lategame     # scoped to lategame/ on purpose: scripts/ carries 2 known pre-existing errors
 ```
