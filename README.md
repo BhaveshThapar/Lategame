@@ -29,30 +29,40 @@ and usage prior, the pinned simulator rev — and the gate scripts that re-deriv
 [Artifacts & reproducibility](#artifacts--reproducibility) for what a clean clone can and cannot
 reproduce.
 
-**What a fresh clone can do today, exactly.** The rule-based baseline and poke-env's bots play
-immediately — that is the command above, and it needs no weights. Every learned agent (`offrl`,
-`ppo`, `bc`, `doubles`) needs a checkpoint, and **no weights are published yet**:
-[Releases](https://github.com/BhaveshThapar/Lategame/releases) is empty, so a learned agent fails
-with a `FileNotFoundError` naming the file it wanted. Two honest options until then — train one
-(`lategame train-rl`, see [Run](#run)), or open an issue asking for the assets.
+**What a fresh clone can do without downloading anything.** The rule-based baseline and poke-env's
+bots play immediately — that is the command above. Every learned agent (`offrl`, `ppo`, `bc`,
+`doubles`) needs a checkpoint, and without one fails with a `FileNotFoundError` naming the file it
+wanted.
 
-**What will be published, and how to check it.** `results/release_assets.json` already names the
-three checkpoints intended for the release — 23 MiB, one playable policy per teambuilt format — with
-the sha256 and byte length of each. It is derived from `check_artifacts.HEADLINE` rather than
-hand-kept, so it cannot drift from the claims those weights back. Once they are attached, drop them
-under `checkpoints/` and:
+**The weights are on the release.** Three checkpoints, 23 MiB, one playable policy per teambuilt
+format:
+[v1.0.0](https://github.com/BhaveshThapar/Lategame/releases/tag/v1.0.0).
+**Restore the paths as you download** — the manifest keys on them, and the gen9ou asset is attached
+under the bare name `iter_320.pt`, which does not say which arm it came from:
 
 ```bash
-python scripts/release_assets.py --verify        # what you have, and whether it is the right file
+B=https://github.com/BhaveshThapar/Lategame/releases/download/v1.0.0
+mkdir -p checkpoints/ppo_v26b_s0
+curl -sL -o checkpoints/ppo_v26b_s0/iter_320.pt  $B/iter_320.pt          # gen9ou, 17.4 MiB
+curl -sL -o checkpoints/doubles_offrl_vgc_v2.pt  $B/doubles_offrl_vgc_v2.pt
+curl -sL -o checkpoints/doubles_bc_vgc_v2.pt     $B/doubles_bc_vgc_v2.pt
+
+python scripts/release_assets.py --verify        # want: 3/3 release assets present and verified
 
 python -m lategame.cli evaluate --p1 offrl --p1-checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
   --p2 heuristic --n 100 --format gen9ou         # the gen9ou ladder top vs the fixed baseline
 ```
 
+Measured by doing exactly the above into a clean `v1.0.0` clone: `3/3` verified, then **0.825 over
+40 battles** on gen9ou and **0.450 over 20** on VGC — the published 0.7513 and 0.467 at small n.
+
 **Verify before you load.** A checkpoint is a pickle and `torch.load` executes code from it, so
-"trust the file on the release page" is not a security posture. `--verify` gates on the release
-assets only; the other checkpoints the manifest lists are provenance for published curves and were
-never going to be on your machine, so it says so rather than reporting them as a failed download.
+"trust the file on the release page" is not a security posture. `results/release_assets.json`
+carries the sha256 and byte length of each asset, is committed, and is derived from
+`check_artifacts.HEADLINE` rather than hand-kept, so it cannot drift from the claims those weights
+back. `--verify` gates on the release assets only; the other 15 checkpoints the manifest lists are
+provenance for published curves and were never going to be on your machine, so it says so rather
+than reporting them as a failed download.
 
 ## Where it stands
 
