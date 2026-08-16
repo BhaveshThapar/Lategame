@@ -337,3 +337,21 @@ def test_load_actor_critic_weights_shape_mismatch_raises():
     dst = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=21)  # value head shape differs
     with pytest.raises(RuntimeError):
         load_actor_critic_weights(dst, src.state_dict())
+
+
+def test_curriculum_gate_scopes_its_paths_to_the_arm():
+    """`arm`, `checkpoints/<arm>_s<seed>/` and `data/` were the literal `curriculum_et_prior`, so a
+    VGC arm would have overwritten the Random Battles one in place and produced a record whose
+    `arm` field named the wrong experiment."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "curriculum_gate.py"
+    spec = importlib.util.spec_from_file_location("curriculum_gate", path)
+    assert spec is not None and spec.loader is not None
+    cg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cg)
+
+    assert cg._out_dir("m4_vgc", 1) == "checkpoints/m4_vgc_s1"
+    # The Random Battles arm keeps its historical paths byte for byte.
+    assert cg._out_dir("curriculum_et_prior", 0) == "checkpoints/curriculum_et_prior_s0"

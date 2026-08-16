@@ -213,6 +213,7 @@ MUST_ASK_FOR_THE_AGENT = (
     "lategame/train/selfplay.py",
     "scripts/ppo_continue_gate.py",
     "scripts/rpredict_oppmodel_gate.py",
+    "scripts/curriculum_gate.py",
 )
 
 
