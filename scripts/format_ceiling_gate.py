@@ -203,6 +203,13 @@ def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) 
     them would make old and new gates incomparable; an alias list reads all of them and leaves the
     files alone. A format with no learned arm at all contributes nothing to `competent` rather than
     raising KeyError -- M1's baseline band and M2 still decide the branch.
+
+    THE BRANCH LABEL AND THE REASON STRING WERE WRITTEN FOR gen9-RB and asserted things that are
+    only true there. `next_branch` said "ou_pivot" -- advice that is meaningless on a format
+    reached *after* the OU pivot -- and the FORMAT_BOUND reason interpolated M2 as "at parity",
+    which was true of RB's 0.500 and is simply false of a w that is nowhere near 0.50. Both are now
+    derived from the record instead of assumed, because a verdict line that states a wrong number
+    is worse than one that states none.
     """
     s = m1["simpleheuristics"]["rate"]
     learned = [m1[k]["rate"] for k in ("offrl_green", "offrl_ou", "bc_v11") if k in m1]
@@ -213,17 +220,32 @@ def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) 
     competent = max(s, w, g)  # the best agent/inference we can field vs the heuristic
 
     sanity_ok = abs(mirror - 0.5) <= MIRROR_TOL
+    # An ABSENT format key means gen9-RB, and the default matters. `run_m1` only started writing
+    # `format` when teambuilt support landed, so `results/format_ceiling_gate.json` -- the record
+    # carrying the original FORMAT_BOUND verdict -- has none. A generic fallback would re-derive
+    # that historical decision with a different `next_branch` the next time anyone re-runs it.
+    fmt = m1.get("format") or m2.get("format") or "gen9randombattle"
+    # "at parity" is only honest within a hair of 0.50; RB's M2 was 0.500 and the template said so
+    # unconditionally. Anything else gets described, not labelled.
+    w_desc = (
+        f"white-box near-optimal inference {w:.3f} at parity"
+        if abs(w - 0.5) <= 0.02
+        else f"white-box near-optimal inference reaches only {w:.3f}"
+    )
     if competent >= HEADROOM:
         verdict, branch = "MODEL_BOUND", "scale_up"
         reason = (
-            f"best competent agent reaches {competent:.3f} >= {HEADROOM} vs heuristic: "
-            "real, uncaptured headroom on gen9-RB -> scale the model before pivoting"
+            f"best competent agent reaches {competent:.3f} >= {HEADROOM} vs heuristic on {fmt}: "
+            "real, uncaptured headroom -> scale the model before pivoting"
         )
     elif competent <= BAND_TOP:
-        verdict, branch = "FORMAT_BOUND", "ou_pivot"
+        # The RB run's branch was "pivot to OU". A teambuilt format has already done that, so the
+        # actionable branch there is "stop spending on strength here", not "pivot" again.
+        verdict = "FORMAT_BOUND"
+        branch = "ou_pivot" if "randombattle" in fmt else "stop_strength_axis"
         reason = (
             f"nothing beats the heuristic: best competent agent {competent:.3f} <= {BAND_TOP} "
-            f"(white-box near-optimal inference {w:.3f} at parity) -> the ceiling is the format"
+            f"({w_desc}) -> the ceiling is the format"
         )
     else:
         verdict, branch = "AMBIGUOUS", "scale_up_probe"
@@ -248,7 +270,12 @@ def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) 
         "reason": reason,
         "mirror_sanity_ok": sanity_ok,
         "m3_corroboration": {"rng_bound_corroborated": rng_corroborates, "note": m3_note},
+        "format": fmt,
         "signals": {"simpleheuristics_s": s, "offrl_green_g": g, "whitebox_w": w, "auc_a": a},
+        # An M2 from `ShapedOnlyPolicy` is a weaker instrument than one from a trained value head,
+        # and `expectimax.ShapedOnlyPolicy` pre-registers the consequence: a WIN is decisive, a
+        # NULL suggestive only. Carried onto the verdict so the caveat travels with the branch.
+        "m2_leaf": m2.get("search_leaf"),
         "thresholds": {"band_top": BAND_TOP, "headroom": HEADROOM, "auc_hi": AUC_HI},
     }
 
