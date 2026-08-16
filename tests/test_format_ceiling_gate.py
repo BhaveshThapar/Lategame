@@ -195,3 +195,45 @@ def test_assess_ou_model_gap_prefers_offrl_arm():
     assert v["learned_offrl"]["rate"] == 0.20
     assert v["learned_bc"]["rate"] == 0.03
     assert abs(v["model_gap"] - (0.64 - 0.20)) < 1e-9
+
+
+def test_a_learned_arm_record_names_the_checkpoint_it_scored():
+    """The record is the only place the weights behind a published ceiling number can be named.
+
+    `run_m1` wrote `{p1, p2, rate, wins, ci95}` and nothing else, and the two learned labels are
+    OU-era schema keys (`bc_v11`, `offrl_ou`) that describe nothing on a doubles run -- both arms
+    build as the `doubles` agent there. So a reader of `results/format_ceiling_gate_vgc_v2.json`
+    could not get from a number to the checkpoint that produced it.
+    """
+    rec = gate._arm_record(
+        "doubles", "heuristic", 0.4533333333333333, 300, "checkpoints/doubles_bc_vgc_v2.pt"
+    )
+    assert rec["checkpoint"] == "checkpoints/doubles_bc_vgc_v2.pt"
+    # Byte-identical arithmetic to what run_m1 did inline, checked against the committed record.
+    assert rec["wins"] == 136
+    assert abs(rec["ci95"][0] - 0.3979441581242692) < 1e-12
+    assert abs(rec["ci95"][1] - 0.5099025620088528) < 1e-12
+
+
+def test_a_baseline_arm_record_carries_no_checkpoint_key():
+    """Baselines have no checkpoint, and adding a `"checkpoint": null` would make every record
+    already committed structurally different from every record written after this change."""
+    rec = gate._arm_record("heuristic", "heuristic", 0.5033333333333333, 300)
+    assert "checkpoint" not in rec
+    assert set(rec) == {"p1", "p2", "rate", "wins", "ci95"}
+    assert rec["wins"] == 151
+
+
+def test_the_recorded_checkpoint_is_visible_to_the_artifact_scanner():
+    """Provenance the scanner cannot see is worse than none: `check_artifacts.py` would report a
+    published headline as backed by zero checkpoints, and `prune_checkpoints.py` -- which uses the
+    same scan as its allowlist -- would treat the file as uncited and prunable."""
+    import json
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from prune_checkpoints import _CKPT_RE  # type: ignore[import-not-found]
+
+    rec = gate._arm_record("doubles", "heuristic", 0.45, 300, "checkpoints/doubles_bc_vgc_v2.pt")
+    found = _CKPT_RE.findall(json.dumps(rec))
+    assert found == ["checkpoints/doubles_bc_vgc_v2.pt"]
