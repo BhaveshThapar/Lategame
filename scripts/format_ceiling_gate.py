@@ -703,13 +703,28 @@ def load_m2(path: Path | None = None) -> dict[str, Any]:
         )
     data = json.loads(src.read_text())
     wb = data["arms"]["whitebox"]
+
+    # TWO SHAPES, because a pooled record is not a single-run record. `rpredict_oppmodel_gate`
+    # writes scalar rates and a top-level `n`; `merge_search_shards` writes {wins, n, rate} objects
+    # and no top-level `n`, since the n is per-arm once shards are summed. Reading only the first
+    # shape is what made "echo the pooled search run as M2" impossible without hand-editing JSON.
+    def _rate(v: Any) -> float:
+        return float(v["rate"] if isinstance(v, dict) else v)
+
+    def _n(v: Any) -> Any:
+        return v["n"] if isinstance(v, dict) else data.get("n")
+
     return {
         "source": str(src),
-        "n": data["n"],
+        "n": _n(wb["search_vs_heuristic"]),
         "depth": data["depth"],
         "format": data.get("format"),
-        "base_vs_heuristic": data["base_vs_heuristic"],
-        "search_vs_heuristic": wb["search_vs_heuristic"],
+        "shards": data.get("shards"),
+        "base_vs_heuristic": _rate(data["base_vs_heuristic"]),
+        "search_vs_heuristic": _rate(wb["search_vs_heuristic"]),
+        "search_vs_base": _rate(wb["search_vs_base"]) if "search_vs_base" in wb else None,
+        "contrast_vs_base": wb.get("contrast_vs_base"),
+        "verdict": wb.get("verdict"),
         "note": "depth-2 expectimax, near-perfect white-box opponent (ceiling from above)",
     }
 
