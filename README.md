@@ -23,11 +23,27 @@ Random Battles needs none. `python -m lategame.cli --help` lists the rest — [R
 training and evaluation pipelines, [Develop](#develop) has the test / lint / type bar.
 
 **A clone contains no trained weights.** `checkpoints/` and `data/` are gitignored, so every number
-below came from files that live only on the machine that produced them. What ships is the
+below came from files that live only on the machine that produced them. What ships in *git* is the
 *evidence*: 236 `results/*.json` gate summaries, the validator-checked team pools, the encoder vocab
 and usage prior, the pinned simulator rev — and the gate scripts that re-derive it. See
 [Artifacts & reproducibility](#artifacts--reproducibility) for what a clean clone can and cannot
 reproduce.
+
+**The weights ship with the release, not the clone.** Three checkpoints are attached to the
+[v1.0.0 release](https://github.com/BhaveshThapar/Lategame/releases/tag/v1.0.0) — 23 MiB total, one
+playable policy per teambuilt format. Drop them under `checkpoints/` and point the CLI at one:
+
+```bash
+python scripts/release_assets.py --verify        # sha256 every file against the committed manifest
+
+python -m lategame.cli evaluate --p1 offrl --p1-checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
+  --p2 heuristic --n 100 --format gen9ou         # the gen9ou ladder top vs the fixed baseline
+```
+
+**Verify before you load.** A checkpoint is a pickle and `torch.load` executes code from it, so
+`results/release_assets.json` carries the sha256 and byte length of every asset — checked into git,
+derived from `check_artifacts.HEADLINE` rather than hand-kept, and re-checkable offline with the
+command above. "Trust the file on the release page" is not a security posture.
 
 ## Where it stands
 
