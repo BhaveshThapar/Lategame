@@ -3529,8 +3529,26 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
    **+0.0036 (p 0.76, positive in 6/10 shards) at n=2500/arm**. And it is worse than neutral: it
    loses to the greedy policy it descends from **head-to-head at 0.3932, 10/10 shards, ~10.7 SE**.
    Search is not the missing ingredient at this level of play; **M7 closes**.
-3. **Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?
-4. **Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)
+3. ~~**Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?~~
+   **ANSWERED BY DESCOPING (2026-08-16): not at all in v1, and NG6 said so from the start.** The
+   question outlived its own non-goal. What v1 ships is the curated-pool half: validator-checked
+   packed pools for both teambuilt formats (`lategame/teambuilding/data/`) drawn per side with
+   distinct seeds. The one piece of team-level *decision-making* that did land is bring-6-pick-4
+   team preview, and it is a fixed rule rather than a learned policy — the codec has no slot for
+   preview and the model no head for it (§13.1, 2026-08-16). Measured worth: up to +0.060 on a
+   single arm at n = 300, and **no movement in the VGC ceiling verdict**, which is the honest
+   argument for why learned teambuilding is not the missing ingredient either. Reopen it only for a
+   format with proven headroom; both teambuilt formats measured so far are `FORMAT_BOUND` or have
+   their strength result already.
+4. ~~**Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)~~
+   **ANSWERED RETROSPECTIVELY: BUILT FRESH.** Not a decision that was taken and recorded so much as
+   one the twenty-eight builds in §13.1 made by happening — ingestion, POV reconstruction, the
+   forward model, the encoders, the codecs, the gates and the eval ladder are all first-party. The
+   question is struck because it describes a fork that never happened, not because the trade-off it
+   names stopped being real. What full control bought is visible in §13.1: a pinned simulator rev,
+   a reconstruction path gated at 1.000 core-transition fidelity, and pre-registered stop rules on
+   arms that could be re-run against them. What it cost is the wall-clock those twenty-eight builds
+   took.
 5. ~~**Eval environment:** stand up a private Showdown server for clean evaluation, or use anonymized non-ranked live play?~~
    **ANSWERED (M5 / G1 build, 2026-08-10): the private/agent-only route — and the alternative turned
    out not to exist.** The question presupposes that "anonymized non-ranked live play" is available
@@ -3541,7 +3559,7 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
    path. The clean-evaluation half of the question is answered by `lategame/eval/ladder.py`: an
    **agent-only eval ladder** on the local server, which is what §12's "private/agent-only server
    or eval ladder" asks for and the only varied field reachable without touching the human ladder.
-6. **Reward shaping specifics:** which intermediate signals densify learning without distorting the win objective?
+6. **Reward shaping specifics:** which intermediate signals densify learning without distorting the win objective? **(THE ONLY QUESTION STILL OPEN.)** `data/reward.py`'s `RewardWeights` is what every arm ran with and it was never ablated — no build varied it, so nothing on the record separates "these weights help" from "these weights are what we happened to use". It is open rather than descoped because it is cheap to answer on `gen9ou`, the one format with proven headroom.
 
 ---
 

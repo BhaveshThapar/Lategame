@@ -1,0 +1,179 @@
+{
+  "schema": "lategame.release_assets/1",
+  "note": "Derived from check_artifacts.HEADLINE, not hand-kept, so it cannot drift from the claims it backs. `runnable` marks the minimum set needed to PLAY a format; the rest is provenance for a curve.",
+  "verify": "python scripts/release_assets.py --verify",
+  "n_assets": 18,
+  "n_runnable": 3,
+  "runnable_bytes": 24298165,
+  "total_bytes": 252526522,
+  "missing_locally": [],
+  "assets": [
+    {
+      "path": "checkpoints/doubles_bc_vgc_v2.pt",
+      "bytes": 3016386,
+      "sha256": "dda7ba91b71930291e28d5fc2cb980adf50bd4bb6e5cdbd101c0c1405acacbd1",
+      "backs": [
+        "VGC B6f C1 0.530",
+        "VGC corrected ladder BC 0.453 / AWR 0.467"
+      ],
+      "runnable": "gen9vgc2025regi -- the BC doubles policy, the other half of the corrected VGC ladder"
+    },
+    {
+      "path": "checkpoints/doubles_offrl_vgc_v2.pt",
+      "bytes": 3016547,
+      "sha256": "28d539e554869e68a383f5fb3fbeec92f81e9a36eb27e5f398f0ab28fa843dbb",
+      "backs": [
+        "VGC B6f C1 0.530",
+        "VGC corrected ladder BC 0.453 / AWR 0.467"
+      ],
+      "runnable": "gen9vgc2025regi -- the AWR doubles policy, and the only viable self-play warm start (the BC one carries no value support)"
+    },
+    {
+      "path": "checkpoints/offrl_gen9ou_wide_s0.pt",
+      "bytes": 18266900,
+      "sha256": "a91b34266e22faa46d896197cafdf3d70a7e51248be87da8be5195bcd916db93",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_b6f_s0/iter_62.pt",
+      "bytes": 3014868,
+      "sha256": "36795e137cddc58275eb780430beabb50fbabd43c8d39024d3fdbe36f38e40c6",
+      "backs": [
+        "VGC B6f C1 0.530"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_b6f_s1/iter_63.pt",
+      "bytes": 3014868,
+      "sha256": "222f7f4ef2f8f50f8c0d581d86266683f65d0c7e05a2c593d9159f9948953c76",
+      "backs": [
+        "VGC B6f C1 0.530"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_b6f_s2/iter_57.pt",
+      "bytes": 3014868,
+      "sha256": "8f1b546d600d92b2a06529172a51e0a2d1a9c8f31b173d59ab5707f98772ad03",
+      "backs": [
+        "VGC B6f C1 0.530"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v23b_s0/iter_80.pt",
+      "bytes": 18264533,
+      "sha256": "ef8cf1167ceef8178454a06d15d28174af2bd0cdeacb8cd176fba08b8e1d69e7",
+      "backs": [
+        "gen9ou Glicko 1776.3 / GXE 0.7434"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v25a_s0/iter_120.pt",
+      "bytes": 18265232,
+      "sha256": "167f6d3625a143295f0b20e0d669e243d82fb548a749101509aac6aa06bf57ca",
+      "backs": [
+        "gen9ou Glicko 1776.3 / GXE 0.7434"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v25b_s0/iter_160.pt",
+      "bytes": 18265232,
+      "sha256": "9c738d4f7d2204054cc19c2f1d58a4440b1bdecd6f99c741232c488e9f52c685",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou Glicko 1776.3 / GXE 0.7434"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v25b_s1/iter_160.pt",
+      "bytes": 18265232,
+      "sha256": "929af8af557d04b72ae92031d0513490f77d090010b8d8396345386924424f7c",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v25b_s2/iter_160.pt",
+      "bytes": 18265232,
+      "sha256": "e1ac0c225de717b1b4cb7a460712425691435d1354f6b5cd0b7baaf0fd807bf5",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26a_s0/iter_240.pt",
+      "bytes": 18265232,
+      "sha256": "83cd2bcc4e45606e918962c7e00240c2a66b287d7added65b25db555e3d7c027",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou Glicko 1776.3 / GXE 0.7434"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26a_s1/iter_240.pt",
+      "bytes": 18265232,
+      "sha256": "9c3d68a9d14e2120233b31ff2e2035b0601c760c86b34d76ba631921e640a9e7",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26a_s2/iter_240.pt",
+      "bytes": 18265232,
+      "sha256": "f9f5544931c98cc55e42e3b8db4a170a8be64197d2a3428b3655901d0c60cc1a",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26b_s0/iter_300.pt",
+      "bytes": 18265232,
+      "sha256": "71c8a72e3edac795ecdf11ddc97e685817c1ad2845758b5a93bc63ea6a38a43d",
+      "backs": [
+        "G5 MET -- four capabilities, each on its own gate's pass criterion"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26b_s0/iter_320.pt",
+      "bytes": 18265232,
+      "sha256": "acb2a87d409422e86cc93e2552b2d20dc888a2eac35fc9ee54d166d6ace80b1d",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou Glicko 1776.3 / GXE 0.7434"
+      ],
+      "runnable": "gen9ou -- the ladder top (Glicko 1776.3 / GXE 0.7434) and the strongest agent here"
+    },
+    {
+      "path": "checkpoints/ppo_v26b_s1/iter_320.pt",
+      "bytes": 18265232,
+      "sha256": "a92b8184a7e8529d24f959ca0e0158faabdab4d759519e0301bf23374c28c5f6",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    },
+    {
+      "path": "checkpoints/ppo_v26b_s2/iter_320.pt",
+      "bytes": 18265232,
+      "sha256": "30a3c2dcb9c257410c1bdb1cfb81e14b971f3d066110dc1b34a4b385a57a2976",
+      "backs": [
+        "gen9ou 0.7513 selection-free terminal"
+      ],
+      "runnable": null
+    }
+  ]
+}

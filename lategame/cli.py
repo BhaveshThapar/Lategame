@@ -82,6 +82,8 @@ async def _run_eval(args: argparse.Namespace) -> None:
     result = await evaluate(
         args.p1, args.p2, args.n, args.battle_format,
         team_pool=_default_team_pool(args.battle_format, args.team_pool),
+        p1_checkpoint=args.p1_checkpoint,
+        p2_checkpoint=args.p2_checkpoint,
     )
     _print_result(result)
 
@@ -477,6 +479,12 @@ def _add_eval_args(parser: argparse.ArgumentParser, default_n: int) -> None:
         help="packed team pool; REQUIRED on a teambuilt format and defaulted per format "
              "(gen9ou / VGC pools are committed under lategame/teambuilding/data/)",
     )
+    # Per SIDE, because a mirror is a legitimate matchup: `--p1 offrl --p2 offrl` with two
+    # checkpoints is how one build is scored against another. Without these the only way to point a
+    # learned agent at a downloaded weight was an agent-specific environment variable
+    # (LATEGAME_OFFRL_CHECKPOINT and friends), which cannot express two different ones at once.
+    parser.add_argument("--p1-checkpoint", default=None, help="weights for --p1 if it is learned")
+    parser.add_argument("--p2-checkpoint", default=None, help="weights for --p2 if it is learned")
 
 
 def build_parser() -> argparse.ArgumentParser:

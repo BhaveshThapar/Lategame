@@ -330,3 +330,33 @@ def test_the_cli_defaults_a_team_pool_per_format():
     # Every default the CLI can hand out must actually exist in the tree.
     for fmt in ("gen9ou", "gen9vgc2025regi"):
         assert Path(cli._default_team_pool(fmt, None)).exists()
+
+
+async def test_evaluate_forwards_a_checkpoint_per_side(monkeypatch):
+    """`--p1-checkpoint` / `--p2-checkpoint` are per SIDE because a mirror is a real matchup:
+    `--p1 offrl --p2 offrl` with two checkpoints is how one build is scored against another.
+
+    Before these flags the only way to point a learned agent at a downloaded weight was an
+    agent-specific environment variable, which cannot express two different ones at once -- so a
+    published release was unusable from the CLI for exactly the comparison it exists to enable.
+    """
+    import lategame.eval.arena as arena
+
+    seen: list[tuple[str, object]] = []
+
+    def fake_build(name, battle_format, **kw):
+        seen.append((name, kw.get("checkpoint_path")))
+        return object()
+
+    async def fake_eval(p1, p2, n):
+        return 0.5
+
+    monkeypatch.setattr(arena, "build_player", fake_build)
+    monkeypatch.setattr(arena, "evaluate_built", fake_eval)
+
+    await arena.evaluate(
+        "offrl", "offrl", 4, "gen9ou",
+        team_pool="lategame/teambuilding/data/teams_gen9ou.packed",
+        p1_checkpoint="a.pt", p2_checkpoint="b.pt",
+    )
+    assert seen == [("offrl", "a.pt"), ("offrl", "b.pt")]

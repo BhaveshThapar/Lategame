@@ -312,6 +312,8 @@ async def evaluate(
     n_battles: int,
     battle_format: str = DEFAULT_FORMAT,
     team_pool: str | None = None,
+    p1_checkpoint: str | None = None,
+    p2_checkpoint: str | None = None,
 ) -> EvalResult:
     """Score ``p1_name`` against ``p2_name``; the CLI's `evaluate` / `play` entry point.
 
@@ -329,8 +331,12 @@ async def evaluate(
 
         return TeamPool.from_packed_file(team_pool, seed=seed)
 
-    p1 = build_player(p1_name, battle_format, team=_team(0))  # type: ignore[arg-type]
-    p2 = build_player(p2_name, battle_format, team=_team(1))  # type: ignore[arg-type]
+    p1 = build_player(
+        p1_name, battle_format, checkpoint_path=p1_checkpoint, team=_team(0),  # type: ignore[arg-type]
+    )
+    p2 = build_player(
+        p2_name, battle_format, checkpoint_path=p2_checkpoint, team=_team(1),  # type: ignore[arg-type]
+    )
     win_rate = await evaluate_built(p1, p2, n_battles)
     # p2 is pinned at the reference rating rather than rated itself: with a single fixed opponent
     # there is nothing in the record to separate "p1 is strong" from "p2 is weak". That is a
