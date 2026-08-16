@@ -1,0 +1,111 @@
+{
+  "gate": "rpredict_recon_live",
+  "format": "gen9vgc2025regi",
+  "doubles": true,
+  "battles": 40,
+  "agent": "heuristic",
+  "opponent": "heuristic",
+  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "pass_rate": 0.99,
+  "snapshots": 698,
+  "errored": 0,
+  "checks": 29984,
+  "mismatches": 27,
+  "match_rate": 0.9991,
+  "by_field": {
+    "active": {
+      "mismatch": 21,
+      "total": 4880,
+      "rate": 0.9957
+    },
+    "boosts": {
+      "mismatch": 6,
+      "total": 4880,
+      "rate": 0.9988
+    },
+    "fainted": {
+      "mismatch": 0,
+      "total": 4880,
+      "rate": 1.0
+    },
+    "hazards": {
+      "mismatch": 0,
+      "total": 1396,
+      "rate": 1.0
+    },
+    "hp": {
+      "mismatch": 0,
+      "total": 4880,
+      "rate": 1.0
+    },
+    "present": {
+      "mismatch": 0,
+      "total": 2792,
+      "rate": 1.0
+    },
+    "status": {
+      "mismatch": 0,
+      "total": 4880,
+      "rate": 1.0
+    },
+    "terrain": {
+      "mismatch": 0,
+      "total": 698,
+      "rate": 1.0
+    },
+    "weather": {
+      "mismatch": 0,
+      "total": 698,
+      "rate": 1.0
+    }
+  },
+  "samples": [
+    {
+      "diffs": [
+        "p2.chienpao.active pe=False drv=True"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.chienpao.active pe=False drv=True"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.farigiraf.active pe=False drv=True"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.tornadus.active pe=False drv=True",
+        "p2.ragingbolt.boosts pe={'spa': -6} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.ogerponwellspring.active pe=False drv=True",
+        "p2.incineroar.boosts pe={'atk': -1, 'spa': -1} drv={}"
+      ]
+    },
+    {
+      "diffs": [
+        "p2.rillaboom.active pe=False drv=True",
+        "p2.incineroar.boosts pe={'atk': -1} drv={}"
+      ]
+    }
+  ],
+  "verdict": "PASS",
+  "note": "Live-play reconstruction fidelity, scored on recon_check._compare -- the same criteria as the replay-driven RB gate (145,400 checks / 7 mismatches / 0.99995), so the numbers are comparable. Gates the search strength run: search on an unfaithful forward model is GIGO. Hidden opponent set details are SAMPLED from the usage prior and are not scored; only what the agent observes is."
+}

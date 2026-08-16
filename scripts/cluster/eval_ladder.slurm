@@ -43,7 +43,15 @@ ANCHOR="${ANCHOR:-heuristic}"
 CONCURRENCY="${CONCURRENCY:-20}"
 TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
 
+# Cluster bootstrap over team matchups. Reachable from HERE and not only from the CLI, for the
+# reason Build 23 had to make target_kl reachable: a knob the cluster path cannot set is a knob
+# that silently keeps its default on every run that matters. RD is binomial-only and therefore a
+# LOWER bound on a teambuilt format; this is the interval entitled to be read as one.
+BOOTSTRAP="${BOOTSTRAP:-300}"
+BOOTSTRAP_SEED="${BOOTSTRAP_SEED:-0}"
+
 ARGS=(--format "$FMT" --n "$N" --anchor "$ANCHOR" --concurrency "$CONCURRENCY" --out "$OUT")
+ARGS+=(--bootstrap "$BOOTSTRAP" --bootstrap-seed "$BOOTSTRAP_SEED")
 [[ -n "${FIELD:-}" ]] && ARGS+=(--field "$FIELD")
 # A teambuilt format needs a pool; Random Battles must NOT get one (the server supplies teams).
 [[ "$FMT" == *randombattle* ]] || ARGS+=(--team-pool "$TEAM_POOL")

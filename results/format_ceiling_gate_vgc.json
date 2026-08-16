@@ -1,0 +1,79 @@
+{
+  "gate": "format_ceiling",
+  "format": "gen9vgc2025regi",
+  "m1": {
+    "n": 300,
+    "format": "gen9vgc2025regi",
+    "mirror": {
+      "p1": "heuristic",
+      "p2": "heuristic",
+      "rate": 0.5233333333333333,
+      "wins": 157,
+      "ci95": [
+        0.46687729355961566,
+        0.5791993463738232
+      ]
+    },
+    "simpleheuristics": {
+      "p1": "simpleheuristics",
+      "p2": "heuristic",
+      "rate": 0.5266666666666666,
+      "wins": 158,
+      "ci95": [
+        0.47018700866487334,
+        0.5824720084019139
+      ]
+    },
+    "maxbasepower": {
+      "p1": "maxbasepower",
+      "p2": "heuristic",
+      "rate": 0.3,
+      "wins": 90,
+      "ci95": [
+        0.2509388173002686,
+        0.35411855469882564
+      ]
+    },
+    "random": {
+      "p1": "random",
+      "p2": "heuristic",
+      "rate": 0.016666666666666666,
+      "wins": 5,
+      "ci95": [
+        0.0071393720427721935,
+        0.038415943621705605
+      ]
+    }
+  },
+  "ou_assessment": {
+    "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+    "mirror_sanity_ok": true,
+    "gradient_ok": true,
+    "harness_ok": true,
+    "ou_band": {
+      "mirror": 0.5233333333333333,
+      "simpleheuristics": 0.5266666666666666,
+      "maxbasepower": 0.3,
+      "random": 0.016666666666666666
+    },
+    "rb_band_reference": {
+      "mirror": 0.513,
+      "simpleheuristics": 0.523,
+      "maxbasepower": 0.107,
+      "random": 0.007,
+      "offrl_green": 0.43
+    },
+    "band_width": {
+      "ou": 0.5099999999999999,
+      "rb": 0.516,
+      "wider_than_rb": false
+    },
+    "ou_verdict": {
+      "verdict": "INSUFFICIENT",
+      "reason": "competent bot (simpleheuristics 0.5266666666666666) < HEADROOM 0.58 -- no wide-band evidence of skill headroom; investigate harness or reconsider a genuine OU ceiling.",
+      "competent_rate": 0.5266666666666666,
+      "headroom": 0.58,
+      "format_bound_rejected": false
+    }
+  }
+}

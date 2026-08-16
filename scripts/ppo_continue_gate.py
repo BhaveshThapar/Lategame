@@ -37,7 +37,7 @@ from pathlib import Path
 from poke_env.teambuilder.teambuilder import Teambuilder
 
 from lategame.config import DEFAULT_FORMAT
-from lategame.eval.arena import build_player, evaluate_built
+from lategame.eval.arena import build_player, evaluate_built, policy_agent
 from lategame.teambuilding.pool import TeamPool
 from lategame.train.ppo import PPOConfig, run_ppo
 
@@ -64,6 +64,7 @@ def _ppo_config(
     target_kl: float = PPOConfig.target_kl,
     anneal_iters: int | None = None,
     resume: bool = False,
+    max_battle_turns: int | None = None,
 ) -> PPOConfig:
     return PPOConfig(
         init=init,
@@ -91,6 +92,8 @@ def _ppo_config(
         anneal_iters=anneal_iters,
         # Build 26: restart from out_dir's last completed iteration. Off == Build 25.
         resume=resume,
+        # B6f: forfeit past this many decisions. None == no ceiling, which is every OU build.
+        max_battle_turns=max_battle_turns,
     )
 
 
@@ -132,8 +135,11 @@ async def _ladder(
     """Greedy win-rate of one checkpoint across all baselines (the confirmatory ladder)."""
     out: dict[str, float] = {}
     for base in _LADDER:
+        # B6f: ASK which learned agent this format wants. `offrl` is in
+        # `arena._SINGLES_ONLY_AGENTS` and is refused outright on a doubles format, so a
+        # hardcoded name made the whole gate unrunnable on VGC.
         learner = build_player(
-            "offrl",
+            policy_agent(fmt),
             fmt,
             checkpoint_path=ckpt,
             max_concurrent_battles=_EVAL_CONCURRENCY,
@@ -197,6 +203,7 @@ async def run_gate(
     target_kl: float = PPOConfig.target_kl,
     anneal_iters: int | None = None,
     resume: bool = False,
+    max_battle_turns: int | None = None,
 ) -> dict:
     if not Path(init).exists():
         raise SystemExit(f"GREEN warm-start checkpoint '{init}' not found.")
@@ -230,6 +237,7 @@ async def run_gate(
             team_pool, loop_penalty, ckpt_prefix,
             ent_coef=ent_coef, ent_coef_final=ent_coef_final, lr=lr, lr_final=lr_final,
             target_kl=target_kl, anneal_iters=anneal_iters, resume=resume,
+            max_battle_turns=max_battle_turns,
         )
         curve = await run_ppo(cfg)
         rec = _seed_record(init, seed, curve, ckpt_prefix)
@@ -259,6 +267,7 @@ async def run_gate(
         "lr_final": lr_final,
         "target_kl": target_kl,
         "anneal_iters": anneal_iters,
+        "max_battle_turns": max_battle_turns,
         "seeds": seeds,
         "iters": iters,
         "games_per_opp": games_per_opp,
@@ -356,6 +365,17 @@ def main(argv: list[str] | None = None) -> None:
         "over (omit = start fresh, the Build 25 behavior). Errors rather than silently starting "
         "fresh if the state is present but unusable.",
     )
+    # B6f: the doubles loop fix's hard half. A soft switch penalty cannot break the absorbing
+    # forced-replacement cycle that put 94.2% of the first VGC shard into 100 of 899 episodes,
+    # because in that state every legal option IS a switch. Omitting this reproduces every OU
+    # build exactly (`None` is exact identity, nothing is counted).
+    parser.add_argument(
+        "--max-battle-turns",
+        dest="max_battle_turns",
+        type=int,
+        default=None,
+        help="Forfeit a battle past this many decisions (omit = no ceiling, the OU behavior)",
+    )
     args = parser.parse_args(argv)
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -380,6 +400,7 @@ def main(argv: list[str] | None = None) -> None:
             target_kl=args.target_kl,
             anneal_iters=args.anneal_iters,
             resume=args.resume,
+            max_battle_turns=args.max_battle_turns,
         )
     )
 

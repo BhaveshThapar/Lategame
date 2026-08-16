@@ -1,0 +1,114 @@
+{
+  "gate": "format_ceiling",
+  "format": "gen9vgc2025regi",
+  "m1": {
+    "n": 300,
+    "format": "gen9vgc2025regi",
+    "mirror": {
+      "p1": "heuristic",
+      "p2": "heuristic",
+      "rate": 0.5033333333333333,
+      "wins": 151,
+      "ci95": [
+        0.44707091826263046,
+        0.559511458870718
+      ]
+    },
+    "simpleheuristics": {
+      "p1": "simpleheuristics",
+      "p2": "heuristic",
+      "rate": 0.4666666666666667,
+      "wins": 140,
+      "ci95": [
+        0.41099010312059053,
+        0.5231861255459253
+      ]
+    },
+    "maxbasepower": {
+      "p1": "maxbasepower",
+      "p2": "heuristic",
+      "rate": 0.31,
+      "wins": 93,
+      "ci95": [
+        0.260342665745168,
+        0.3644618376539715
+      ]
+    },
+    "random": {
+      "p1": "random",
+      "p2": "heuristic",
+      "rate": 0.023333333333333334,
+      "wins": 7,
+      "ci95": [
+        0.01134751559829571,
+        0.04737255433287896
+      ]
+    },
+    "offrl_ou": {
+      "p1": "doubles",
+      "p2": "heuristic",
+      "rate": 0.4666666666666667,
+      "wins": 140,
+      "ci95": [
+        0.41099010312059053,
+        0.5231861255459253
+      ]
+    },
+    "bc_v11": {
+      "p1": "doubles",
+      "p2": "heuristic",
+      "rate": 0.4533333333333333,
+      "wins": 136,
+      "ci95": [
+        0.3979441581242692,
+        0.5099025620088528
+      ]
+    }
+  },
+  "ou_assessment": {
+    "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+    "mirror_sanity_ok": true,
+    "gradient_ok": true,
+    "harness_ok": true,
+    "ou_band": {
+      "mirror": 0.5033333333333333,
+      "simpleheuristics": 0.4666666666666667,
+      "maxbasepower": 0.31,
+      "random": 0.023333333333333334
+    },
+    "rb_band_reference": {
+      "mirror": 0.513,
+      "simpleheuristics": 0.523,
+      "maxbasepower": 0.107,
+      "random": 0.007,
+      "offrl_green": 0.43
+    },
+    "band_width": {
+      "ou": 0.44333333333333336,
+      "rb": 0.516,
+      "wider_than_rb": false
+    },
+    "ou_verdict": {
+      "verdict": "INSUFFICIENT",
+      "reason": "competent bot (simpleheuristics 0.4666666666666667) < HEADROOM 0.58 -- no wide-band evidence of skill headroom; investigate harness or reconsider a genuine OU ceiling.",
+      "competent_rate": 0.4666666666666667,
+      "headroom": 0.58,
+      "format_bound_rejected": false,
+      "learned_bc": {
+        "rate": 0.4533333333333333,
+        "ci95": [
+          0.3979441581242692,
+          0.5099025620088528
+        ]
+      },
+      "learned_offrl": {
+        "rate": 0.4666666666666667,
+        "ci95": [
+          0.41099010312059053,
+          0.5231861255459253
+        ]
+      },
+      "model_gap": 0.0
+    }
+  }
+}

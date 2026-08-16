@@ -184,3 +184,60 @@ def test_node_value_terminal_and_no_move_leaf() -> None:
     leaf = _res(p1_choices=[], p2_choices=[])
     assert _node_value(fm, _FakePV(), object(), leaf, "p1", cfg, 1) == 0.5
     assert fm.calls == []  # never stepped
+
+
+# --- format parameterization (Build 27 A1) --------------------------------------------------
+@requires_showdown
+def test_an_omitted_format_still_reconstructs_as_random_battles() -> None:
+    """THE REGRESSION GUARD FOR EVERY PUBLISHED R-PREDICT NUMBER.
+
+    `FORMAT` used to be a module constant pinned to gen9randombattle. It now comes from the spec,
+    so a spec that omits it -- which is every caller before 2026-08 -- must still reconstruct
+    exactly as before, right down to the driver sampling the RB pool to fill the hidden opponent.
+    """
+    from lategame.search.forward import ForwardModel
+
+    bare = {
+        "seed": 7,
+        "p1": {"team": [{"species": "dragonite", "moves": ["earthquake"]}],
+               "state": [{"hp_frac": 1.0}], "active": 0, "fill": 0},
+        "p2": {"team": [{"species": "garchomp", "moves": ["earthquake"]}],
+               "state": [{"hp_frac": 1.0}], "active": 0, "fill": 5},
+        "field": {"weather": "", "terrain": "", "pseudo": []},
+        "hazards": {"p1": {}, "p2": {}},
+        "turn": 1,
+    }
+    explicit = {**bare, "format": "gen9randombattle"}
+
+    with ForwardModel() as fm:
+        a = fm.reconstruct(bare)
+        b = fm.reconstruct(explicit)
+    # Same seed, same format => the determinization must be identical, not merely similar.
+    assert a["digest"] == b["digest"]
+    assert len(a["digest"]["p2"]) == 6  # RB still fills the hidden roster from its own pool
+
+
+@requires_showdown
+def test_a_teambuilt_format_never_invents_species() -> None:
+    """On gen9ou the opponent's six are known from team preview, so there is nothing to sample --
+    and there is no random-set generator to sample legally with. `fill` must be ignored rather
+    than quietly producing a team the format would reject."""
+    from lategame.search.forward import ForwardModel
+
+    spec = {
+        "seed": 3,
+        "format": "gen9ou",
+        "p1": {"team": [{"species": "greattusk", "moves": ["earthquake"],
+                         "ability": "protosynthesis", "item": "leftovers", "level": 100}],
+               "state": [{"hp_frac": 1.0}], "active": 0, "fill": 0},
+        "p2": {"team": [{"species": "kingambit", "moves": ["suckerpunch"],
+                         "ability": "supremeoverlord", "item": "leftovers", "level": 100}],
+               "state": [{"hp_frac": 1.0}], "active": 0, "fill": 5},  # fill must be IGNORED here
+        "field": {"weather": "", "terrain": "", "pseudo": []},
+        "hazards": {"p1": {}, "p2": {}},
+        "turn": 1,
+    }
+    with ForwardModel() as fm:
+        recon = fm.reconstruct(spec)
+    assert len(recon["digest"]["p2"]) == 1, "a teambuilt format must not invent opponent species"
+    assert recon["p1_choices"], "the reconstructed gen9ou battle must offer legal choices"

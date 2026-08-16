@@ -36,6 +36,7 @@ def _config_from_env() -> SearchConfig:
         top_k_my=int(os.environ.get("LATEGAME_SEARCH_TOPK_MY", "3")),
         opp_cap_deep=int(os.environ.get("LATEGAME_SEARCH_OPP_CAP_DEEP", "3")),
         seed=int(os.environ.get("LATEGAME_SEARCH_SEED", "0")),
+        root_cap=int(os.environ.get("LATEGAME_SEARCH_ROOT_CAP", "0")),
     )
 
 
@@ -49,20 +50,33 @@ class SearchAgent(Player):
     ) -> None:
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
-        from lategame.search.expectimax import PolicyValue, choose_order
+        from lategame.search.expectimax import (
+            LeafPolicy,
+            PolicyValue,
+            ShapedOnlyPolicy,
+            choose_order,
+        )
         from lategame.search.forward import ForwardModel
         from lategame.search.opponent_model import build_opponent_model
 
         self._choose_order = choose_order
-
-        path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
-        if not path.exists():
-            raise FileNotFoundError(
-                f"Search checkpoint not found at '{path}'. Train one (`lategame train-rl`) "
-                f"or set {CHECKPOINT_ENV_VAR}."
-            )
         self._cfg = _config_from_env()
-        self._pv = PolicyValue(str(path), policy_blend=self._cfg.policy_blend)
+
+        # SHAPED-ONLY MODE: search with no trained model at all, leaves scored by the shaped
+        # state-value. This is what makes an M2 ("what does near-optimal search achieve here?")
+        # possible on a format with no checkpoint -- which is every doubles format, since the
+        # encoder and action space are singles-only until the G4/M6 build. Opt-in, so no existing
+        # caller changes behaviour.
+        if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1":
+            self._pv: LeafPolicy = ShapedOnlyPolicy()
+        else:
+            path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"Search checkpoint not found at '{path}'. Train one (`lategame train-rl`) "
+                    f"or set {CHECKPOINT_ENV_VAR}."
+                )
+            self._pv = PolicyValue(str(path), policy_blend=self._cfg.policy_blend)
         # Lever 14: an opponent policy for probability-weighted expectimax (opp_agg="model").
         # The learned arm reuses the same frozen GREEN policy as the modeled opponent.
         self._opp_model = build_opponent_model(
@@ -78,7 +92,21 @@ class SearchAgent(Player):
             order = self._choose_order(self._fm, self._pv, battle, self._cfg, self._opp_model)
         except Exception:  # noqa: BLE001 -- search must never crash a live battle
             order = None
-        return order if order is not None else self._pv.greedy_order(battle)
+        if order is not None:
+            return order
+        # No trained policy to fall back on in shaped-only mode, so fall back to the M1 rule --
+        # which is also the agent this probe is measured against, making the fallback the
+        # conservative direction rather than a free win.
+        greedy = getattr(self._pv, "greedy_order", None)
+        if greedy is not None:
+            return greedy(battle)
+        from lategame.agents.heuristic_agent import heuristic_pick
+
+        pick = heuristic_pick(
+            battle.active_pokemon, battle.opponent_active_pokemon,
+            battle.available_moves, battle.available_switches,
+        )
+        return self.create_order(pick[1]) if pick else self.choose_default_move()
 
     def __del__(self) -> None:
         fm = getattr(self, "_fm", None)

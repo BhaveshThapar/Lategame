@@ -1,0 +1,21 @@
+{
+  "gate": "rpredict_oppmodel_gate_b",
+  "init": "checkpoints/ppo_v26b_s0/iter_300.pt",
+  "n": 250,
+  "sanity_n": 40,
+  "depth": 2,
+  "seed": 4,
+  "format": "gen9ou",
+  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "loop_penalty": 4.0,
+  "base_vs_heuristic": 0.748,
+  "arms": {
+    "whitebox": {
+      "search_vs_random": 0.825,
+      "search_vs_heuristic": 0.752,
+      "search_vs_base": 0.368,
+      "delta_vs_base_at_heuristic": 0.004,
+      "verdict": "RED"
+    }
+  }
+}

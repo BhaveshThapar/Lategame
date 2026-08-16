@@ -387,15 +387,34 @@ def test_table_renders_every_agent():
 # --------------------------------------------------------------------------- #
 # run_round_robin, against fakes
 # --------------------------------------------------------------------------- #
+class _FakeMon:
+    def __init__(self, species):
+        self.species = species
+
+
+class _FakeBattle:
+    """Enough of poke-env's Battle for the per-battle record extraction."""
+
+    def __init__(self, tag, won, own_team, opponent_team, finished=True):
+        self.battle_tag = tag
+        self.finished = finished
+        self.won = won is True
+        self.lost = won is False
+        self.team = {s: _FakeMon(s) for s in own_team}
+        self.teampreview_opponent_team = [_FakeMon(s) for s in opponent_team]
+
+
 class _FakePlayer:
     """Enough of poke-env's Player for the driver: counters, battle_against, reset, teardown."""
 
-    def __init__(self, name, script):
+    def __init__(self, name, script, teams=None):
         self.username = name
         self._script = script  # opponent -> (wins, losses, ties)
         self.n_won_battles = self.n_lost_battles = self.n_finished_battles = 0
         self.resets = 0
         self.stopped = False
+        self._battles = {}
+        self._teams = teams or {}  # opponent -> (own_team, opponent_team) per battle, cycled
         self.ps_client = type("_C", (), {"stop_listening": self._stop})()
 
     async def _stop(self):
@@ -410,12 +429,21 @@ class _FakePlayer:
             player.n_won_battles += wins
             player.n_lost_battles += losses
             player.n_finished_battles += wins + losses + ties
+            matchups = player._teams.get(opponent.username)
+            if matchups is None:
+                continue
+            outcomes = [True] * wins + [False] * losses + [None] * ties
+            for i, won in enumerate(outcomes):
+                own, opp = matchups[i % len(matchups)]
+                tag = f"{player.username}-{opponent.username}-{i}"
+                player._battles[tag] = _FakeBattle(tag, won, own, opp)
 
     def reset_battles(self):
         if getattr(self, "refuse_reset", False):
             raise OSError("Can not reset player's battles while they are still running")
         self.resets += 1
         self.n_won_battles = self.n_lost_battles = self.n_finished_battles = 0
+        self._battles = {}
 
 
 def test_round_robin_scores_every_pair_from_the_counters(monkeypatch):
@@ -436,7 +464,7 @@ def test_round_robin_scores_every_pair_from_the_counters(monkeypatch):
     monkeypatch.setattr(arena, "AGENTS", {"a": object, "b": object, "c": object})
 
     entries = [FieldEntry(name) for name in ("a", "b", "c")]
-    pairs = asyncio.run(L.run_round_robin(entries, "gen9ou", 100))
+    pairs = asyncio.run(L.run_round_robin(entries, "gen9ou", 100)).pairs
 
     assert len(pairs) == 3  # 3 agents -> 3 unordered pairs, each played once
     ab = next(p for p in pairs if {p.a, p.b} == {"a", "b"})
@@ -476,7 +504,7 @@ def test_pairs_are_scored_by_difference_when_reset_is_refused(monkeypatch):
     monkeypatch.setattr(arena, "AGENTS", {"a": object, "b": object, "c": object})
 
     entries = [FieldEntry(name) for name in ("a", "b", "c")]
-    pairs = asyncio.run(L.run_round_robin(entries, "gen9ou", 100))
+    pairs = asyncio.run(L.run_round_robin(entries, "gen9ou", 100)).pairs
 
     # `a` plays b then c. Absolute counters would report a's SECOND pair as 140-50-10 over 200
     # games; the delta is the pair that was actually played.
@@ -518,3 +546,212 @@ def test_nothing_is_clamped_in_a_normal_field():
     pairs = _round_robin({"w": 1300.0, "x": 1500.0, "z": 1700.0}, 300)
     fit = rate_field(pairs, anchor="x")
     assert fit.clamped == () and fit.unbounded == ()
+
+
+# --------------------------------------------------------------------------- #
+# The cluster bootstrap: the interval RD is not
+# --------------------------------------------------------------------------- #
+def _cell_records(a: str, b: str, cells: dict[str, float], per_cell: int):
+    """`cells` maps a cell key to `a`'s score in EVERY battle of that cell -- i.e. a matchup that
+    is entirely decided by the team pairing, which is the dependence structure being modelled."""
+    return [
+        L.BattleRecord(a=a, b=b, score=score, cell=cell)
+        for cell, score in cells.items()
+        for _ in range(per_cell)
+    ]
+
+
+def test_the_cell_key_is_the_unordered_team_matchup():
+    """Ordering the key would split one cluster in two and understate the dependence, which is the
+    entire quantity the bootstrap exists to recover."""
+    x, y = [_FakeMon("Landorus")], [_FakeMon("Kingambit")]
+    assert L.battle_cell(x, y, "tag-1") == L.battle_cell(y, x, "tag-2")
+
+
+def test_an_unknown_team_makes_each_battle_its_own_cluster():
+    """Random Battles draw fresh teams every game, so there is no matchup to cluster on and the
+    right behaviour is to degenerate to the ordinary per-battle bootstrap -- automatically, so no
+    caller has to ask whether the format is teambuilt."""
+    assert L.battle_cell([], [], "tag-1") != L.battle_cell([], [], "tag-2")
+    assert L.battle_cell([], [_FakeMon("Landorus")], "tag-1") == "battle:tag-1"
+
+
+def test_records_score_a_tie_as_a_half_and_skip_unfinished_battles():
+    battles = [
+        _FakeBattle("t1", won=True, own_team=["A"], opponent_team=["B"]),
+        _FakeBattle("t2", won=None, own_team=["A"], opponent_team=["B"]),  # tie
+        _FakeBattle("t3", won=False, own_team=["A"], opponent_team=["B"]),
+        _FakeBattle("t4", won=None, own_team=["A"], opponent_team=["B"], finished=False),
+    ]
+    records = L.records_from_battles("a", "b", battles)
+    assert [r.score for r in records] == [1.0, 0.5, 0.0]
+    assert len({r.cell for r in records}) == 1  # same matchup -> one cluster
+
+
+def test_aggregating_records_reproduces_the_pair_totals():
+    """The bootstrap re-aggregates resampled records into the same shape `rate_field` reads, so a
+    disagreement here would silently fit a different matrix than the point estimate did."""
+    records = (
+        _cell_records("a", "b", {"c1": 1.0}, 60)
+        + _cell_records("a", "b", {"c2": 0.0}, 30)
+        + _cell_records("a", "b", {"c3": 0.5}, 10)
+    )
+    pair = L.aggregate_records(records)[0]
+    assert (pair.wins, pair.losses, pair.ties, pair.games) == (60, 30, 10, 100)
+    assert pair.score == pytest.approx(0.65)
+
+
+def test_aggregation_canonicalises_pair_orientation():
+    """A resampled cell can hold both orientations of one pairing; if they landed in two rows the
+    fit would see the same agents twice and double-count the evidence."""
+    records = [
+        L.BattleRecord(a="b", b="a", score=1.0, cell="c1"),
+        L.BattleRecord(a="a", b="b", score=1.0, cell="c1"),
+    ]
+    pairs = L.aggregate_records(records)
+    assert len(pairs) == 1
+    assert (pairs[0].wins, pairs[0].losses, pairs[0].games) == (1, 1, 2)
+
+
+def test_a_warm_start_reaches_the_same_fit_as_a_cold_one():
+    """The bootstrap's speedup rests entirely on this. Damping makes the sweep a contraction and
+    the anchor removes the remaining gauge direction, so the fixed point is unique and the start
+    can only change how many sweeps it takes -- pinned from a deliberately terrible start."""
+    pairs = _round_robin({"w": 1300.0, "x": 1450.0, "y": 1500.0, "z": 1650.0}, 500)
+    cold = rate_field(pairs, anchor="y")
+    warm = rate_field(pairs, anchor="y", start={"w": 1900.0, "x": 1100.0, "y": 1500.0, "z": 900.0})
+    for label in cold.ratings:
+        assert warm.ratings[label].rating == pytest.approx(cold.ratings[label].rating, abs=1e-4)
+        assert warm.ratings[label].rd == pytest.approx(cold.ratings[label].rd, abs=1e-6)
+
+
+def test_clustered_battles_give_a_far_wider_interval_than_rd(monkeypatch):
+    """THE POINT OF THE WHOLE MECHANISM, as a measurement.
+
+    1000 battles between two agents, but every battle's outcome is fixed by which of 10 team
+    matchups it was played under -- 5 that `a` always wins, 5 that `b` always wins. The score is
+    0.500 and RD, which knows only about binomial noise, reports the tight interval it would report
+    for 1000 independent coin flips. The effective sample is 10, not 1000, and the cluster bootstrap
+    is what says so.
+    """
+    monkeypatch.setattr(L, "RATING_CLAMP", 600.0)  # keep all-one-way resamples finite
+    cells = {f"a{i}": 1.0 for i in range(5)} | {f"b{i}": 0.0 for i in range(5)}
+    records = _cell_records("a", "b", cells, per_cell=100)
+
+    point = rate_field(L.aggregate_records(records), anchor="b")
+    boot = L.cluster_bootstrap(records, point, anchor="b", n_resamples=200, seed=0)
+
+    lo, hi = boot.glicko["a"]
+    rd_width = 2 * 1.96 * point.ratings["a"].rd
+    assert boot.n_cells == 10
+    assert hi - lo > 5 * rd_width, f"cluster CI {hi - lo:.0f} vs RD-implied {rd_width:.0f}"
+
+
+def test_unclustered_battles_stay_near_the_binomial_interval(monkeypatch):
+    """The control for the test above: with every battle in its own cell there is no clustering to
+    find, and the bootstrap must NOT manufacture extra width."""
+    monkeypatch.setattr(L, "RATING_CLAMP", 600.0)
+    cells = {f"g{i}": (1.0 if i % 2 else 0.0) for i in range(1000)}
+    records = _cell_records("a", "b", cells, per_cell=1)
+
+    point = rate_field(L.aggregate_records(records), anchor="b")
+    boot = L.cluster_bootstrap(records, point, anchor="b", n_resamples=200, seed=0)
+
+    lo, hi = boot.glicko["a"]
+    rd_width = 2 * 1.96 * point.ratings["a"].rd
+    assert boot.n_cells == 1000
+    assert hi - lo < 2 * rd_width, f"cluster CI {hi - lo:.0f} vs RD-implied {rd_width:.0f}"
+
+
+def test_the_interval_is_reproducible_from_its_seed():
+    records = _cell_records("a", "b", {f"c{i}": (i % 3) / 2.0 for i in range(12)}, per_cell=20)
+    point = rate_field(L.aggregate_records(records), anchor="b")
+    kwargs = dict(anchor="b", n_resamples=50)
+    assert (
+        L.cluster_bootstrap(records, point, seed=7, **kwargs).glicko
+        == L.cluster_bootstrap(records, point, seed=7, **kwargs).glicko
+    )
+    assert (
+        L.cluster_bootstrap(records, point, seed=7, **kwargs).glicko
+        != L.cluster_bootstrap(records, point, seed=8, **kwargs).glicko
+    )
+
+
+def test_resamples_that_miss_an_agent_are_discarded_not_patched():
+    """Substituting anything for a missing agent would put a number into the percentile that no fit
+    ever produced. `c` plays in exactly one cell, so most resamples drop it entirely."""
+    records = (
+        _cell_records("a", "b", {f"ab{i}": (i % 2) * 1.0 for i in range(8)}, per_cell=10)
+        + _cell_records("a", "c", {"rare": 1.0}, per_cell=10)
+        + _cell_records("b", "c", {"rare": 0.0}, per_cell=10)
+    )
+    point = rate_field(L.aggregate_records(records), anchor="b")
+    boot = L.cluster_bootstrap(records, point, anchor="b", n_resamples=100, seed=0)
+    assert boot.skipped > 0
+    assert boot.n_resamples == 100 - boot.skipped
+
+
+def _graded_field(fraction: dict[tuple[str, str], float], cells: int, per_cell: int):
+    """A field where the first agent of each pair wins `fraction` of the CELLS outright -- so the
+    score rate is as asked while the outcome still varies at the cluster level, not within it."""
+    records = []
+    for (a, b), share in fraction.items():
+        wins = round(share * cells)
+        records += _cell_records(
+            a, b, {f"{a}{b}{i}": (1.0 if i < wins else 0.0) for i in range(cells)}, per_cell
+        )
+    return records
+
+
+def test_the_summary_reports_which_neighbours_are_actually_separated():
+    """A standings table read top-down implies an ordering whether or not the data support one, so
+    the verdict is written per adjacent pair rather than left to the reader."""
+    records = _graded_field(
+        {("strong", "mid"): 0.90, ("mid", "weak"): 0.90, ("strong", "weak"): 0.99},
+        cells=100, per_cell=3,
+    )
+    pairs = L.aggregate_records(records)
+    point = rate_field(pairs, anchor="mid")
+    boot = L.cluster_bootstrap(records, point, anchor="mid", n_resamples=100, seed=0)
+    summary = summarize_ladder(
+        [FieldEntry(n) for n in ("strong", "mid", "weak")], pairs, point,
+        battle_format="gen9ou", n_battles=300, bootstrap=boot,
+    )
+
+    assert [row["separated"] for row in summary["bootstrap"]["adjacent_separation"]] == [True, True]
+    assert all("glicko_ci95" in row for row in summary["agents"])
+    assert "SEPARATED" in format_table(summary)
+
+
+def test_neighbours_of_equal_strength_are_reported_as_NOT_separated(monkeypatch):
+    """The half that matters for reading Build 26's ladder: `v25a` and `v25b` sit a few points
+    apart on a clustered field, and the honest answer is that the table does not order them. A
+    verdict that could only ever say SEPARATED would be no verdict at all."""
+    monkeypatch.setattr(L, "RATING_CLAMP", 600.0)
+    records = _graded_field(
+        {("twin_a", "twin_b"): 0.50, ("twin_a", "weak"): 0.90, ("twin_b", "weak"): 0.90},
+        cells=40, per_cell=5,
+    )
+    pairs = L.aggregate_records(records)
+    point = rate_field(pairs, anchor="weak")
+    boot = L.cluster_bootstrap(records, point, anchor="weak", n_resamples=100, seed=0)
+    summary = summarize_ladder(
+        [FieldEntry(n) for n in ("twin_a", "twin_b", "weak")], pairs, point,
+        battle_format="gen9ou", n_battles=200, bootstrap=boot,
+    )
+
+    adjacent = summary["bootstrap"]["adjacent_separation"]
+    twins = next(r for r in adjacent if {r["above"], r["below"]} == {"twin_a", "twin_b"})
+    assert twins["separated"] is False
+    assert "not separated" in format_table(summary)
+
+
+def test_the_bootstrap_is_optional_and_absent_by_default():
+    """Every existing caller passes no bootstrap, and their output must be byte-identical."""
+    pairs = _round_robin({"a": 1400.0, "b": 1600.0}, 200)
+    summary = summarize_ladder(
+        [FieldEntry("a"), FieldEntry("b")], pairs, rate_field(pairs, anchor="a"),
+        battle_format="gen9ou", n_battles=200,
+    )
+    assert "bootstrap" not in summary
+    assert all("glicko_ci95" not in row for row in summary["agents"])

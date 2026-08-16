@@ -133,6 +133,24 @@ def _compare(stats: ReconStats, pe: Mapping, drv: Mapping) -> None:
         stats.samples.append({"diffs": sample[:6]})
 
 
+def check_live_snapshot(stats: ReconStats, battle: AbstractBattle, fm: ForwardModel) -> None:
+    """Score one LIVE POV: determinize it, reconstruct, and compare observable digests.
+
+    The replay-driven path above cannot run on every format. It re-simulates an ``inputlog``, and
+    gen9ou public replays carry none (OU Build 2) -- which is also why OU ingest had to use the
+    seed-free reconstructor. Live play needs no inputlog at all, so this is the path a teambuilt
+    or doubles format is scored on, against the *same* ``_compare`` criteria as the RB gate so the
+    numbers stay commensurable.
+    """
+    stats.snapshots += 1
+    try:
+        drv = fm.reconstruct(battle_to_spec(battle, seed=stats.snapshots))["digest"]
+    except Exception:  # noqa: BLE001 -- a bad reconstruction is a data point, not a crash
+        stats.errored += 1
+        return
+    _compare(stats, pokeenv_digest(battle), drv)
+
+
 def run_recon_check(
     replays: Iterable[Mapping[str, object]],
     showdown_dir: str = _DEFAULT_SHOWDOWN,
