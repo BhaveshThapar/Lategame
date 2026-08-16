@@ -42,7 +42,7 @@ jobs:
       - run: mypy lategame
 
       # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 15 tests
-      # self-skip and 699 pass -- measured on a fresh clone, not inferred. A 16th skip means an
+      # self-skip and 709 pass -- measured on a fresh clone, not inferred. A 16th skip means an
       # environment gate started firing that should not have, which is a regression, not noise.
       - run: pytest -q
 
