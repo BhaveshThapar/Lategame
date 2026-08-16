@@ -1140,6 +1140,46 @@ ratios are real), `invalid_frac_max` <= 0.031 against a 0.05 ceiling, `dec_frac_
 Without the decision-row denominator the same run would have reported a KL an order of magnitude
 smaller and certified a trust region that never bound.
 
+### Team preview is modelled now, and it does not move the VGC verdict
+
+Every VGC number above was measured with `Player.random_teampreview` picking 4 of 6 uniformly at
+random on **both** sides, and plan.md has carried that as an open caveat — "a large part of VGC
+skill the policy cannot express, adding variance to every number above". `lategame/agents/
+teampreview.py` now scores the bring: our known moves into their previewed six for offense, their
+STAB types into ours for threat, combined multiplicatively so a mon that cannot damage anything
+scores zero however well it resists. It is applied by `eval.arena.build_player` to **every** player
+on a doubles format, poke-env's own baselines included — a preview policy on our arm alone would
+have let it bring a better four and had that read as play strength.
+
+**The contrast, n = 300 per cell, both halves run back to back in one session against one server
+and one team pool** (`results/format_ceiling_gate_vgc_v3.json`, `..._v3_nopreview.json`):
+
+| arm | preview OFF | preview ON | ON − OFF |
+|---|---|---|---|
+| mirror (sanity) | 0.497 [0.440, 0.553] | 0.497 [0.440, 0.553] | +0.000 |
+| `simpleheuristics` | 0.520 [0.464, 0.576] | 0.493 [0.437, 0.550] | −0.027 |
+| `maxbasepower` | 0.280 [0.232, 0.333] | 0.290 [0.242, 0.344] | +0.010 |
+| `random` | 0.057 [0.036, 0.089] | 0.013 [0.005, 0.034] | −0.043 |
+| **AWR** (`doubles_offrl_vgc_v2.pt`) | 0.387 [0.333, 0.443] | **0.447** [0.391, 0.503] | **+0.060** |
+| **BC** (`doubles_bc_vgc_v2.pt`) | 0.467 [0.411, 0.523] | 0.453 [0.398, 0.510] | −0.013 |
+
+Each cell is *both* sides gaining a preview, so a delta is the NET of the arm's gain against the
+heuristic's. Read that way the ordering is the expected one: `random` drops the most (−0.043) because
+preview skill compounds with play skill and it has none to compound with, and the learned AWR arm
+gains the most (+0.060) — a policy that can use a favourable bring is the one a bring helps.
+
+**What it does not do is move the verdict.** Harness sanity is unchanged (mirror 0.497, gradient
+ordered, both `harness_ok`), and the competent bot reads 0.520 OFF / 0.493 ON against a HEADROOM
+threshold of 0.58 — `INSUFFICIENT` either way, and not close. So the caveat was real and is now
+retired rather than inherited: modelling preview does **not** rescue the doubles ceiling, and the
+published BC/AWR ladder above is not invalidated by having been measured without it.
+
+*The reason both halves had to be run in one session.* Against the on-record v2 ladder — the same
+configuration, a different day — the preview-OFF rerun drifts by up to **0.080** (`offrl_ou` 0.467 →
+0.387, `simpleheuristics` 0.467 → 0.520). That cross-run band is **larger than the largest preview
+effect measured**. Comparing v3-ON against the v2 record would have attributed run-to-run noise to
+team preview and gotten a bigger, cleaner-looking answer than the truth.
+
 ## Artifacts & reproducibility
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
@@ -1158,12 +1198,13 @@ a gate can be re-pinned and a result file cannot:
 | Glicko **1776.3** / GXE **0.7434** | `results/eval_ladder_gen9ou_v26.json` |
 | VGC B6f C1 **0.530** | `results/ppo_vgc_gate_b6f{,_s0,_s1,_s2}.json`, `results/seed_strength_gate_b6f_c1.json`, `results/awr_vgc_arm_b6f.json` |
 | VGC corrected ladder **BC 0.453** / **AWR 0.467** | `results/format_ceiling_gate_vgc_v2.json` |
+| **G5 MET** — four capabilities, each on its own gate's criterion | `results/g5_capability_gate.json` |
 
 Every checkpoint those records name is present on the machine that produced them, and none of them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 121 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-221 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+224 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
