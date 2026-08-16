@@ -48,7 +48,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import switch_mass_gate as smg  # type: ignore[import-not-found]
+import switch_mass_gate as smg
 
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
 

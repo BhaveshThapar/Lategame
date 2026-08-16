@@ -89,6 +89,7 @@ import json
 import math
 import random
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -174,7 +175,9 @@ def noise_scale(sq_small: float, b_small: int, sq_big: float, b_big: int) -> dic
     }
 
 
-def _flat_grad(model: nn.Module, loss: torch.Tensor, params: list[torch.Tensor]) -> torch.Tensor:
+def _flat_grad(
+    model: nn.Module, loss: torch.Tensor, params: Sequence[torch.Tensor]
+) -> torch.Tensor:
     """Flattened dL/dtheta over every trainable parameter (zeros where the loss is independent)."""
     grads = torch.autograd.grad(loss, params, retain_graph=True, allow_unused=True)
     return torch.cat(
