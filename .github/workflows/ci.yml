@@ -14,8 +14,20 @@ on:
 permissions:
   contents: read
 
+# Superseding a branch run is a saving; superseding a `main` run destroys a record.
+#
+# This was `cancel-in-progress: true` for every ref, and it cost the v1.0.0 merge commit its
+# verdict: a follow-up push to main landed ~2 minutes later and GitHub killed run 14 on 6c82027
+# mid-flight, so that commit carries `cancelled` -- neither pass nor fail -- permanently. The
+# successor run covers the same TREE, but not that commit, and `main` still looked healthy
+# throughout. That is the same shape as this workflow's other two repaired blind spots: a bar that
+# reads as checked and is not.
+#
+# On a branch, cancelling is right -- only the tip matters and the runners are shared. On main every
+# commit is something a reader may check out, cite, or bisect to, so each one keeps its own run.
+# `github.run_id` is unique per run, so main's group never collides with itself.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.run_id || 'shared' }}
   cancel-in-progress: true
 
 jobs:
