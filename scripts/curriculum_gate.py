@@ -120,7 +120,14 @@ def preflight_verdict(stats: dict) -> str:
     return "PASS"
 
 
-async def run_preflight(init: str, fmt: str, games: int, max_concurrent: int) -> dict:
+async def run_preflight(
+    init: str,
+    fmt: str,
+    games: int,
+    max_concurrent: int,
+    team_pool: str | None = None,
+    max_battle_turns: int | None = None,
+) -> dict:
     """Collect a small GREEN-vs-tough shard and report the AWR pre-flight signal."""
     # ASK, do not name. `build_player` refuses a singles-only name on a doubles format, and this
     # is the only self-play -> results/ bridge in the tree, so an M4 doubles arm has to come
@@ -139,6 +146,11 @@ async def run_preflight(init: str, fmt: str, games: int, max_concurrent: int) ->
         RewardWeights(),
         gamma=0.99,
         max_concurrent=max_concurrent,
+        # Gate A collects through its OWN `collect_selfplay` call, not through `SelfPlayConfig`.
+        # Threading the pool into the config alone left this one teamless, and the first VGC run
+        # died here on a rejected-team popup after the job had already claimed its node.
+        team_pool=team_pool,
+        max_battle_turns=max_battle_turns,
     )
     stats = preflight_stats(dataset.reward, dataset.done, dataset.gamma)
     verdict = preflight_verdict(stats)
@@ -292,7 +304,8 @@ async def run_gate(args: argparse.Namespace) -> dict:
     # Gate A -- cheap KILL pre-flight.
     if not args.skip_preflight:
         pre = await run_preflight(
-            init, args.battle_format, args.preflight_games, args.max_concurrent
+            init, args.battle_format, args.preflight_games, args.max_concurrent,
+            team_pool=args.team_pool, max_battle_turns=args.max_battle_turns,
         )
         result["preflight"] = pre
         if pre["verdict"] == "KILL":

@@ -42,6 +42,19 @@ def _z_test(w1: int, n1: int, w2: int, n2: int) -> dict[str, float]:
     return {"diff": round(p1 - p2, 4), "z": round(z, 3), "p_value": round(p, 6), "se": round(se, 4)}
 
 
+def _one(key: str, shards: list[dict[str, Any]]) -> Any:
+    """The single value of ``key`` across shards, or None if absent; refuse a disagreement.
+
+    Pooling shards that were run differently produces one number describing two experiments. The
+    fields that define the run -- format, init, depth -- are taken from shard 0 by long-standing
+    habit; this is for the ones where silently taking the first would hide a real split.
+    """
+    seen = {s[key] for s in shards if s.get(key) is not None}
+    if len(seen) > 1:
+        raise SystemExit(f"shards disagree on {key}: {sorted(seen)} -- these are not one run")
+    return seen.pop() if seen else None
+
+
 def merge(paths: list[str]) -> dict[str, Any]:
     shards = [json.loads(Path(p).read_text()) for p in sorted(paths)]
     if not shards:
@@ -73,6 +86,12 @@ def merge(paths: list[str]) -> dict[str, Any]:
         "format": shards[0].get("format"),
         "init": shards[0].get("init"),
         "depth": shards[0].get("depth"),
+        # Which leaf evaluated the search, carried up from the shards. `ShapedOnlyPolicy` is a
+        # weaker instrument than a trained value head and `expectimax.ShapedOnlyPolicy`
+        # pre-registers the consequence -- a WIN is decisive, a NULL suggestive only -- so a pooled
+        # record that dropped it would launder that caveat away. Absent when the shards predate the
+        # field; a run whose shards DISAGREE is not poolable and says so rather than picking one.
+        "search_leaf": _one("search_leaf", shards),
         "alpha": ALPHA,
         "note": MDE_NOTE,
         "base_vs_heuristic": {"wins": base_w, "n": base_n, "rate": round(base_w / base_n, 4)},
