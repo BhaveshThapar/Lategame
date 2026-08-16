@@ -1050,7 +1050,10 @@ of `battle.turn`. Collection got ~90x faster as a side effect — the loop was t
 turns carry no decision" note in the collection code measured the loop, not the format. And the
 critic's target was compressed ~4x by zero-reward loop frames (return std 0.80 against the corrected
 shard's 3.14), so the previously reported doubles value-MAE was measured against a near-constant
-target. The BC/AWR figures from those builds are withdrawn and re-run on a corrected shard.
+target. The BC/AWR figures from those builds are withdrawn and re-run on a corrected shard. They are
+withdrawn rather than superseded on purpose: they were `n = 100` screening reads recorded in commit
+bodies, and the corrected ladder scores at `n = 300`, so no before/after delta may be read across the
+pair — the difference in `n` is larger than the effect either would have to resolve.
 
 *Read honestly:* a loop guard and a per-battle turn cap were built first, on the theory that this
 was a property of forced-replacement states. They are not what closed it — capped and uncapped arms
@@ -1098,15 +1101,51 @@ ratios are real), `invalid_frac_max` <= 0.031 against a 0.05 ceiling, `dec_frac_
 Without the decision-row denominator the same run would have reported a KL an order of magnitude
 smaller and certified a trust region that never bound.
 
+## Artifacts & reproducibility
+
+**A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
+gitignored, so every number above was produced from files that exist only on the machine that ran
+them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 221
+`results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
+team pools (`lategame/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
+(`lategame/features/data/`), and the pinned simulator rev.
+
+**Which record backs which headline.** These name result files rather than checkpoint paths, because
+a gate can be re-pinned and a result file cannot:
+
+| headline | record |
+|---|---|
+| gen9ou **0.7513** selection-free terminal | `results/ppo_ou_gate_v26b_terminal.json`, `results/seed_strength_gate_v26_terminal.json` |
+| Glicko **1776.3** / GXE **0.7434** | `results/eval_ladder_gen9ou_v26.json` |
+| VGC B6f C1 **0.530** | `results/ppo_vgc_gate_b6f{,_s0,_s1,_s2}.json`, `results/seed_strength_gate_b6f_c1.json`, `results/awr_vgc_arm_b6f.json` |
+
+Every checkpoint those records name is present on the machine that produced them, and none of them
+ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
+
+**58 of the 121 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
+221 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
+teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
+(`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
+were never candidates. **No headline claim is among the 58** — they back superseded intermediate
+builds whose measured numbers remain in the JSON. A reader following an older record to a file will
+find nothing; that is a known state, recorded here rather than left to be discovered.
+
+**What a clean clone can and cannot reproduce.** It can run the whole pipeline end to end — setup,
+collect, train, gate — against a pinned simulator, with the pools, vocab and prior it needs already
+committed. It cannot bit-exactly re-derive a published build: an arm is ~40 h of wall-clock and the
+shards it trained on are gone. The gate scripts are the reproduction path, not the checkpoints.
+
 ## Setup
 
 ```bash
-# 1. Python env (Python 3.11, isolated) — environment.yml runs `pip install -e ".[dev]"`
+# 1. Python env (Python 3.11, isolated) — environment.yml runs `pip install -e ".[dev,ml]"`,
+#    torch included: train / grad_noise_diag / the bc agent all die at the first `import torch`
 conda env create -f environment.yml
 conda activate lategame
 
-# 2. Torch (needed for the learned agents / all training)
-pip install -e ".[ml]"
+# 2. On a CPU-only box, install the CPU torch wheel FIRST to avoid pulling ~2.5 GB of CUDA:
+#    pip install "torch>=2.2" --index-url https://download.pytorch.org/whl/cpu
 
 # 3. Local Showdown server + vendored simulator (fetches smogon/pokemon-showdown into
 #    third_party/ and builds dist/ — dist/ is also used by replay re-simulation)
@@ -1250,10 +1289,12 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 700 tests, 0 skipped with the env active (node) + a local server up
+pytest            # 707 tests, 0 skipped with the env active (node) + a local server up
                   #   LATEGAME_LIVE_TEST=1 also enables the opt-in live-client smoke
+                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 14 self-skip
+                  #   and 693 pass. That is the CI configuration; a 15th skip is a regression.
 ruff check .
-mypy lategame
+mypy lategame     # scoped to lategame/ on purpose: scripts/ carries 2 known pre-existing errors
 ```
 
 ## Layout
