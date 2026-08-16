@@ -1242,7 +1242,7 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 584 tests, 0 skipped with the env active (node) + a local server up
+pytest            # 700 tests, 0 skipped with the env active (node) + a local server up
                   #   LATEGAME_LIVE_TEST=1 also enables the opt-in live-client smoke
 ruff check .
 mypy lategame

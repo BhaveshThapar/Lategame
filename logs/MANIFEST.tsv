@@ -113,3 +113,14 @@ logs/slurm/v25b/slurm-lg-ppo-7188055_2.out	slurm-lg-ppo-7188055_2.out	7188055	83
 logs/slurm/v25c/slurm-lg-ppo-7188056_0.out	slurm-lg-ppo-7188056_0.out	7188056	8400	v25c	slurm:ckpt-prefix
 logs/slurm/v25c/slurm-lg-ppo-7188056_1.out	slurm-lg-ppo-7188056_1.out	7188056	8401	v25c	slurm:ckpt-prefix
 logs/slurm/v25c/slurm-lg-ppo-7188056_2.out	slurm-lg-ppo-7188056_2.out	7188056	8402	v25c	slurm:ckpt-prefix
+logs/ppo/b6f/ppo_b6f_s0.log	ppo_b6f_s0.log			b6f	ppo:filename
+logs/ppo/b6f/ppo_b6f_s1.log	ppo_b6f_s1.log			b6f	ppo:filename
+logs/ppo/b6f/ppo_b6f_s2.log	ppo_b6f_s2.log			b6f	ppo:filename
+logs/slurm/slurm-lg-ppo-7254988_0.out	slurm-lg-ppo-7254988_0.out	7254988		b6f	slurm:job-name
+logs/slurm/slurm-lg-ppo-7254988_1.out	slurm-lg-ppo-7254988_1.out	7254988		b6f	slurm:job-name
+logs/slurm/slurm-lg-ppo-7254988_2.out	slurm-lg-ppo-7254988_2.out	7254988		b6f	slurm:job-name
+logs/slurm/slurm-lg-ppo-7254992_2.out	slurm-lg-ppo-7254992_2.out	7254992		b6f	slurm:job-name
+logs/showdown/b6f/showdown_7254988_2.log	showdown_7254988_2.log	7254988		b6f	showdown:jobid
+logs/showdown/b6f/showdown_7254989_0.log	showdown_7254989_0.log	7254989		b6f	showdown:jobid
+logs/showdown/b6f/showdown_7254990_1.log	showdown_7254990_1.log	7254990		b6f	showdown:jobid
+logs/showdown/b6f/showdown_7254992_2.log	showdown_7254992_2.log	7254992		b6f	showdown:jobid
