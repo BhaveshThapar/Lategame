@@ -200,8 +200,11 @@ def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
 
 
 def test_agent_dispatch_returns_a_usable_name_for_every_format():
-    """`train.ppo` and `scripts/ppo_continue_gate` must ASK which agent to build rather than
-    hardcode `offrl`, which `build_player` refuses on a doubles format."""
+    """`train.ppo`, `train.selfplay` and `scripts/ppo_continue_gate` must ASK which agent to build
+    rather than hardcode `offrl`, which `build_player` refuses on a doubles format.
+
+    `train.selfplay` joined this list late: it was omitted when the helper was introduced, kept
+    its five hardcoded `offrl` names, and so was the one loop that still died on a VGC format."""
     from lategame.config import is_doubles_format
     from lategame.eval.arena import (
         AGENTS,
