@@ -462,6 +462,7 @@ async def collect_selfplay(
     record_opponents: bool = True,
     max_concurrent: int = 1,
     max_battle_turns: int | None = None,
+    team_pool: str | None = None,
 ) -> TrajectoryDataset:
     """Play ``learner`` against each opponent; return all turns + shaped rewards.
 
@@ -469,6 +470,10 @@ async def collect_selfplay(
     per-pair pattern). Both sides are recorded by default so the value head sees --
     and AWR can imitate -- the stronger anchor/opponent behaviour too, which is the
     whole point of keeping fixed anchors in the pool.
+
+    ``team_pool`` is REQUIRED on a teambuilt format (gen9ou, VGC) and must be omitted on Random
+    Battles, where the server supplies the teams. Each side of each pairing gets its own
+    distinctly-seeded pool, so the two do not draw the same team in lockstep.
     """
     if not opponents:
         raise ValueError("Need at least one opponent to generate self-play games.")
@@ -481,12 +486,23 @@ async def collect_selfplay(
     done_chunks: list[bool] = []
     dropped = 0
 
-    for opp in opponents:
+    make_team = _team_factory(team_pool)
+    for i, opp in enumerate(opponents):
         pl = _build_recording_player(
-            learner, battle_format, weights, max_concurrent, max_battle_turns=max_battle_turns
+            learner,
+            battle_format,
+            weights,
+            max_concurrent,
+            team=make_team(2 * i),
+            max_battle_turns=max_battle_turns,
         )
         po = _build_recording_player(
-            opp, battle_format, weights, max_concurrent, max_battle_turns=max_battle_turns
+            opp,
+            battle_format,
+            weights,
+            max_concurrent,
+            team=make_team(2 * i + 1),
+            max_battle_turns=max_battle_turns,
         )
         await cross_evaluate([pl, po], n_challenges=games_per_opp)
         for player in (pl, po) if record_opponents else (pl,):

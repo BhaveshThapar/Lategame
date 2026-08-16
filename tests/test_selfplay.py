@@ -73,6 +73,192 @@ def test_recording_player_forwards_checkpoint_kwargs(monkeypatch):
     assert captured["sample"] is True
 
 
+def test_selfplay_config_has_the_teambuilt_and_cap_fields():
+    """Both default to None, so every RB/OU arm ever run is bit-identical."""
+    from lategame.train.selfplay import SelfPlayConfig
+
+    cfg = SelfPlayConfig()
+    assert cfg.team_pool is None
+    assert cfg.max_battle_turns is None
+
+
+def test_run_selfplay_rejects_format_mismatch(tmp_path):
+    """Collection reads the checkpoint's format, eval reads the config's; a mismatch means the
+    two measure different games. `run_ppo` has refused this since Build 26; M4 did not."""
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "rb_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9randombattle", -3.0, 3.0, 11
+    )
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9ou")
+    with pytest.raises(ValueError, match="format mismatch"):
+        asyncio.run(run_selfplay(cfg))
+
+
+def test_run_selfplay_rejects_an_encoder_mismatched_warm_start(tmp_path):
+    """A singles-dimension checkpoint tagged as VGC clears the format check and must die on the
+    codec fingerprint -- otherwise it reaches the fine-tune step as a shape error, one full
+    iteration of collection later."""
+    import asyncio
+
+    pytest.importorskip("torch")
+    from lategame.model.actor_critic import ActorCritic
+    from lategame.train.ppo import _save_checkpoint
+    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+
+    path = tmp_path / "fake_vgc_init.pt"
+    _save_checkpoint(
+        ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path), "gen9vgc2025regi", -3.0, 3.0, 11
+    )
+    cfg = SelfPlayConfig(init=str(path), battle_format="gen9vgc2025regi")
+    with pytest.raises(ValueError, match="encoder mismatch"):
+        asyncio.run(run_selfplay(cfg))
+
+
+def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
+    """`_eval_point` was the first thing a VGC self-play run hit, and it hardcoded `offrl`.
+
+    `build_player` refuses a singles-only name on a doubles format, so `run_selfplay` raised at
+    iteration 0's eval point -- before a battle was ever requested. Pins both directions: the
+    doubles format gets a doubles-safe name, and the singles path is unchanged.
+    """
+    import asyncio
+
+    from lategame.train import selfplay as sp
+
+    async def fake_eval(a, b, n):
+        return 0.5
+
+    def calls_for(fmt: str) -> list[tuple[str, dict]]:
+        calls: list[tuple[str, dict]] = []
+
+        def fake_build(name, battle_format, **kwargs):
+            calls.append((name, kwargs))
+            return object()
+
+        monkeypatch.setattr(sp, "build_player", fake_build)
+        monkeypatch.setattr(sp, "evaluate_built", fake_eval)
+        asyncio.run(sp._eval_point(1, "ck.pt", sp.SelfPlayConfig(battle_format=fmt), team="POOL"))
+        return calls
+
+    for fmt, expected in (("gen9vgc2025regi", "doubles"), ("gen9randombattle", "offrl")):
+        calls = calls_for(fmt)
+        learner_names = {n for n, kw in calls if "checkpoint_path" in kw}
+        assert learner_names == {expected}
+        for name, _kw in calls:
+            assert name in arena.AGENTS
+            assert name not in arena._singles_only_agents() or fmt == "gen9randombattle"
+        # Every player, baselines included: on a teambuilt format a baseline with no team
+        # cannot start a battle, and only the learner builds were ever going to be looked at.
+        assert all(kw.get("team") == "POOL" for _n, kw in calls)
+
+
+def test_the_selfplay_loop_never_hardcodes_the_singles_agent_name():
+    """Pinned literally, because the behavioural test above cannot reach the `PlayerSpec`
+    construction inside `run_selfplay` without torch and a real checkpoint.
+
+    The quoted form deliberately does not match `SelfPlayConfig.init`'s default checkpoint PATH,
+    `"checkpoints/offrl_gen9randombattle.pt"`, which is not a registry name.
+    """
+    import inspect
+
+    from lategame.train import selfplay as sp
+
+    assert '"offrl"' not in inspect.getsource(sp)
+
+
+def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
+    """A teambuilt M4 arm must reach BOTH sides, and the two must not draw in lockstep.
+
+    ``collect_selfplay`` had no ``team_pool`` parameter at all, so a VGC self-play run had
+    nowhere to put a pool even once ``SelfPlayConfig`` grew the field. Passing ONE pool object
+    to both players would satisfy a naive "team is not None" check while making every battle a
+    same-team mirror, so this pins that the two objects differ.
+    """
+    import asyncio
+
+    from lategame.teambuilding.pool import DEFAULT_VGC_POOL
+
+    captured: list[dict] = []
+
+    class Dummy:
+        dropped = 0
+
+    def fake_build(spec, battle_format, weights=None, max_concurrent=1, **kwargs):
+        captured.append(kwargs)
+        return Dummy()
+
+    async def fake_cross_evaluate(players, n_challenges):
+        return None
+
+    def fake_append(player, weights, obs, action, mask, reward, done):
+        obs.append(np.zeros((1, OBS_DIM), dtype=np.float32))
+        action.append(np.zeros(1, dtype=np.int64))
+        mask.append(np.ones((1, GEN9_ACTION_SPACE_SIZE), dtype=bool))
+        reward.append(np.zeros(1, dtype=np.float32))
+        done.append(np.array([True]))
+        return 0
+
+    monkeypatch.setattr(collect, "_build_recording_player", fake_build)
+    monkeypatch.setattr(collect, "cross_evaluate", fake_cross_evaluate)
+    monkeypatch.setattr(collect, "_append_episodes", fake_append)
+
+    asyncio.run(
+        collect.collect_selfplay(
+            PlayerSpec("offrl"),
+            [PlayerSpec("simpleheuristics")],
+            1,
+            "gen9ou",
+            team_pool=str(DEFAULT_VGC_POOL),
+        )
+    )
+
+    teams = [c["team"] for c in captured]
+    assert len(teams) == 2
+    assert all(t is not None for t in teams)
+    assert teams[0] is not teams[1]
+
+
+def test_collect_selfplay_leaves_random_battles_teamless(monkeypatch):
+    """Random Battles must NOT get a team -- the server supplies them there."""
+    import asyncio
+
+    captured: list[dict] = []
+
+    class Dummy:
+        dropped = 0
+
+    def fake_build(spec, battle_format, weights=None, max_concurrent=1, **kwargs):
+        captured.append(kwargs)
+        return Dummy()
+
+    async def fake_cross_evaluate(players, n_challenges):
+        return None
+
+    def fake_append(player, weights, obs, action, mask, reward, done):
+        obs.append(np.zeros((1, OBS_DIM), dtype=np.float32))
+        action.append(np.zeros(1, dtype=np.int64))
+        mask.append(np.ones((1, GEN9_ACTION_SPACE_SIZE), dtype=bool))
+        reward.append(np.zeros(1, dtype=np.float32))
+        done.append(np.array([True]))
+        return 0
+
+    monkeypatch.setattr(collect, "_build_recording_player", fake_build)
+    monkeypatch.setattr(collect, "cross_evaluate", fake_cross_evaluate)
+    monkeypatch.setattr(collect, "_append_episodes", fake_append)
+
+    asyncio.run(
+        collect.collect_selfplay(PlayerSpec("offrl"), [PlayerSpec("random")], 1, "gen9randombattle")
+    )
+    assert [c["team"] for c in captured] == [None, None]
+
+
 def _tiny_traj(n: int, val: float = 1.0) -> TrajectoryDataset:
     return TrajectoryDataset(
         obs=np.zeros((n, OBS_DIM), dtype=np.float32),
