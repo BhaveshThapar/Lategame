@@ -180,11 +180,23 @@ def _is_learnable(action: np.ndarray | int, mask: np.ndarray) -> bool:
     * **The label must be legal under its own mask.** 2 rows in 51,650 were not, and each
       contributes ~1e9 to cross-entropy (the target sits at ``NEG_INF``), which alone drove BC's
       reported train loss to 43,024 while validation sat at 0.04.
-    * **The turn must offer a choice.** On doubles, 98.4% of recorded turns had exactly ONE legal
-      action per slot -- forced replacements and unasked slots -- because poke-env calls
-      ``choose_move`` for those too. Training on them is not imitation, it is copying the only
-      option, and it inflated accuracy to 0.988 against ~19 legal actions per slot on the 1.6% of
-      turns that were real decisions. Singles hits this far less, which is why it never surfaced.
+    * **The turn must offer a choice.** A turn where every slot has exactly one legal action is
+      not imitation, it is copying the only option; on a factored head it also hands the model a
+      free correct prediction for that slot.
+
+    CORRECTED (B6f). This docstring used to read "98.4% of recorded turns had exactly ONE legal
+    action per slot ... against ~19 legal actions per slot on the 1.6% of turns that were real
+    decisions", and cited that as a property of doubles. It was not: it measured the loop in
+    ``agents.heuristic_agent._choose_doubles_move``, which emitted a WHOLE-order
+    ``DefaultBattleOrder`` for an idle slot and so re-requested the same state thousands of times
+    (see ``agents.turn_cap``). On a shard collected after that fix, VGC doubles is a normal,
+    decision-DENSE format:
+
+        decision density        0.923   (loop-contaminated shard: 0.571; gen9ou: 0.9998)
+        legal actions per slot  14.0    (loop-contaminated shard: 2.62;  gen9ou: 7.67)
+
+    So this filter rejects ~8% of doubles turns, not 98.4%, and doubles offers roughly TWICE OU's
+    branching per slot rather than a fraction of it.
     """
     if mask.ndim == 1:  # singles: scalar action, (A,) mask
         a = int(action)
