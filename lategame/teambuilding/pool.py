@@ -17,6 +17,10 @@ from poke_env.teambuilder.teambuilder import Teambuilder
 # Curated, validator-checked pool written by scripts/build_ou_teampool.py (one packed team per
 # line). Committed under the package (like features/data/) since /data/ holds gitignored shards.
 DEFAULT_OU_POOL = Path("lategame/teambuilding/data/teams_gen9ou.packed")
+# The VGC twin. Named here rather than spelled out at each call site: a teambuilt format that
+# gets the wrong pool does not fail, it plays illegal-for-the-format teams the server rejects
+# one battle at a time, and a typo'd path is a FileNotFoundError only if you are lucky.
+DEFAULT_VGC_POOL = Path("lategame/teambuilding/data/teams_gen9vgc.packed")
 
 
 class TeamPool(Teambuilder):
