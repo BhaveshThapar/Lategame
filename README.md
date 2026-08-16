@@ -1154,6 +1154,7 @@ a gate can be re-pinned and a result file cannot:
 | gen9ou **0.7513** selection-free terminal | `results/ppo_ou_gate_v26b_terminal.json`, `results/seed_strength_gate_v26_terminal.json` |
 | Glicko **1776.3** / GXE **0.7434** | `results/eval_ladder_gen9ou_v26.json` |
 | VGC B6f C1 **0.530** | `results/ppo_vgc_gate_b6f{,_s0,_s1,_s2}.json`, `results/seed_strength_gate_b6f_c1.json`, `results/awr_vgc_arm_b6f.json` |
+| VGC corrected ladder **BC 0.453** / **AWR 0.467** | `results/format_ceiling_gate_vgc_v2.json` |
 
 Every checkpoint those records name is present on the machine that produced them, and none of them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
