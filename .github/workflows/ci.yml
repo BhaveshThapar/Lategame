@@ -1,0 +1,52 @@
+# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame.
+name: ci
+
+on:
+  push:
+    branches: [main, eval-ladder]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # CPU wheel FIRST, so the `[ml]` extra below resolves torch as already-satisfied instead of
+      # pulling ~2.5 GB of CUDA for a runner that has no GPU. environment.yml documents the same
+      # trick for cluster login nodes.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch>=2.2" --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,ml]"
+
+      - run: ruff check .
+
+      # Scoped to lategame/ exactly as README's Develop block is. scripts/ carries 2 known
+      # pre-existing "assign to a type" errors; widening this is a separate cleanup, not a CI change.
+      - run: mypy lategame
+
+      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 15 tests
+      # self-skip and 699 pass -- measured on a fresh clone, not inferred. A 16th skip means an
+      # environment gate started firing that should not have, which is a regression, not noise.
+      - run: pytest -q
+
+      # NOT run here: `python scripts/check_artifacts.py`. A runner has no checkpoints/ at all, so
+      # every headline reads as gone and it would exit 1 on every push. Its runnable half -- that
+      # each headline still maps to a gate file that cites something -- needs only the committed
+      # results/ and is covered by tests/test_check_artifacts.py, which pytest above already ran.
