@@ -73,6 +73,92 @@ def test_recording_player_forwards_checkpoint_kwargs(monkeypatch):
     assert captured["sample"] is True
 
 
+def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
+    """A teambuilt M4 arm must reach BOTH sides, and the two must not draw in lockstep.
+
+    ``collect_selfplay`` had no ``team_pool`` parameter at all, so a VGC self-play run had
+    nowhere to put a pool even once ``SelfPlayConfig`` grew the field. Passing ONE pool object
+    to both players would satisfy a naive "team is not None" check while making every battle a
+    same-team mirror, so this pins that the two objects differ.
+    """
+    import asyncio
+
+    from lategame.teambuilding.pool import DEFAULT_VGC_POOL
+
+    captured: list[dict] = []
+
+    class Dummy:
+        dropped = 0
+
+    def fake_build(spec, battle_format, weights=None, max_concurrent=1, **kwargs):
+        captured.append(kwargs)
+        return Dummy()
+
+    async def fake_cross_evaluate(players, n_challenges):
+        return None
+
+    def fake_append(player, weights, obs, action, mask, reward, done):
+        obs.append(np.zeros((1, OBS_DIM), dtype=np.float32))
+        action.append(np.zeros(1, dtype=np.int64))
+        mask.append(np.ones((1, GEN9_ACTION_SPACE_SIZE), dtype=bool))
+        reward.append(np.zeros(1, dtype=np.float32))
+        done.append(np.array([True]))
+        return 0
+
+    monkeypatch.setattr(collect, "_build_recording_player", fake_build)
+    monkeypatch.setattr(collect, "cross_evaluate", fake_cross_evaluate)
+    monkeypatch.setattr(collect, "_append_episodes", fake_append)
+
+    asyncio.run(
+        collect.collect_selfplay(
+            PlayerSpec("offrl"),
+            [PlayerSpec("simpleheuristics")],
+            1,
+            "gen9ou",
+            team_pool=str(DEFAULT_VGC_POOL),
+        )
+    )
+
+    teams = [c["team"] for c in captured]
+    assert len(teams) == 2
+    assert all(t is not None for t in teams)
+    assert teams[0] is not teams[1]
+
+
+def test_collect_selfplay_leaves_random_battles_teamless(monkeypatch):
+    """Random Battles must NOT get a team -- the server supplies them there."""
+    import asyncio
+
+    captured: list[dict] = []
+
+    class Dummy:
+        dropped = 0
+
+    def fake_build(spec, battle_format, weights=None, max_concurrent=1, **kwargs):
+        captured.append(kwargs)
+        return Dummy()
+
+    async def fake_cross_evaluate(players, n_challenges):
+        return None
+
+    def fake_append(player, weights, obs, action, mask, reward, done):
+        obs.append(np.zeros((1, OBS_DIM), dtype=np.float32))
+        action.append(np.zeros(1, dtype=np.int64))
+        mask.append(np.ones((1, GEN9_ACTION_SPACE_SIZE), dtype=bool))
+        reward.append(np.zeros(1, dtype=np.float32))
+        done.append(np.array([True]))
+        return 0
+
+    monkeypatch.setattr(collect, "_build_recording_player", fake_build)
+    monkeypatch.setattr(collect, "cross_evaluate", fake_cross_evaluate)
+    monkeypatch.setattr(collect, "_append_episodes", fake_append)
+
+    asyncio.run(
+        collect.collect_selfplay(PlayerSpec("offrl"), [PlayerSpec("random")], 1, "gen9randombattle")
+    )
+    assert [c["team"] for c in captured] == [None, None]
+
+
 def _tiny_traj(n: int, val: float = 1.0) -> TrajectoryDataset:
     return TrajectoryDataset(
         obs=np.zeros((n, OBS_DIM), dtype=np.float32),
