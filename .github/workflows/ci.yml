@@ -1,9 +1,14 @@
 # The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame scripts.
 name: ci
 
+# EVERY branch, not a named list. It used to be `branches: [main, eval-ladder]` plus pull_request,
+# and with no `gh` on the dev host no PR gets opened either -- so the eleven commits that FIXED a
+# red CI ran on `m4-doubles-and-vgc-record` without CI seeing one of them. The bar first executed on
+# the merge commit. That is the same blind spot as measuring the bar the wrong way: the work reads
+# as checked and is not.
 on:
   push:
-    branches: [main, eval-ladder]
+    branches: ['**']
   pull_request:
 
 permissions:
