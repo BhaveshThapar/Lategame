@@ -1279,7 +1279,7 @@ for the remainder. The record carries all of it under `_read_as`.
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every number above was produced from files that exist only on the machine that ran
-them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 221
+them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 236
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`lategame/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`lategame/features/data/`), and the pinned simulator rev.
