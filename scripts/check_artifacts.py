@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from prune_checkpoints import (  # type: ignore[import-not-found]
+from prune_checkpoints import (
     _CKPT_RE,
     referenced_checkpoints,
 )

@@ -53,7 +53,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from format_ceiling_gate import wilson_ci  # type: ignore[import-not-found]
+from format_ceiling_gate import wilson_ci
 
 from lategame.eval.arena import build_player, evaluate_built, policy_agent
 from lategame.teambuilding.pool import TeamPool

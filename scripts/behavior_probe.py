@@ -42,7 +42,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Protocol, cast
 
 import numpy as np
 from poke_env import to_id_str
@@ -141,7 +141,21 @@ class TwoCycleRow:
     return_action: int  # the switch-back action index (== d.action), i.e. onto the just-left mon
 
 
-def two_cycle_rows(decisions: Sequence[Decision]) -> list[TwoCycleRow]:
+class SwitchDecision(Protocol):
+    """The four fields ``two_cycle_rows`` actually reads off a decision.
+
+    ``Decision`` satisfies this structurally, but ``pingpong_probe`` deliberately rebuilds its
+    rows from the JSONL sidecar rather than replaying the probe, so it passes a light stand-in
+    carrying only these four. Typing against the protocol says what the function needs instead of
+    demanding a full ``Decision`` it never looks at."""
+
+    forced: bool
+    action: int
+    battle_tag: str
+    team_order: list[str]
+
+
+def two_cycle_rows(decisions: Sequence[SwitchDecision]) -> list[TwoCycleRow]:
     """Stream indices of A->B->A voluntary switches: the switch target equals the target two
     voluntary switches earlier in the same battle.
 
@@ -500,7 +514,7 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
     offline_rl_agent.action_to_order = spy_decode
     bc_agent.embed_battle = spy_embed
     offline_rl_agent.embed_battle = spy_embed
-    action_space.Player = _FallbackSpy
+    action_space.Player = _FallbackSpy  # type: ignore[misc]
     try:
         yield
     finally:
@@ -510,7 +524,7 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
         offline_rl_agent.action_to_order = orig_decode
         bc_agent.embed_battle = orig_embed_bc
         offline_rl_agent.embed_battle = orig_embed_offrl
-        action_space.Player = orig_player
+        action_space.Player = orig_player  # type: ignore[misc]
 
 
 def _record_teampreview(player: Player, probe: _BehaviorProbe) -> None:
