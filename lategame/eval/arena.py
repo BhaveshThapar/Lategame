@@ -311,9 +311,26 @@ async def evaluate(
     p2_name: str,
     n_battles: int,
     battle_format: str = DEFAULT_FORMAT,
+    team_pool: str | None = None,
 ) -> EvalResult:
-    p1 = build_player(p1_name, battle_format)
-    p2 = build_player(p2_name, battle_format)
+    """Score ``p1_name`` against ``p2_name``; the CLI's `evaluate` / `play` entry point.
+
+    ``team_pool`` is required on a teambuilt format and refused by ``build_player`` when absent --
+    the CLI defaults it per format rather than making every invocation pass one, since the pools
+    are committed and there is exactly one sensible choice per format.
+
+    Each side draws from its own distinctly-seeded pool, as the ceiling gate does, so the matchup
+    varies rather than every battle being the same pairing.
+    """
+    def _team(seed: int) -> object | None:
+        if not team_pool:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool.from_packed_file(team_pool, seed=seed)
+
+    p1 = build_player(p1_name, battle_format, team=_team(0))  # type: ignore[arg-type]
+    p2 = build_player(p2_name, battle_format, team=_team(1))  # type: ignore[arg-type]
     win_rate = await evaluate_built(p1, p2, n_battles)
     # p2 is pinned at the reference rating rather than rated itself: with a single fixed opponent
     # there is nothing in the record to separate "p1 is strong" from "p2 is weak". That is a
