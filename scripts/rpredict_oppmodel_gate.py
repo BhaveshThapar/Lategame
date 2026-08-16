@@ -213,7 +213,14 @@ async def _winrate(
     loop_penalty: float = 0.0,
     pool_seed: int = 0,
 ) -> float:
-    from lategame.eval.arena import _LOOP_GUARD_AGENTS, build_player, evaluate_built
+    from lategame.config import is_doubles_format
+    from lategame.eval.arena import (
+        _CHECKPOINT_AGENTS,
+        _DOUBLES_LOOP_GUARD_AGENTS,
+        _LOOP_GUARD_AGENTS,
+        build_player,
+        evaluate_built,
+    )
 
     def _team(seed: int) -> object | None:
         # A teambuilt format needs a team; both sides draw independently from the same pool so the
@@ -224,14 +231,20 @@ async def _winrate(
 
         return TeamPool.from_packed_file(team_pool, seed=2 * pool_seed + seed)
 
+    # Which names take a checkpoint / a LoopGuard is the registry's business, not this gate's.
+    # Both literals here named only the singles learner, so the doubles learner would have been
+    # built WITHOUT its weights and evaluated as a random-init policy -- a silent wrong number,
+    # not a crash.
+    guard_agents = _DOUBLES_LOOP_GUARD_AGENTS if is_doubles_format(fmt) else _LOOP_GUARD_AGENTS
+
     def _mk(name: str, seed: int) -> object:
         return build_player(
             name,
             fmt,
-            checkpoint_path=ckpt if name in ("search", "offrl") else None,
+            checkpoint_path=ckpt if name in _CHECKPOINT_AGENTS else None,
             max_concurrent_battles=concurrency,
             team=_team(seed),  # type: ignore[arg-type]
-            loop_penalty=loop_penalty if name in _LOOP_GUARD_AGENTS else 0.0,
+            loop_penalty=loop_penalty if name in guard_agents else 0.0,
         )
 
     return await evaluate_built(_mk(p1, 0), _mk(p2, 1), n)  # type: ignore[arg-type]
@@ -239,16 +252,23 @@ async def _winrate(
 
 async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
     from lategame.config import DEFAULT_FORMAT
+    from lategame.eval.arena import policy_agent
 
     if not Path(args.init).exists():
         raise SystemExit(f"checkpoint '{args.init}' not found.")
     fmt = args.battle_format or DEFAULT_FORMAT
     ckpt = args.init
 
+    # ASK which learner the format wants. This gate is the M2 leg of the format-ceiling probe, and
+    # `--format gen9vgc2025regi` was already a documented use of it (`arena._singles_only_agents`
+    # unlocks `search` on doubles under LATEGAME_SEARCH_SHAPED_ONLY=1 for exactly this run) -- but
+    # the base arm hardcoded `offrl`, which `build_player` refuses on a doubles format. So M2 on
+    # doubles could not run at all: the same defect as `train.selfplay`'s, in the next module.
+    base = policy_agent(fmt)
     cc = args.concurrency
     tp, lp, ps = args.team_pool, args.loop_penalty, args.seed
-    base_vs_heur = await _winrate("offrl", "heuristic", args.n, ckpt, fmt, cc, tp, lp, ps)
-    print(f"base vs heuristic = {base_vs_heur:.3f}  (shared reference, concurrency={cc})")
+    base_vs_heur = await _winrate(base, "heuristic", args.n, ckpt, fmt, cc, tp, lp, ps)
+    print(f"{base} vs heuristic = {base_vs_heur:.3f}  (shared reference, concurrency={cc})")
 
     arms: dict[str, Any] = {}
     for opp_model in [a.strip() for a in args.arms.split(",") if a.strip()]:
@@ -260,7 +280,7 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
             "search_vs_heuristic":
                 await _winrate("search", "heuristic", args.n, ckpt, fmt, cc, tp, lp, ps),
             "search_vs_base":
-                await _winrate("search", "offrl", args.n, ckpt, fmt, cc, tp, lp, ps),
+                await _winrate("search", base, args.n, ckpt, fmt, cc, tp, lp, ps),
         }
         delta = r["search_vs_heuristic"] - base_vs_heur
         if delta > 0.03 and r["search_vs_base"] > 0.52:
