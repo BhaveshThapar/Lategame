@@ -1,4 +1,4 @@
-# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame.
+# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame scripts.
 name: ci
 
 on:
@@ -37,9 +37,11 @@ jobs:
 
       - run: ruff check .
 
-      # Scoped to lategame/ exactly as README's Develop block is. scripts/ carries 2 known
-      # pre-existing "assign to a type" errors; widening this is a separate cleanup, not a CI change.
-      - run: mypy lategame
+      # Both trees, exactly as README's Develop block is. It used to be `mypy lategame` alone, with
+      # a footnote saying scripts/ carried "2 known pre-existing errors". The footnote was written
+      # stale (7 of the 8 erroring files already existed) and had drifted to 10. A count nobody runs
+      # is a claim nobody can check, so the count is gone and the checker covers both trees instead.
+      - run: mypy lategame scripts
 
       # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 15 tests
       # self-skip and 709 pass -- measured on a fresh clone, not inferred. A 16th skip means an
