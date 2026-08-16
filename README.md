@@ -29,7 +29,10 @@ end to end through one core, and Build 28 then ran the *strength* campaign on th
 (`gen9vgc2025regi`) that G4's exit criterion deliberately did not require: BC → offline RL →
 factored PPO. That campaign's headline is a **correction**, not a win: the VGC shards it started
 from were 94% frames from one looping bug of ours, so the previously reported doubles BC/AWR
-numbers are withdrawn and re-run. On corrected data, factored PPO beats its own warm start
+numbers were withdrawn and re-run at n = 300 — **BC 0.453**, **AWR 0.467**, both stronger than the
+withdrawn reads, published in
+[the corrected ladder below](#build-28--b6f--the-vgc-shard-was-94-one-bug-and-it-was-ours). On
+corrected data, factored PPO beats its own warm start
 **0.530** [0.519, 0.540] over 9,000 battles (all three seeds individually clear 0.50) but is
 **NULL** against the fixed heuristic — a format whose competent bots sit at parity with each
 other, so the pre-registered stop rule fires and the strength axis is ceiling-bound. That leaves
