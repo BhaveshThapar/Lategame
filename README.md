@@ -1275,3 +1275,15 @@ mypy lategame
 | `lategame/live/` | M5 deploy / G1: live-server client, policy gate, session supervisor, telemetry |
 | `lategame/cli.py` | all subcommands (eval / collect / train / data / live) |
 | `scripts/` | local Showdown server + simulator setup/run, and every experiment gate |
+
+## License & acknowledgements
+
+This project is MIT-licensed — see [`LICENSE`](LICENSE). `CITATION.cff` carries the citation record.
+
+- **[poke-env](https://github.com/hsahovic/poke-env)** (Haris Sahovic), MIT — the battle-client and
+  baseline-player layer every agent here is built on. A pip dependency, declared in `pyproject.toml`.
+- **[pokemon-showdown](https://github.com/smogon/pokemon-showdown)** (© 2011–2026 Guangcong Luo and
+  other contributors), MIT — the simulator. It is **cloned, not vendored**: `scripts/setup_server.sh`
+  fetches it into `third_party/` at the pinned rev `393d5c86`, and `.gitignore` keeps it out of this
+  tree entirely. Nothing from it is redistributed here, and its license is its own — read it at
+  `third_party/pokemon-showdown/LICENSE` after running the setup script.
