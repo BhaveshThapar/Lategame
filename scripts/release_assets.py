@@ -117,20 +117,58 @@ def build_manifest() -> dict[str, Any]:
 
 
 def verify(manifest: dict[str, Any]) -> int:
+    """Check what the downloader actually has, and let absent provenance be absent.
+
+    ONLY THE RUNNABLE ASSETS GATE THE EXIT STATUS. The manifest lists all 18 checkpoints the
+    headlines cite, but only 3 are ever attached to a release -- the rest are provenance for curves
+    and were never going to be on the machine of someone who just cloned. A first version of this
+    checked all 18 and told a fresh clone `0/18 verified`, which reads as a broken download and is
+    in fact the correct and expected state.
+
+    A file that is PRESENT but hashes wrong is always a failure, runnable or not: that is the case
+    the digest exists for.
+    """
+    runnable = [a for a in manifest["assets"] if a["runnable"]]
+    provenance = [a for a in manifest["assets"] if not a["runnable"]]
     bad = 0
-    for a in manifest["assets"]:
+
+    def _check(a: dict[str, Any]) -> str:
+        nonlocal bad
         p = Path(a["path"])
         if not p.exists():
-            print(f"  MISSING  {a['path']}")
-            bad += 1
-            continue
+            return "absent"
         actual = _sha256(p)
-        ok = actual == a["sha256"] and p.stat().st_size == a["bytes"]
-        print(f"  {'OK      ' if ok else 'MISMATCH'} {a['path']}")
-        if not ok:
-            print(f"           expected {a['sha256']}\n           actual   {actual}")
-            bad += 1
-    print(f"\n{len(manifest['assets']) - bad}/{len(manifest['assets'])} verified")
+        if actual == a["sha256"] and p.stat().st_size == a["bytes"]:
+            return "ok"
+        print(f"  MISMATCH {a['path']}")
+        print(f"           expected {a['sha256']}\n           actual   {actual}")
+        bad += 1
+        return "mismatch"
+
+    print("release assets (attached to the GitHub release):")
+    have = 0
+    for a in runnable:
+        state = _check(a)
+        if state == "ok":
+            have += 1
+            print(f"  OK       {a['path']}")
+        elif state == "absent":
+            print(f"  not here {a['path']}  <- download it from the release, or train your own")
+
+    prov_ok = prov_absent = 0
+    for a in provenance:
+        state = _check(a)
+        prov_ok += state == "ok"
+        prov_absent += state == "absent"
+    print(
+        f"\nprovenance checkpoints (never shipped): {prov_ok} present, {prov_absent} absent"
+        " -- absent is normal and is not an error"
+    )
+    print(f"\n{have}/{len(runnable)} release assets present and verified")
+    if bad:
+        print(f"{bad} file(s) present but WRONG -- do not load these")
+    elif have == 0:
+        print("none downloaded yet; `--upload-hint` lists what to fetch")
     return bad
 
 
