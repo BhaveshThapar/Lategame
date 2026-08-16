@@ -447,3 +447,32 @@ def test_the_verdict_carries_which_search_leaf_backed_its_m2():
         m1, {"search_vs_heuristic": 0.35, "search_leaf": "shaped_only"}, {"auc": 0.5}
     )
     assert d["m2_leaf"] == "shaped_only"
+
+
+# --------------------------------------------------------------------------- #
+# Pooling shards that were not one run.
+# --------------------------------------------------------------------------- #
+def _merge_mod():
+    import importlib.util
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "merge_search_shards.py"
+    spec = importlib.util.spec_from_file_location("merge_search_shards", path)
+    assert spec is not None and spec.loader is not None
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_pooling_refuses_shards_that_disagree_on_the_search_leaf():
+    """A pooled record is one number describing one experiment. Shards run with different leaves
+    are two experiments, and taking shard 0's value -- the habit for format/init/depth -- would
+    launder a real split into a single confident row."""
+    m = _merge_mod()
+    with pytest.raises(SystemExit, match="disagree on search_leaf"):
+        m._one("search_leaf", [{"search_leaf": "shaped_only"}, {"search_leaf": "policy_value"}])
+
+
+def test_pooling_carries_the_leaf_up_and_tolerates_shards_that_predate_it():
+    m = _merge_mod()
+    assert m._one("search_leaf", [{"search_leaf": "shaped_only"}] * 3) == "shaped_only"
+    assert m._one("search_leaf", [{"n": 30}, {"n": 30}]) is None

@@ -474,7 +474,19 @@ async def collect_selfplay(
     ``team_pool`` is REQUIRED on a teambuilt format (gen9ou, VGC) and must be omitted on Random
     Battles, where the server supplies the teams. Each side of each pairing gets its own
     distinctly-seeded pool, so the two do not draw the same team in lockstep.
+
+    REQUIRED is now enforced, because the failure without it is not an error. Showdown answers a
+    teamless challenge on a teambuilt format with a popup -- "Your team was rejected ... This
+    format requires you to use your own team" -- which poke-env logs as a WARNING. Collection then
+    proceeds to gather nothing while every surface reads as running. A caller that forgot the pool
+    should be told, in the same breath the docstring already used.
     """
+    if "randombattle" not in battle_format and not team_pool:
+        raise ValueError(
+            f"collect_selfplay on the teambuilt format {battle_format!r} needs a `team_pool`; "
+            f"without one Showdown rejects every challenge with a popup rather than an error and "
+            f"the collection silently yields no episodes."
+        )
     if not opponents:
         raise ValueError("Need at least one opponent to generate self-play games.")
     weights = weights or RewardWeights()

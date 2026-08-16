@@ -355,3 +355,39 @@ def test_curriculum_gate_scopes_its_paths_to_the_arm():
     assert cg._out_dir("m4_vgc", 1) == "checkpoints/m4_vgc_s1"
     # The Random Battles arm keeps its historical paths byte for byte.
     assert cg._out_dir("curriculum_et_prior", 0) == "checkpoints/curriculum_et_prior_s0"
+
+
+def test_collect_selfplay_refuses_a_teambuilt_format_with_no_team_pool():
+    """Without a pool the failure is NOT an error, which is why it needs to be made one.
+
+    Showdown answers a teamless challenge on a teambuilt format with a popup -- "Your team was
+    rejected ... This format requires you to use your own team" -- that poke-env logs as a WARNING.
+    Collection then gathers nothing while every surface reads as running. The first VGC M4 job died
+    exactly this way, after claiming its node, because `curriculum_gate`'s Gate A collects through
+    its own `collect_selfplay` call and the pool had only been threaded into `SelfPlayConfig`.
+    """
+    import asyncio
+
+    for fmt in ("gen9vgc2025regi", "gen9ou"):
+        with pytest.raises(ValueError, match="needs a `team_pool`"):
+            asyncio.run(
+                collect.collect_selfplay(PlayerSpec("doubles"), [PlayerSpec("random")], 1, fmt)
+            )
+
+
+def test_curriculum_gate_preflight_takes_the_pool_and_the_turn_cap():
+    """Gate A is a separate collection from the self-play loop's, so `SelfPlayConfig` carrying the
+    pool does nothing for it. Pinned by signature so the two cannot drift apart again."""
+    import importlib.util
+    import inspect
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "curriculum_gate.py"
+    spec = importlib.util.spec_from_file_location("curriculum_gate", path)
+    assert spec is not None and spec.loader is not None
+    cg = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cg)
+
+    params = inspect.signature(cg.run_preflight).parameters
+    assert "team_pool" in params and "max_battle_turns" in params
+    assert "team_pool=team_pool" in inspect.getsource(cg.run_preflight)
