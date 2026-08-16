@@ -1343,7 +1343,7 @@ pytest            # 724 tests, 0 skipped with the env active (node) + a local se
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form.
 ruff check .
-mypy lategame     # scoped to lategame/ on purpose: scripts/ carries 2 known pre-existing errors
+mypy lategame scripts   # both trees; CI runs the same two arguments
 ```
 
 ## Layout
