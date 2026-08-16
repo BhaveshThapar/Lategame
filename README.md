@@ -1349,6 +1349,24 @@ ruff check .
 mypy lategame scripts   # both trees; CI runs the same two arguments
 ```
 
+**Reading the CI result without `gh`.** There is no `gh` on the dev host, which is a large part of
+why a red CI went unnoticed for eleven commits. It does not need one — the runs are public and the
+REST API is unauthenticated:
+
+```bash
+# last 5 runs: which branch, which commit, red or green
+curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs?per_page=5" \
+  | python -m json.tool | grep -E '"(run_number|head_branch|head_sha|conclusion)"'
+
+# per-step conclusions for one run (is it `pytest -q` that failed, or `mypy`?)
+curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs/<RUN_ID>/jobs" \
+  | python -m json.tool | grep -E '"(name|conclusion)"'
+```
+
+Only the log *text* needs a token (the download 403s anonymously), so the pass/skip split is not
+readable remotely — the step conclusion is. Check this after every push. A local run of the same
+command is a reproduction, not an observation, and the distinction is exactly what went wrong.
+
 ## Layout
 
 | Path | Role |
