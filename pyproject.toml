@@ -7,8 +7,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lategame"
-version = "0.1.0"
-description = "Competitive Pokemon Showdown ML battle agent (M0 infra + M1 baseline)"
+version = "1.0.0"
+description = "Competitive Pokemon Showdown ML battle agent across gen9randombattle, gen9ou and gen9vgc2025regi -- BC, offline RL and PPO self-play, every claim gated on a pre-registered evaluation"
 readme = "README.md"
 # 3.11 exactly is what is tested: ruff target-version, mypy python_version and environment.yml all
 # say 3.11, and 3.10 has never been run once.
@@ -17,6 +17,7 @@ authors = [{ name = "Bhavesh Thapar" }]
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3.11",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",

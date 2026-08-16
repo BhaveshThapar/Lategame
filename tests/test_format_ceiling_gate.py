@@ -11,6 +11,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 _GATE_PATH = Path(__file__).resolve().parent.parent / "scripts" / "format_ceiling_gate.py"
 _spec = importlib.util.spec_from_file_location("format_ceiling_gate", _GATE_PATH)
@@ -237,3 +238,241 @@ def test_the_recorded_checkpoint_is_visible_to_the_artifact_scanner():
     rec = gate._arm_record("doubles", "heuristic", 0.45, 300, "checkpoints/doubles_bc_vgc_v2.pt")
     found = _CKPT_RE.findall(json.dumps(rec))
     assert found == ["checkpoints/doubles_bc_vgc_v2.pt"]
+
+
+# --------------------------------------------------------------------------- #
+# The learned arm is read by ALIAS, so a teambuilt record reaches the verdict.
+# --------------------------------------------------------------------------- #
+def test_verdict_reads_the_teambuilt_learned_arm_names():
+    """`run_m1` labels the learned arm `offrl_green` on RB and `offrl_ou` on a teambuilt format,
+    and drops the green arm off RB entirely. `compute_verdict` used to read `offrl_green` by
+    literal key, so a VGC record could not reach it at all -- KeyError, not a verdict.
+
+    The names are the on-disk schema of every record ever written, so they are aliased rather
+    than renamed; renaming would make old and new gates incomparable.
+    """
+    m1 = {
+        "simpleheuristics": {"rate": 0.49},
+        "offrl_ou": {"rate": 0.47},
+        "bc_v11": {"rate": 0.45},
+        "mirror": {"rate": 0.50},
+    }
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.50}, {"auc": 0.50})
+    assert d["verdict"] == "FORMAT_BOUND"
+    assert d["signals"]["offrl_green_g"] == 0.47, "the best learned arm present, by any alias"
+
+
+def test_verdict_survives_a_record_with_no_learned_arm_at_all():
+    """A first-look format has baselines and no trained policy. That must contribute nothing to
+    `competent` rather than raising -- M1's band and M2 still decide the branch."""
+    m1 = {"simpleheuristics": {"rate": 0.62}, "mirror": {"rate": 0.50}}
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.50}, {"auc": 0.50})
+    assert d["signals"]["offrl_green_g"] == 0.0
+    assert d["verdict"] == "MODEL_BOUND"  # driven by simpleheuristics 0.62 >= HEADROOM
+
+
+# --------------------------------------------------------------------------- #
+# M3 off team-preview lines: no inputlog, no node.
+# --------------------------------------------------------------------------- #
+def _replay(p1_team, p2_team, winner, p1="alice", p2="bob"):
+    lines = [f"|player|p1|{p1}|1|", f"|player|p2|{p2}|2|"]
+    lines += [f"|poke|p1|{s}, L50, F|" for s in p1_team]
+    lines += [f"|poke|p2|{s}, L50, F|" for s in p2_team]
+    lines += ["|teampreview", "|start", f"|win|{winner}"]
+    return {"log": "\n".join(lines)}
+
+
+def test_preview_teams_reads_both_full_rosters_as_species_ids():
+    d = _replay(["Flutter Mane"] * 6, ["Iron Hands"] * 6, "alice")
+    p1, p2 = gate._preview_teams(d["log"])
+    assert p1 == ["fluttermane"] * 6
+    assert p2 == ["ironhands"] * 6
+
+
+def test_preview_teams_strips_level_and_gender():
+    """`|poke|p1|Dragonite, L50, F|` -- the species is everything before the FIRST comma. Keeping
+    the rest would make every mon an out-of-vocabulary lookup scoring 0."""
+    p1, _ = gate._preview_teams("|poke|p1|Dragonite, L50, F|")
+    assert p1 == ["dragonite"]
+
+
+def test_log_player_names_pairs_the_sides():
+    p1, p2 = gate._log_player_names(_replay(["Ditto"], ["Ditto"], "alice")["log"])
+    assert (p1, p2) == ("alice", "bob")
+
+
+def test_m3_preview_scores_only_complete_six_mon_previews(tmp_path):
+    """A preview screen that did not show all six is not a comparable sample, and a replay with no
+    resolvable winner (tie, disconnect) is not a label. Both are dropped, and `n_battles_used`
+    says how many survived -- the number a reader needs to judge the AUC."""
+    import json as _json
+
+    strong = ["Miraidon"] * 6
+    weak = ["Sunkern"] * 6
+    files = []
+    for i, d in enumerate(
+        [
+            _replay(strong, weak, "alice"),          # kept
+            _replay(weak, strong, "bob"),            # kept
+            _replay(strong[:4], weak, "alice"),      # dropped: only 4 shown
+            _replay(strong, weak, "nobody"),         # dropped: winner matches neither player
+        ]
+    ):
+        p = tmp_path / f"r{i}.json"
+        p.write_text(_json.dumps(d))
+        files.append(str(p))
+
+    out = gate.run_m3_preview(sorted(files))
+    assert out["n_replays_scanned"] == 4
+    assert out["n_battles_used"] == 2
+    assert out["mode"] == "preview"
+    # Both kept battles are won by the stronger side, so the proxy separates them perfectly.
+    assert out["auc"] == 1.0
+    assert out["caveats"], "the unrated sample and the brought-six limit travel with the number"
+
+
+def test_m3_dispatches_to_the_preview_path_when_no_inputlog_is_present(tmp_path):
+    """Public replays carry no inputlog, so the re-sim path cannot run on them. Dispatch is on the
+    DATA rather than the format string, and one mode is chosen for the whole batch -- mixing a
+    level-adjusted proxy with a species-level one inside one AUC compares incomparable numbers."""
+    import json as _json
+
+    for i in range(3):
+        (tmp_path / f"r{i}.json").write_text(
+            _json.dumps(_replay(["Miraidon"] * 6, ["Sunkern"] * 6, "alice"))
+        )
+    out = gate.run_m3(10, str(tmp_path / "*.json"))
+    assert out["mode"] == "preview"
+
+
+def test_auc_bootstrap_ci_reports_undefined_instead_of_crashing_on_one_class():
+    """Every resample of a single-class sample is itself single-class, so the NaN filter emptied
+    the array and numpy raised IndexError from inside a percentile. An undefined interval is a
+    result; a traceback out of a helper is not."""
+    lo, hi = gate.auc_bootstrap_ci(np.array([1.0, 2.0, 3.0]), np.array([1, 1, 1]))
+    assert math.isnan(lo) and math.isnan(hi)
+    # NaN != NaN, so the empty case is checked the same way rather than by tuple equality.
+    elo, ehi = gate.auc_bootstrap_ci(np.array([]), np.array([]))
+    assert math.isnan(elo) and math.isnan(ehi)
+
+
+# --------------------------------------------------------------------------- #
+# M2 is echoed from two different record shapes.
+# --------------------------------------------------------------------------- #
+def test_load_m2_reads_both_the_single_run_and_the_pooled_shape(tmp_path):
+    """`rpredict_oppmodel_gate` writes scalar rates and a top-level `n`; `merge_search_shards`
+    writes {wins, n, rate} objects and no top-level `n`, because once shards are summed the n is
+    per-arm. Reading only the first shape is what made "echo the pooled search run as the M2 leg"
+    impossible without hand-editing JSON -- and the pooled run is the larger measurement."""
+    import json as _json
+
+    single = tmp_path / "single.json"
+    single.write_text(_json.dumps({
+        "n": 120, "depth": 2, "base_vs_heuristic": 0.4833,
+        "arms": {"whitebox": {"search_vs_heuristic": 0.5, "search_vs_base": 0.3167}},
+    }))
+    pooled = tmp_path / "pooled.json"
+    pooled.write_text(_json.dumps({
+        "shards": 10, "format": "gen9ou", "depth": 2,
+        "base_vs_heuristic": {"wins": 1922, "n": 2500, "rate": 0.7688},
+        "arms": {"whitebox": {
+            "search_vs_heuristic": {"wins": 1931, "n": 2500, "rate": 0.7724},
+            "search_vs_base": {"wins": 983, "n": 2500, "rate": 0.3932},
+            "contrast_vs_base": {"diff": 0.0036, "p_value": 0.762101},
+            "verdict": "NULL",
+        }},
+    }))
+
+    a = gate.load_m2(single)
+    assert a["search_vs_heuristic"] == 0.5 and a["n"] == 120
+
+    b = gate.load_m2(pooled)
+    assert b["search_vs_heuristic"] == 0.7724, "the rate, not the {wins,n,rate} object"
+    assert b["n"] == 2500, "per-arm n, since a pooled record has no top-level n"
+    assert b["shards"] == 10 and b["verdict"] == "NULL"
+    # Whatever the shape, compute_verdict only ever needs a float here.
+    assert isinstance(b["search_vs_heuristic"], float)
+
+
+def test_load_m2_says_how_to_produce_a_missing_record(tmp_path):
+    """The old hardcoded path meant a missing M2 was a bare FileNotFoundError from a json read."""
+    with pytest.raises(SystemExit, match="rpredict_oppmodel_gate"):
+        gate.load_m2(tmp_path / "absent.json")
+
+
+# --------------------------------------------------------------------------- #
+# The verdict text and branch were written for gen9-RB and asserted RB-only things.
+# --------------------------------------------------------------------------- #
+def test_a_record_with_no_format_key_is_still_read_as_random_battles():
+    """`run_m1` only began writing `format` when teambuilt support landed, so the record holding
+    the ORIGINAL FORMAT_BOUND verdict has none. A generic fallback would re-derive that historical
+    decision with a different branch the next time anyone re-ran the gate."""
+    d = gate.compute_verdict(*_signals(s=0.51, w=0.50, g=0.47, a=0.45))
+    assert d["format"] == "gen9randombattle"
+    assert d["next_branch"] == "ou_pivot"
+
+
+def test_a_teambuilt_format_is_not_told_to_pivot_to_ou():
+    """"ou_pivot" is advice for a format measured BEFORE the OU pivot. On a teambuilt format the
+    actionable branch is to stop spending on the strength axis, not to pivot again."""
+    m1 = {
+        "format": "gen9vgc2025regi",
+        "simpleheuristics": {"rate": 0.493},
+        "offrl_ou": {"rate": 0.447},
+        "mirror": {"rate": 0.497},
+    }
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.353}, {"auc": 0.520})
+    assert d["verdict"] == "FORMAT_BOUND"
+    assert d["next_branch"] == "stop_strength_axis"
+
+
+def test_the_reason_only_says_at_parity_when_m2_is_actually_at_parity():
+    """The FORMAT_BOUND template interpolated M2 as "at parity" unconditionally. True of RB's
+    0.500; simply false of a w nowhere near 0.50, and a verdict line stating a wrong number is
+    worse than one stating none."""
+    at_parity = gate.compute_verdict(*_signals(s=0.51, w=0.50, g=0.47, a=0.45))
+    assert "at parity" in at_parity["reason"]
+
+    far = gate.compute_verdict(*_signals(s=0.51, w=0.353, g=0.47, a=0.45))
+    assert "at parity" not in far["reason"]
+    assert "reaches only 0.353" in far["reason"]
+
+
+def test_the_verdict_carries_which_search_leaf_backed_its_m2():
+    """`ShapedOnlyPolicy` is a weaker instrument than a trained value head, and its pre-registered
+    consequence is that a NULL is suggestive only. The caveat has to travel with the branch."""
+    m1 = {"format": "gen9vgc2025regi", "simpleheuristics": {"rate": 0.49},
+          "mirror": {"rate": 0.50}}
+    d = gate.compute_verdict(
+        m1, {"search_vs_heuristic": 0.35, "search_leaf": "shaped_only"}, {"auc": 0.5}
+    )
+    assert d["m2_leaf"] == "shaped_only"
+
+
+# --------------------------------------------------------------------------- #
+# Pooling shards that were not one run.
+# --------------------------------------------------------------------------- #
+def _merge_mod():
+    import importlib.util
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "merge_search_shards.py"
+    spec = importlib.util.spec_from_file_location("merge_search_shards", path)
+    assert spec is not None and spec.loader is not None
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_pooling_refuses_shards_that_disagree_on_the_search_leaf():
+    """A pooled record is one number describing one experiment. Shards run with different leaves
+    are two experiments, and taking shard 0's value -- the habit for format/init/depth -- would
+    launder a real split into a single confident row."""
+    m = _merge_mod()
+    with pytest.raises(SystemExit, match="disagree on search_leaf"):
+        m._one("search_leaf", [{"search_leaf": "shaped_only"}, {"search_leaf": "policy_value"}])
+
+
+def test_pooling_carries_the_leaf_up_and_tolerates_shards_that_predate_it():
+    m = _merge_mod()
+    assert m._one("search_leaf", [{"search_leaf": "shaped_only"}] * 3) == "shaped_only"
+    assert m._one("search_leaf", [{"n": 30}, {"n": 30}]) is None

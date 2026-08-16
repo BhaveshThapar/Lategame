@@ -10,6 +10,7 @@ See plan.md 12, requirement R-EVAL.
 
 from __future__ import annotations
 
+import os
 import secrets
 from dataclasses import dataclass
 
@@ -111,8 +112,6 @@ def _singles_only_agents() -> set[str]:
     fallback is the doubles-capable heuristic rule -- so no singles assumption survives anywhere on
     that path. That mode is exactly what the VGC M2 ceiling probe runs.
     """
-    import os
-
     if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1":
         return _SINGLES_ONLY_AGENTS - {"search"}
     return _SINGLES_ONLY_AGENTS
@@ -157,6 +156,47 @@ class EvalResult:
     p1_gxe: float | None = None
 
 
+# Team preview, applied to EVERY player on a doubles format rather than to our agents only.
+#
+# Set LATEGAME_TEAM_PREVIEW=0 to restore poke-env's `random_teampreview` on both sides, which is
+# what every VGC number measured before this existed used. That is not a legacy switch: the
+# preview-on/preview-off contrast is itself the measurement of how much of VGC skill lives in the
+# bring-4 decision, and it needs both halves runnable from one build.
+#
+# Applied by SUBCLASSING rather than by editing the agents, because the three baselines a VGC
+# ladder is measured against -- poke-env's RandomPlayer, MaxBasePowerPlayer, SimpleHeuristicsPlayer
+# -- are not ours to edit. Giving only our arm a real preview would let it win on bringing a better
+# four and have that read as play strength.
+_PREVIEW_CACHE: dict[type[Player], type[Player]] = {}
+
+
+def team_preview_enabled() -> bool:
+    return os.environ.get("LATEGAME_TEAM_PREVIEW", "1") != "0"
+
+
+def _with_team_preview(cls: type[Player], battle_format: str) -> type[Player]:
+    """``cls`` with ``TeamPreviewMixin`` ahead of it, on doubles formats with preview enabled.
+
+    Singles formats are returned untouched: gen9ou has team preview too, but its selection is
+    bring-6-play-6 (no subset to pick), and Random Battles have none at all. Cached so repeated
+    builds of the same agent share one class -- poke-env checks `isinstance` in places, and a fresh
+    subclass per player would make two builds of the same agent mutually non-identical.
+    """
+    if not (is_doubles_format(battle_format) and team_preview_enabled()):
+        return cls
+    # The registry is typed `dict[str, type[Player]]`, but tests substitute plain callables into it
+    # to avoid constructing a real Player against a real server. Subclassing one of those raises a
+    # metaclass conflict, so a non-class factory passes through unwrapped -- a double does not need
+    # a preview policy, and this must not be the reason a test cannot substitute one.
+    if not isinstance(cls, type):
+        return cls
+    if cls not in _PREVIEW_CACHE:
+        from lategame.agents.teampreview import TeamPreviewMixin
+
+        _PREVIEW_CACHE[cls] = type(f"Preview{cls.__name__}", (TeamPreviewMixin, cls), {})
+    return _PREVIEW_CACHE[cls]
+
+
 def _unique_username(name: str) -> str:
     # Showdown usernames are short; keep a stable prefix + random suffix so
     # repeated runs never collide.
@@ -186,7 +226,7 @@ def build_player(
             f"Making the learned agents doubles-capable is the G4/M6 build (plan.md 13): a "
             f"per-slot action head and a two-active encoder."
         )
-    cls = AGENTS[name]
+    cls = _with_team_preview(AGENTS[name], battle_format)
     extra: dict[str, object] = {}
     if name in _CHECKPOINT_AGENTS:
         extra["sample"] = sample
@@ -206,6 +246,21 @@ def build_player(
         extra["max_concurrent_battles"] = max_concurrent_battles
     # Teambuilt formats (e.g. gen9ou) need a team; Random Battles leave this None and the
     # server supplies one. Accepts a packed/Showdown string or a Teambuilder (R-TEAM pool).
+    #
+    # REFUSED HERE, because forgetting it is not an error anywhere else. Showdown answers a
+    # teamless challenge on a teambuilt format with a popup -- "Your team was rejected ... This
+    # format requires you to use your own team" -- which poke-env logs at WARNING and nothing
+    # raises. The player then simply never battles, and the arm reads as a run that produced no
+    # wins rather than as one that never started. Three separate call sites in
+    # `scripts/curriculum_gate.py` had this defect simultaneously, each found only by watching a
+    # cluster job's log; `build_player` is the one choke point where it can be found at all.
+    if team is None and "randombattle" not in battle_format:
+        raise ValueError(
+            f"'{name}' on the teambuilt format {battle_format!r} needs a `team`; without one "
+            f"Showdown rejects every challenge with a popup rather than an error, and the player "
+            f"silently never battles. Pass a packed team or a TeamPool "
+            f"(lategame/teambuilding/data/teams_gen9vgc.packed for VGC)."
+        )
     if team is not None:
         extra["team"] = team
     return cls(
@@ -256,9 +311,26 @@ async def evaluate(
     p2_name: str,
     n_battles: int,
     battle_format: str = DEFAULT_FORMAT,
+    team_pool: str | None = None,
 ) -> EvalResult:
-    p1 = build_player(p1_name, battle_format)
-    p2 = build_player(p2_name, battle_format)
+    """Score ``p1_name`` against ``p2_name``; the CLI's `evaluate` / `play` entry point.
+
+    ``team_pool`` is required on a teambuilt format and refused by ``build_player`` when absent --
+    the CLI defaults it per format rather than making every invocation pass one, since the pools
+    are committed and there is exactly one sensible choice per format.
+
+    Each side draws from its own distinctly-seeded pool, as the ceiling gate does, so the matchup
+    varies rather than every battle being the same pairing.
+    """
+    def _team(seed: int) -> object | None:
+        if not team_pool:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool.from_packed_file(team_pool, seed=seed)
+
+    p1 = build_player(p1_name, battle_format, team=_team(0))  # type: ignore[arg-type]
+    p2 = build_player(p2_name, battle_format, team=_team(1))  # type: ignore[arg-type]
     win_rate = await evaluate_built(p1, p2, n_battles)
     # p2 is pinned at the reference rating rather than rated itself: with a single fixed opponent
     # there is nothing in the record to separate "p1 is strong" from "p2 is weak". That is a

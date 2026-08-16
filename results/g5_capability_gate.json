@@ -1,0 +1,119 @@
+{
+  "gate": "g5_capability",
+  "goal": "G5 -- encode the skill stack as explicit, testable capabilities (plan.md 3.1)",
+  "exit_criterion": "each capability names a gate that runs, a number from a committed results file, and THAT GATE'S OWN pre-registered pass criterion, met. No threshold is introduced here.",
+  "capabilities": [
+    {
+      "capability": "state estimation",
+      "requirement": "R-STATE / R-PRIORS (plan.md 7)",
+      "gate": "lategame/search/recon_check.py",
+      "records": [
+        {
+          "record": "rpredict_recon.json",
+          "format": "gen9randombattle",
+          "match_rate": 0.999952,
+          "checks": 145400,
+          "mismatches": 7,
+          "floor": 0.99,
+          "verdict": "PASS",
+          "ok": true
+        },
+        {
+          "record": "rpredict_recon_ou.json",
+          "format": "gen9ou",
+          "match_rate": 1.0,
+          "checks": 26505,
+          "mismatches": 0,
+          "floor": 0.99,
+          "verdict": "PASS",
+          "ok": true
+        },
+        {
+          "record": "rpredict_recon_vgc.json",
+          "format": "gen9vgc2025regi",
+          "match_rate": 0.9991,
+          "checks": 29984,
+          "mismatches": 27,
+          "floor": 0.99,
+          "verdict": "PASS",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "note": "all three formats, same comparison criteria, so the rates are comparable"
+    },
+    {
+      "capability": "prediction / opponent modeling",
+      "requirement": "R-PREDICT (plan.md 7)",
+      "gate": "scripts/rpredict_oppmodel_gate.py --gate a",
+      "records": [
+        {
+          "record": "rpredict_oppmodel_gate_a.json",
+          "opp_pov_team_fidelity": 1.0,
+          "whitebox_decodable_rate": 1.0,
+          "whitebox_vs_heuristic_agreement": 0.9582,
+          "n": 239,
+          "verdict": "PASS",
+          "ok": true
+        }
+      ],
+      "strength_context_not_gated": {
+        "record": "rpredict_oppmodel_gate_b_whitebox_n120.json",
+        "search_vs_heuristic": 0.5,
+        "verdict": "RED"
+      },
+      "ok": true
+    },
+    {
+      "capability": "win-condition planning",
+      "requirement": "R-PLAN (plan.md 7)",
+      "gate": "lategame/search/expectimax.py via scripts/rpredict_oppmodel_gate.py --gate b",
+      "records": [
+        {
+          "record": "rpredict_search_ou.json",
+          "format": "gen9ou",
+          "init": "checkpoints/ppo_v26b_s0/iter_300.pt",
+          "shards": 10,
+          "n_per_arm": 2500,
+          "base_vs_heuristic": 0.7688,
+          "search_vs_heuristic": 0.7724,
+          "contrast": {
+            "diff": 0.0036,
+            "z": 0.303,
+            "p_value": 0.762101,
+            "se": 0.0119
+          },
+          "verdict": "NULL",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "strength_verdict": "NULL",
+      "note": "DEMONSTRATED, NOT BENEFICIAL. The pre-registered rule returns NULL (diff +0.0036, p=0.762101). G5 asks for an explicit testable capability; it does not ask for a win rate. The null is reported rather than dropped -- omitting it is the 'merely implemented' claim G5 exists to replace."
+    },
+    {
+      "capability": "precise damage math",
+      "requirement": "R-CALC (plan.md 7)",
+      "gate": "lategame/search/fidelity.py + lategame/engine/damage.py",
+      "records": [
+        {
+          "record": "rpredict_fidelity.json",
+          "replays": 300,
+          "transitions": 9734,
+          "core_match_rate": 1.0,
+          "full_match_rate": 1.0,
+          "threshold": 0.99,
+          "verdict": "PASS",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "note": "gen9randombattle only: the replay-driven path needs an inputlog to re-sim, and public replays for the teambuilt formats carry none. Live-play reconstruction covers OU and VGC instead, under state estimation above."
+    }
+  ],
+  "verdict": "MET",
+  "not_claimed": [
+    "that any capability raises win rate -- win-condition planning is a pre-registered NULL on OU and parity on gen9-RB, and is recorded as demonstrated, not beneficial",
+    "that team preview is modelled as a learned capability -- the bring-4 selector is a fixed rule, and the codec has no slot and the model no head for it"
+  ]
+}

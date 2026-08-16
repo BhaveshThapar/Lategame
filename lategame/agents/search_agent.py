@@ -100,7 +100,18 @@ class SearchAgent(Player):
         greedy = getattr(self._pv, "greedy_order", None)
         if greedy is not None:
             return greedy(battle)
-        from lategame.agents.heuristic_agent import heuristic_pick
+        from poke_env.battle.double_battle import DoubleBattle
+
+        from lategame.agents.heuristic_agent import doubles_order, heuristic_pick
+
+        # A DoubleBattle hands `available_moves` back as a list of per-slot lists, so the singles
+        # rule dies on `'list' object has no attribute 'base_power'` -- and dies SILENTLY, inside
+        # poke-env's detached message task, leaving the server to play a default move on the timer.
+        # This fallback is reached on the one path `_SINGLES_ONLY_AGENTS` deliberately lets through
+        # to doubles (LATEGAME_SEARCH_SHAPED_ONLY=1, the VGC M2 ceiling probe), where an arm that
+        # never answers reads as a very weak agent rather than a broken one.
+        if isinstance(battle, DoubleBattle):
+            return doubles_order(battle, self.create_order, self.choose_default_move)
 
         pick = heuristic_pick(
             battle.active_pokemon, battle.opponent_active_pokemon,

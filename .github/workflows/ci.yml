@@ -1,9 +1,14 @@
-# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame.
+# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame scripts.
 name: ci
 
+# EVERY branch, not a named list. It used to be `branches: [main, eval-ladder]` plus pull_request,
+# and with no `gh` on the dev host no PR gets opened either -- so the eleven commits that FIXED a
+# red CI ran on `m4-doubles-and-vgc-record` without CI seeing one of them. The bar first executed on
+# the merge commit. That is the same blind spot as measuring the bar the wrong way: the work reads
+# as checked and is not.
 on:
   push:
-    branches: [main, eval-ladder]
+    branches: ['**']
   pull_request:
 
 permissions:
@@ -37,13 +42,19 @@ jobs:
 
       - run: ruff check .
 
-      # Scoped to lategame/ exactly as README's Develop block is. scripts/ carries 2 known
-      # pre-existing "assign to a type" errors; widening this is a separate cleanup, not a CI change.
-      - run: mypy lategame
+      # Both trees, exactly as README's Develop block is. It used to be `mypy lategame` alone, with
+      # a footnote saying scripts/ carried "2 known pre-existing errors". The footnote was written
+      # stale (7 of the 8 erroring files already existed) and had drifted to 10. A count nobody runs
+      # is a claim nobody can check, so the count is gone and the checker covers both trees instead.
+      - run: mypy lategame scripts
 
-      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 15 tests
-      # self-skip and 709 pass -- measured on a fresh clone, not inferred. A 16th skip means an
+      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 16 tests
+      # self-skip and 753 pass -- measured on a fresh clone, not inferred. A 17th skip means an
       # environment gate started firing that should not have, which is a regression, not noise.
+      #
+      # 15/709 until the doubles self-play smoke landed. That test is server-gated like its singles
+      # sibling, so it self-skips here by design; the bar moves with it in the same commit rather
+      # than reading as the regression it is not.
       - run: pytest -q
 
       # NOT run here: `python scripts/check_artifacts.py`. A runner has no checkpoints/ at all, so

@@ -60,7 +60,7 @@ def _is_full_decision(battle: AbstractBattle) -> bool:
 def _snapshotting_agent(base_cls: type, stats: ReconStats, model: Any, cap: int) -> type:
     """Wrap an agent so every decision it makes is also a reconstruction-fidelity sample."""
 
-    class _Snapshotter(base_cls):  # type: ignore[valid-type, misc]
+    class _Snapshotter(base_cls):
         def choose_move(self, battle: AbstractBattle) -> BattleOrder:
             if stats.snapshots < cap and _is_full_decision(battle):
                 check_live_snapshot(stats, battle, model)

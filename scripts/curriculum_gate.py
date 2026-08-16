@@ -46,7 +46,7 @@ from lategame.config import DEFAULT_FORMAT
 from lategame.data.collect import PlayerSpec, collect_selfplay
 from lategame.data.reward import RewardWeights
 from lategame.data.rl_dataset import discounted_returns
-from lategame.eval.arena import build_player, evaluate_built
+from lategame.eval.arena import build_player, evaluate_built, policy_agent
 from lategame.train.selfplay import SelfPlayConfig, run_selfplay
 
 _LADDER = ("random", "maxbasepower", "simpleheuristics", "heuristic")
@@ -120,12 +120,23 @@ def preflight_verdict(stats: dict) -> str:
     return "PASS"
 
 
-async def run_preflight(init: str, fmt: str, games: int, max_concurrent: int) -> dict:
+async def run_preflight(
+    init: str,
+    fmt: str,
+    games: int,
+    max_concurrent: int,
+    team_pool: str | None = None,
+    max_battle_turns: int | None = None,
+) -> dict:
     """Collect a small GREEN-vs-tough shard and report the AWR pre-flight signal."""
-    learner = PlayerSpec("offrl", checkpoint_path=init, sample=True)
+    # ASK, do not name. `build_player` refuses a singles-only name on a doubles format, and this
+    # is the only self-play -> results/ bridge in the tree, so an M4 doubles arm has to come
+    # through here. Same repair as `train.selfplay` and `rpredict_oppmodel_gate`.
+    agent = policy_agent(fmt)
+    learner = PlayerSpec(agent, checkpoint_path=init, sample=True)
     opponents = [
         PlayerSpec("simpleheuristics"),
-        PlayerSpec("offrl", checkpoint_path=init, sample=True),  # the iter-0 league member
+        PlayerSpec(agent, checkpoint_path=init, sample=True),  # the iter-0 league member
     ]
     dataset = await collect_selfplay(
         learner,
@@ -135,6 +146,11 @@ async def run_preflight(init: str, fmt: str, games: int, max_concurrent: int) ->
         RewardWeights(),
         gamma=0.99,
         max_concurrent=max_concurrent,
+        # Gate A collects through its OWN `collect_selfplay` call, not through `SelfPlayConfig`.
+        # Threading the pool into the config alone left this one teamless, and the first VGC run
+        # died here on a rejected-team popup after the job had already claimed its node.
+        team_pool=team_pool,
+        max_battle_turns=max_battle_turns,
     )
     stats = preflight_stats(dataset.reward, dataset.done, dataset.gamma)
     verdict = preflight_verdict(stats)
@@ -153,12 +169,18 @@ async def run_preflight(init: str, fmt: str, games: int, max_concurrent: int) ->
 # --------------------------------------------------------------------------------------
 # Gate B -- the powered-up self-play run, per seed.
 # --------------------------------------------------------------------------------------
+def _out_dir(arm: str, seed: int) -> str:
+    return f"checkpoints/{arm}_s{seed}"
+
+
 def _selfplay_config(init: str, seed: int, args: argparse.Namespace) -> SelfPlayConfig:
     return SelfPlayConfig(
         init=init,
-        out_dir=f"checkpoints/curriculum_et_prior_s{seed}",
-        data_dir=f"data/curriculum_s{seed}",
+        out_dir=_out_dir(args.arm, seed),
+        data_dir=f"data/{args.arm}_s{seed}",
         battle_format=args.battle_format,
+        team_pool=args.team_pool,
+        max_battle_turns=args.max_battle_turns,
         iters=args.iters,
         games_per_opp=args.games_per_opp,
         pop_size=args.pop_size,
@@ -181,8 +203,8 @@ def _best_checkpoint(out_dir: str, init: str, best_iter: int) -> str:
     return str(Path(out_dir) / f"iter_{best_iter:02d}.pt")
 
 
-def _seed_record(init: str, seed: int, curve: list[dict]) -> dict:
-    out_dir = f"checkpoints/curriculum_et_prior_s{seed}"
+def _seed_record(init: str, seed: int, curve: list[dict], arm: str) -> dict:
+    out_dir = _out_dir(arm, seed)
     start = next(p for p in curve if p["iter"] == 0)
     sp_points = [p for p in curve if p["iter"] >= 1]
     best = max(sp_points, key=lambda p: p.get("vs_heuristic", 0.0)) if sp_points else start
@@ -246,13 +268,48 @@ def _print_table(summary: dict, verd: str) -> None:
 # --------------------------------------------------------------------------------------
 # Gate C -- confirmatory ladder on the single best checkpoint.
 # --------------------------------------------------------------------------------------
-async def _ladder(ckpt: str, fmt: str, n: int) -> dict[str, float]:
+async def _ladder(
+    ckpt: str,
+    fmt: str,
+    n: int,
+    team_pool: str | None = None,
+    max_battle_turns: int | None = None,
+) -> dict[str, float]:
+    """Gate C. THE THIRD collection site in this file that needed the pool and did not have it.
+
+    Gate A collects, the self-play loop collects, and this ladder builds its own players -- three
+    independent paths, and threading the pool into `SelfPlayConfig` reached exactly one of them.
+    `build_player` refuses a teamless teambuilt build now, so a fourth site cannot be added quietly.
+
+    Both sides draw from the same pool with different seeds, as the ceiling gate does, so the
+    matchup varies and the mirror stays fair in expectation.
+
+    IT MUST ALSO RUN THE ARM'S CONFIGURATION, and it did not. `_eval_point` passes
+    `max_battle_turns` to all four of its builds and this ladder passed none, so the first VGC
+    capability record read the SAME checkpoint at 0.383 on the curve and 0.600 on the ladder --
+    0.22 apart, against an n=60 standard error of ~0.063. A confirmatory ladder that confirms a
+    different game than the one it is confirming is worse than no ladder.
+    """
+    def _team(seed: int) -> object | None:
+        if not team_pool:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool.from_packed_file(team_pool, seed=seed)
+
     out: dict[str, float] = {}
     for base in _LADDER:
         learner = build_player(
-            "offrl", fmt, checkpoint_path=ckpt, max_concurrent_battles=_EVAL_CONCURRENCY
+            policy_agent(fmt), fmt, checkpoint_path=ckpt,
+            max_concurrent_battles=_EVAL_CONCURRENCY,
+            team=_team(0),  # type: ignore[arg-type]
+            max_battle_turns=max_battle_turns,
         )
-        opponent = build_player(base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY)
+        opponent = build_player(
+            base, fmt, max_concurrent_battles=_EVAL_CONCURRENCY,
+            team=_team(1),  # type: ignore[arg-type]
+            max_battle_turns=max_battle_turns,
+        )
         out[base] = round(await evaluate_built(learner, opponent, n), 4)
     return out
 
@@ -266,12 +323,23 @@ async def run_gate(args: argparse.Namespace) -> dict:
         f"games_per_opp {args.games_per_opp} | eval_n {args.eval_n}"
     )
 
-    result: dict = {"init": init, "arm": "curriculum_et_prior", "opponent": "heuristic"}
+    result: dict = {
+        "init": init,
+        "arm": args.arm,
+        "opponent": "heuristic",
+        # RECORDED so `merge_gate_seeds` and any later comparison can refuse a cross-format pool.
+        # The RB record predates these keys and carries no `format` at all, which is exactly the
+        # ambiguity that makes an unlabelled arm uncomparable.
+        "format": args.battle_format,
+        "team_pool": args.team_pool,
+        "max_battle_turns": args.max_battle_turns,
+    }
 
     # Gate A -- cheap KILL pre-flight.
     if not args.skip_preflight:
         pre = await run_preflight(
-            init, args.battle_format, args.preflight_games, args.max_concurrent
+            init, args.battle_format, args.preflight_games, args.max_concurrent,
+            team_pool=args.team_pool, max_battle_turns=args.max_battle_turns,
         )
         result["preflight"] = pre
         if pre["verdict"] == "KILL":
@@ -288,7 +356,7 @@ async def run_gate(args: argparse.Namespace) -> dict:
     for seed in seeds:
         cfg = _selfplay_config(init, seed, args)
         curve = await run_selfplay(cfg)
-        rec = _seed_record(init, seed, [dict(p) for p in curve])
+        rec = _seed_record(init, seed, [dict(p) for p in curve], args.arm)
         records.append(rec)
         print(
             f"seed={seed} start={rec['start_vs_heuristic']:.3f} "
@@ -316,7 +384,10 @@ async def run_gate(args: argparse.Namespace) -> dict:
     result["best_checkpoint"] = overall_best["best_checkpoint"]
     if verd != "AMBER" or summary["best_vs_heuristic"]["mean"] >= _AMBER_VS_ITER0:
         print(f"\nconfirmatory ladder (n={args.ladder_n}) on {overall_best['best_checkpoint']}")
-        ladder = await _ladder(overall_best["best_checkpoint"], args.battle_format, args.ladder_n)
+        ladder = await _ladder(
+            overall_best["best_checkpoint"], args.battle_format, args.ladder_n, args.team_pool,
+            max_battle_turns=args.max_battle_turns,
+        )
         print("  " + "  ".join(f"{k} {v:.3f}" for k, v in ladder.items()))
         result["confirmatory_ladder"] = ladder
 
@@ -335,7 +406,15 @@ def _write(out: str, result: dict) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="curriculum_gate")
     parser.add_argument("--init", default="checkpoints/offrl_scale_et_prior_s0.pt")
-    parser.add_argument("--out", default="results/curriculum_gate.json")
+    parser.add_argument("--out", default=None,
+                        help="default results/curriculum_gate.json for the RB arm, else "
+                             "results/curriculum_gate_<arm>.json")
+    parser.add_argument("--arm", default="curriculum_et_prior",
+                        help="arm name: the `arm` field, checkpoints/<arm>_s<seed>/ and data/")
+    parser.add_argument("--team-pool", default=None,
+                        help="packed team pool; REQUIRED on a teambuilt format (gen9ou, VGC)")
+    parser.add_argument("--max-battle-turns", type=int, default=None,
+                        help="B6f per-battle decision ceiling; None is exact identity")
     parser.add_argument("--seeds", default="0,1,2", help="Comma-separated seeds")
     parser.add_argument("--iters", type=int, default=12, help="Self-play iterations per seed")
     parser.add_argument("--games-per-opp", type=int, default=48, help="Battles per opponent")
@@ -352,6 +431,19 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--format", dest="battle_format", default=DEFAULT_FORMAT)
     args = parser.parse_args(argv)
+    if args.out is None:
+        args.out = (
+            "results/curriculum_gate.json"
+            if args.arm == "curriculum_et_prior"
+            else f"results/curriculum_gate_{args.arm}.json"
+        )
+    # A teambuilt format with no pool starts no battles at all, and the failure arrives one full
+    # collection later. `ppo_seed.slurm` refuses the same thing in its preflight.
+    if "randombattle" not in args.battle_format and not args.team_pool:
+        raise SystemExit(
+            f"--team-pool is required on the teambuilt format {args.battle_format!r}; "
+            f"try lategame/teambuilding/data/teams_gen9vgc.packed"
+        )
 
     asyncio.run(run_gate(args))
 
