@@ -1339,10 +1339,12 @@ python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (ne
 ## Develop
 
 ```bash
-pytest            # 724 tests, 0 skipped with the env active (node) + a local server up
-                  #   LATEGAME_LIVE_TEST=1 also enables the opt-in live-client smoke
-                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 15 self-skip
-                  #   and 709 pass. That is what CI runs; a 16th skip is a regression, not noise.
+pytest            # 726 tests. With the env active (node ON PATH) + a local server up: 725 pass,
+                  #   1 skip -- the opt-in live-client smoke, which LATEGAME_LIVE_TEST=1 enables
+                  #   for 726/0. `node` on PATH is load-bearing: without it six simulator tests
+                  #   self-skip even with dist/ built, and the count reads 719/7.
+                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
+                  #   and 710 pass. That is what CI runs; a 17th skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form.
 ruff check .
