@@ -57,6 +57,8 @@ HEADROOM = 0.58  # any competent agent at/above this => real, uncaptured headroo
 AUC_HI = 0.65  # M3 corroboration: team strength predicts the winner this well => RNG-bound
 MIRROR_TOL = 0.05  # heuristic-vs-heuristic must land within this of 0.50
 
+ArmRecord = dict[str, Any]
+
 # M1 sweep: (label, p1, p2, p1_checkpoint).
 _MATCHUPS: list[tuple[str, str, str, str | None]] = [
     ("mirror", "heuristic", "heuristic", None),
@@ -93,6 +95,27 @@ def _build_matchups(
     if bc_ckpt:
         matchups.append(("bc_v11", bc_agent, "heuristic", bc_ckpt))
     return matchups
+
+
+def _arm_record(p1: str, p2: str, rate: float, n: int, checkpoint: str | None = None) -> ArmRecord:
+    """One matchup row of the M1 block.
+
+    ``checkpoint`` is written ONLY when the arm has one, so a baseline row stays byte-identical to
+    every record already committed and only the learned rows grow a key.
+
+    The LABEL is a schema key with OU-era spelling, not a description: ``assess_ou`` reads
+    ``bc_v11`` and ``offrl_ou`` by literal name, so they cannot be renamed per format without
+    making old and new records incomparable. On the VGC run those two labels describe nothing --
+    both arms were built as the ``doubles`` agent -- and the path is what actually says which
+    weights were scored. Recording it is also what lets `check_artifacts.py` verify a published
+    ceiling number, since that scan looks for `checkpoints/...pt` in the record text.
+    """
+    k = round(rate * n)
+    lo, hi = wilson_ci(k, n)
+    record: ArmRecord = {"p1": p1, "p2": p2, "rate": float(rate), "wins": k, "ci95": [lo, hi]}
+    if checkpoint:
+        record["checkpoint"] = checkpoint
+    return record
 
 # On-record gen9-RB M1 band (results/format_ceiling_gate.json, Lever 15) for a side-by-side
 # read on the teambuilt (OU) smoke. GREEN there is the RB-trained offrl checkpoint.
@@ -393,9 +416,8 @@ async def run_m1(
             p2, battle_format, max_concurrent_battles=concurrency, team=_pool(),  # type: ignore[arg-type]
         )
         rate = await evaluate_built(player1, player2, n)
-        k = round(rate * n)
-        lo, hi = wilson_ci(k, n)
-        block[label] = {"p1": p1, "p2": p2, "rate": float(rate), "wins": k, "ci95": [lo, hi]}
+        block[label] = _arm_record(p1, p2, rate, n, ckpt)
+        lo, hi = block[label]["ci95"]
         print(f"  M1 {label:>16}: {p1} vs {p2}  {rate:.3f}  ci95 [{lo:.3f}, {hi:.3f}]  (n={n})")
     return block
 
