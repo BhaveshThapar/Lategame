@@ -286,6 +286,7 @@ async def run_gate(args: argparse.Namespace) -> dict:
         # ambiguity that makes an unlabelled arm uncomparable.
         "format": args.battle_format,
         "team_pool": args.team_pool,
+        "max_battle_turns": args.max_battle_turns,
     }
 
     # Gate A -- cheap KILL pre-flight.
