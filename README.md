@@ -5,6 +5,52 @@ server — with the whole pipeline built and reported on **Gen 9 Random Battles*
 Lever 15 measured that format's ceiling and forced the pivot (see Status). See [plan.md](plan.md)
 for the full PRD and roadmap.
 
+---
+
+## Quickstart
+
+```bash
+conda env create -f environment.yml && conda activate lategame
+bash scripts/setup_server.sh          # vendored Showdown, pinned rev, builds dist/
+bash scripts/run_server.sh &          # ws://localhost:8000
+
+python -m lategame.cli evaluate --p1 heuristic --p2 random --n 20 --format gen9ou
+```
+
+That runs the rule-based baseline against `random` on a local server and prints a win rate — no
+weights, no GPU, no network. The team pool is defaulted per format (`--team-pool` overrides);
+Random Battles needs none. `python -m lategame.cli --help` lists the rest — [Run](#run) has the
+training and evaluation pipelines, [Develop](#develop) has the test / lint / type bar.
+
+**A clone contains no trained weights.** `checkpoints/` and `data/` are gitignored, so every number
+below came from files that live only on the machine that produced them. What ships is the
+*evidence*: 236 `results/*.json` gate summaries, the validator-checked team pools, the encoder vocab
+and usage prior, the pinned simulator rev — and the gate scripts that re-derive it. See
+[Artifacts & reproducibility](#artifacts--reproducibility) for what a clean clone can and cannot
+reproduce.
+
+## Where it stands
+
+| goal | status | headline |
+|---|---|---|
+| **G1** live play | built + verified | `lategame/live/`, behind an explicit opt-in |
+| **G2** strong-human on one format | **met, both halves** | gen9ou **0.7513** vs the heuristic; agent-only ladder **Glicko 1776.3 / GXE 0.7434** |
+| **G3** continual improvement | **booked** | five-dose self-play curve, monotone on both reads (80 → 320 updates) |
+| **G4** ≥3 formats through one core | **met** | `gen9randombattle`, `gen9ou`, `gen9vgc2025regi` end to end |
+| **G5** skill stack as testable capability | **met** | four capabilities, each on its own gate's criterion |
+
+**Two of the three formats measure as ceiling-bound, and that is a result rather than a shortfall.**
+gen9-RB and VGC both return `FORMAT_BOUND` from the three-leg ceiling probe — nothing competent
+beats the fixed heuristic there, near-optimal search included — so the project's own instruments say
+not to spend more on their strength axes. gen9ou is where headroom was proven and where the strength
+result lives.
+
+**Not claimed:** no public *ranked* ladder play (NG3), so the Glicko figure is measured against a
+bot field and is **not** comparable to a Showdown GXE against humans; and only the self-play axis of
+G3 has a dose-response curve, not the replay-data axis.
+
+---
+
 ## Status
 
 A complete experimental pipeline is built and verified — rule-based baseline → behavior
