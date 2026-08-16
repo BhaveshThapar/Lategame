@@ -62,6 +62,14 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Four test modules do `from tests.conftest import requires_showdown`, and `tests/` is not a
+# package (no `__init__.py`) and is not installed -- `packages.find` above ships `lategame*` only,
+# which makes the editable install finder-based rather than a root-on-sys.path `.pth`. So the repo
+# root reaches sys.path only when the interpreter puts it there, which `python -m pytest` does and
+# a bare `pytest` does not. CI runs the bare form: without this line those four modules raise
+# `ModuleNotFoundError: No module named 'tests'` at COLLECTION, which aborts the whole run before
+# a single test executes -- 0 passed, not 4 failed.
+pythonpath = ["."]
 
 [tool.mypy]
 python_version = "3.11"
