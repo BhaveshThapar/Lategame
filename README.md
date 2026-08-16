@@ -930,6 +930,15 @@ because poke-env supplies only *one* competent doubles bot and the probe needs t
 | `maxbasepower` | 0.107 | 0.060 | 0.300 |
 | `random` | 0.007 | 0.030 | 0.017 |
 
+> **The VGC column is a pre-loop-fix read.** It was measured in `4647bb0`, three days before B6f
+> Stage A found the doubles collection loop, on the same instrument whose output got the BC/AWR
+> figures withdrawn. Every one of these four cells was re-measured afterwards at the same n = 300
+> — mirror 0.503, `simpleheuristics` 0.467, `maxbasepower` 0.310, `random` 0.023 — in
+> [the corrected ladder below](#build-28--b6f--the-vgc-shard-was-94-one-bug-and-it-was-ours). The
+> verdict below is unchanged by that (if anything the corrected `simpleheuristics` sits *lower*,
+> further from the 0.58 headroom threshold), but these specific numbers are superseded and the
+> corrected ones are what to quote.
+
 **On the discriminating quantity VGC reproduces the gen9-RB signature almost exactly** — the
 strongest competent bot at 0.527 with a CI spanning 0.50, indistinguishable even from the
 heuristic's own mirror. **But the verdict is INSUFFICIENT, not FORMAT_BOUND.** Two readings fit:
@@ -1050,10 +1059,37 @@ of `battle.turn`. Collection got ~90x faster as a side effect — the loop was t
 turns carry no decision" note in the collection code measured the loop, not the format. And the
 critic's target was compressed ~4x by zero-reward loop frames (return std 0.80 against the corrected
 shard's 3.14), so the previously reported doubles value-MAE was measured against a near-constant
-target. The BC/AWR figures from those builds are withdrawn and re-run on a corrected shard. They are
-withdrawn rather than superseded on purpose: they were `n = 100` screening reads recorded in commit
-bodies, and the corrected ladder scores at `n = 300`, so no before/after delta may be read across the
-pair — the difference in `n` is larger than the effect either would have to resolve.
+target. The BC/AWR figures from those builds are withdrawn, and the corrected ladder is below. They
+are withdrawn rather than superseded on purpose: they were `n = 100` screening reads recorded in
+commit bodies, and the corrected ladder scores at `n = 300`, so no before/after delta may be read
+across the pair — the difference in `n` is larger than the effect either would have to resolve.
+
+**The corrected ladder, n = 300 per cell** (`results/format_ceiling_gate_vgc_v2.json`; SE ≈ 0.029
+against the withdrawn reads' ≈ 0.05). Every arm plays the fixed `heuristic`:
+
+| arm | vs `heuristic` | ci95 | withdrawn `n = 100` read |
+|---|---|---|---|
+| mirror (sanity) | 0.503 | [0.447, 0.560] | — |
+| `simpleheuristics` | 0.467 | [0.411, 0.523] | — |
+| `maxbasepower` | 0.310 | [0.260, 0.364] | — |
+| `random` | 0.023 | [0.011, 0.047] | — |
+| **BC** — `checkpoints/doubles_bc_vgc_v2.pt` | **0.453** | [0.398, 0.510] | 0.390 |
+| **AWR** — `checkpoints/doubles_offrl_vgc_v2.pt` | **0.467** | [0.411, 0.523] | 0.350 |
+
+Both learned arms read *stronger* on corrected data than they did on loop data. The last column is
+printed as provenance, not as a delta: it is the withdrawn number, and the paragraph above is why
+subtracting it is not allowed. The mirror at 0.503 says the harness is sound.
+
+**And the pre-registered stop rule fires, where B6d said it did not.** The rule, written before the
+campaign: *"if the BC agent lands near `simpleheuristics` while `simpleheuristics` is still at parity
+with the heuristic, that is the FORMAT_BOUND signature arriving early."* Both clauses now hold — BC
+0.453 against `simpleheuristics` 0.467 is 0.5 SE, indistinguishable, and `simpleheuristics`'s CI
+[0.411, 0.523] spans 0.50. B6d adjudicated the same rule "does not fire" **by eye in a commit
+message**, on loop data, where BC read 0.390 and so looked safely below both competent bots. Two
+process failures, not one: the rule was evaluated against corrupted numbers, and it was evaluated
+informally rather than by the instrument it names (`format_ceiling_gate --bc-checkpoint`, which had
+never been run). This is the ceiling that makes B6f's C2 null below uninterpretable rather than
+merely negative.
 
 *Read honestly:* a loop guard and a per-battle turn cap were built first, on the theory that this
 was a property of forced-replacement states. They are not what closed it — capped and uncapped arms
