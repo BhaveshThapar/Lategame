@@ -10,6 +10,7 @@ See plan.md 12, requirement R-EVAL.
 
 from __future__ import annotations
 
+import os
 import secrets
 from dataclasses import dataclass
 
@@ -111,8 +112,6 @@ def _singles_only_agents() -> set[str]:
     fallback is the doubles-capable heuristic rule -- so no singles assumption survives anywhere on
     that path. That mode is exactly what the VGC M2 ceiling probe runs.
     """
-    import os
-
     if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1":
         return _SINGLES_ONLY_AGENTS - {"search"}
     return _SINGLES_ONLY_AGENTS
@@ -157,6 +156,47 @@ class EvalResult:
     p1_gxe: float | None = None
 
 
+# Team preview, applied to EVERY player on a doubles format rather than to our agents only.
+#
+# Set LATEGAME_TEAM_PREVIEW=0 to restore poke-env's `random_teampreview` on both sides, which is
+# what every VGC number measured before this existed used. That is not a legacy switch: the
+# preview-on/preview-off contrast is itself the measurement of how much of VGC skill lives in the
+# bring-4 decision, and it needs both halves runnable from one build.
+#
+# Applied by SUBCLASSING rather than by editing the agents, because the three baselines a VGC
+# ladder is measured against -- poke-env's RandomPlayer, MaxBasePowerPlayer, SimpleHeuristicsPlayer
+# -- are not ours to edit. Giving only our arm a real preview would let it win on bringing a better
+# four and have that read as play strength.
+_PREVIEW_CACHE: dict[type[Player], type[Player]] = {}
+
+
+def team_preview_enabled() -> bool:
+    return os.environ.get("LATEGAME_TEAM_PREVIEW", "1") != "0"
+
+
+def _with_team_preview(cls: type[Player], battle_format: str) -> type[Player]:
+    """``cls`` with ``TeamPreviewMixin`` ahead of it, on doubles formats with preview enabled.
+
+    Singles formats are returned untouched: gen9ou has team preview too, but its selection is
+    bring-6-play-6 (no subset to pick), and Random Battles have none at all. Cached so repeated
+    builds of the same agent share one class -- poke-env checks `isinstance` in places, and a fresh
+    subclass per player would make two builds of the same agent mutually non-identical.
+    """
+    if not (is_doubles_format(battle_format) and team_preview_enabled()):
+        return cls
+    # The registry is typed `dict[str, type[Player]]`, but tests substitute plain callables into it
+    # to avoid constructing a real Player against a real server. Subclassing one of those raises a
+    # metaclass conflict, so a non-class factory passes through unwrapped -- a double does not need
+    # a preview policy, and this must not be the reason a test cannot substitute one.
+    if not isinstance(cls, type):
+        return cls
+    if cls not in _PREVIEW_CACHE:
+        from lategame.agents.teampreview import TeamPreviewMixin
+
+        _PREVIEW_CACHE[cls] = type(f"Preview{cls.__name__}", (TeamPreviewMixin, cls), {})
+    return _PREVIEW_CACHE[cls]
+
+
 def _unique_username(name: str) -> str:
     # Showdown usernames are short; keep a stable prefix + random suffix so
     # repeated runs never collide.
@@ -186,7 +226,7 @@ def build_player(
             f"Making the learned agents doubles-capable is the G4/M6 build (plan.md 13): a "
             f"per-slot action head and a two-active encoder."
         )
-    cls = AGENTS[name]
+    cls = _with_team_preview(AGENTS[name], battle_format)
     extra: dict[str, object] = {}
     if name in _CHECKPOINT_AGENTS:
         extra["sample"] = sample
