@@ -53,6 +53,7 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
   - **The curve comes from `seed_strength_gate.py`, NOT from the eval ladder, and that is a measured decision rather than a stylistic one.** The obvious improvement — plot the curve in the Glicko the goal is stated in — was tried and refused by the data. On the 2026-08-11 ladder the Glicko ordering is not even monotone in update count (120 → 1755.0 sits *above* 160 → 1710.7, against the gate's seed-robust move the other way), and the cluster bootstrap shows **no adjacent learned pair separates at 95%**. The ladder is a single-seed field: it separates bands, and cannot speak to build-vs-build at all. It is therefore not evidence against the gate, and not a substitute for it.
   - **Not demonstrated on the other half of G3's wording.** The goal says "self-play volume *and replay data* grow". Only the self-play axis has a dose-response curve; the replay-data axis was measured once (OU Builds 2–4) and never scaled, so no claim is made for it.
 - **G4.** Generalize the *system* to ≥3 formats spanning singles random, singles teambuilt (OU), and doubles (VGC) by plugging in per-format data, action heads, and team sources — without rewriting the core.
+  - **The VGC ceiling verdict is FORMAT_BOUND as of 2026-08-16**, on three legs (M1 0.493 / M2 0.373 / M3 0.520) rather than the M1-only `INSUFFICIENT` this goal was booked alongside. That does not change G4, whose exit is "playable end to end" and was met on 2026-08-12 — it settles the *separate* question of whether the doubles strength axis is worth spending on. It is not: `stop_strength_axis`. See §13.1.
   - **EXIT CRITERION MET (2026-08-12): three formats play end to end through one core.** Verified against a live local server, 6/6 battles completed on each:
 
     | format | agent | vs `random` | finished |
@@ -3418,6 +3419,72 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     `LATEGAME_LIVE_TEST=1`), and `node` merely being *installed* is not enough — it has to be **on
     PATH**, or six simulator tests self-skip with `dist/` built and the count reads 719/7 instead
     of 725/1. Measured: **710 pass / 16 skip** bare clone, **725 pass / 1 skip** with env + server.
+
+  - **THE VGC CEILING NOW STANDS ON THREE LEGS: FORMAT_BOUND.** `results/format_ceiling_gate_vgc_v3.json`.
+
+    | leg | measure | value |
+    |---|---|---|
+    | **M1** | best competent bot vs `heuristic` | **0.493** (n = 300/cell; mirror 0.497, gradient ordered) |
+    | **M2** | near-optimal depth-2 search vs `heuristic` | **0.373** (n = 300 pooled over 10 shards; sanity vs `random` 0.94) |
+    | **M3** | team-strength → winner AUC | **0.520** [0.482, 0.556] (n = 997) |
+
+    `competent = max(0.493, 0.373, 0.453) = 0.493 ≤ BAND_TOP 0.53` → **FORMAT_BOUND →
+    `stop_strength_axis`**. Not `ou_pivot`: that branch is advice for a format measured *before* the
+    OU pivot, and it was the literal string for every verdict until a second format reached the
+    function. Two other RB-isms went with it — the reason interpolated M2 as "at parity"
+    unconditionally (true of RB's 0.500, false of 0.373), and the M3 note explained RB's
+    level-balancing on a format where nobody assigned the teams.
+
+  - **M2 IS THE WEAKER LEG AND THE ASYMMETRY WAS PRE-REGISTERED.** It evaluates leaves with
+    `ShapedOnlyPolicy` — shaped state value, no encoder, no priors — because that is the only mode
+    admitting `search` to a doubles format. `expectimax.ShapedOnlyPolicy` already says what follows:
+    *a WIN is decisive, a NULL is suggestive only, because a shallower leaf could produce it on its
+    own.* RB's M2 used GREEN's trained value head, so **VGC's FORMAT_BOUND is less strongly
+    evidenced than RB's**. `m2_leaf` now travels on the verdict; the pooled record's is hand-added
+    and flagged three ways, the array predating the field by one commit.
+
+  - **AND THE INSTRUMENT WAS BROKEN IN THE DIRECTION THAT WOULD HAVE MADE THE VERDICT LOOK
+    DECIDED.** `arena._singles_only_agents` justifies letting `search` onto doubles because "the
+    fallback is the doubles-capable heuristic rule". It called `heuristic_pick`, the singles one:
+    `AttributeError: 'list' object has no attribute 'base_power'`, swallowed by poke-env's detached
+    message task, server plays defaults on the timer. An M2 arm in that state returns a *number*,
+    and the number is "near-optimal search is very weak on doubles". Found by running the probe,
+    not by reading it.
+
+  - **RANDOM BATTLES IS UNTOUCHED, CHECKED RATHER THAN ASSUMED.** An absent `format` key means
+    gen9-RB — `run_m1` only began writing it when teambuilt support landed, so the record holding
+    the original FORMAT_BOUND verdict has none, and a generic fallback would have re-derived that
+    historical decision with a different branch. Re-deriving from its own M1/M2/M3 reproduces
+    verdict, branch, reason, mirror sanity and the M3 note identically.
+
+  - **M4 RUNS ON DOUBLES AS A BUILD, SIZED BY THE VERDICT.**
+    `results/curriculum_gate_m4_vgc_cap.json`, one seed and two iterations, because spending a
+    three-seed arm on a FORMAT_BOUND format is what the Lever-15 idiom exists to prevent. Gate A
+    **PASS** (160 episodes, 80/80, gap 6.86); curve vs `heuristic` 0.500 → 0.367; Gate C ladder
+    `random` 0.967 / `maxbasepower` 0.733 / `simpleheuristics` 0.567 / `heuristic` 0.600. There was
+    no cluster job for self-play at all before this (`scripts/cluster/selfplay_gate.slurm`), and
+    `run_selfplay` still writes only a curve — `curriculum_gate` is the only bridge to `results/`.
+
+  - **THE RECORD'S TWO `vs heuristic` READS ARE NOT EVIDENCE ABOUT EACH OTHER, AND TWO GUESSES AT
+    WHY WERE BOTH WRONG.** Curve 0.367, ladder 0.600, same checkpoint. Tested: the asymmetric turn
+    cap (learner-capped-only **0.4167** vs neither-capped **0.4167** — a VGC battle never reaches 60
+    decisions) and sharing one `TeamPool` across both players (means 0.490 vs 0.457, inside both
+    spreads). Both fail. What is left is the spread — ten independent n = 60 reads of one checkpoint
+    against one opponent range **0.367–0.550** (separate-pool spread 0.150, shared 0.133). **n = 60
+    on a ten-team pool cannot support a comparison between two reads**, which is the same clustering
+    caveat §13.1 already records for the OU ladder at n = 150, worse here. The 0.600 sits just above
+    the observed range, so this is mostly but not provably entirely noise and no cause is claimed
+    for the remainder. Carried in the record under `_read_as`, because the failure mode is someone
+    quoting one of the two numbers out of the JSON.
+
+  - **FORGETTING A TEAM WAS NEVER AN ERROR, AND THAT IS NOW FIXED AT THE CHOKE POINT.**
+    `curriculum_gate` has three independent player-building paths — Gate A's collection, the
+    self-play loop, Gate C's ladder — and each was found teamless by watching a cluster job's stderr
+    log, one node claim at a time. Showdown answers a teamless challenge with a popup that poke-env
+    logs at WARNING; nothing raises, the player never battles, and the arm reads as a run that
+    produced no wins rather than one that never started. `build_player` refuses it now, Random
+    Battles exempted. The blast radius was four kwarg-forwarding tests relying on the permissive
+    default.
 
 ---
 
