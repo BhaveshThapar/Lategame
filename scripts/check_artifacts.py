@@ -61,6 +61,10 @@ HEADLINE: dict[str, tuple[str, ...]] = {
         "seed_strength_gate_b6f_c1.json",
         "awr_vgc_arm_b6f.json",
     ),
+    # Verifiable only since the record was given a `_provenance` block: `run_m1` wrote no
+    # checkpoint paths, so before that this entry would have registered as vacuously OK over an
+    # empty checkpoint set -- a headline that checks nothing.
+    "VGC corrected ladder BC 0.453 / AWR 0.467": ("format_ceiling_gate_vgc_v2.json",),
 }
 
 
