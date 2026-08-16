@@ -199,12 +199,43 @@ def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
     assert _SINGLES_ONLY_AGENTS == {"bc", "offrl", "ppo", "search"}
 
 
-def test_agent_dispatch_returns_a_usable_name_for_every_format():
-    """`train.ppo`, `train.selfplay` and `scripts/ppo_continue_gate` must ASK which agent to build
-    rather than hardcode `offrl`, which `build_player` refuses on a doubles format.
+# Every module that builds a learned player from a caller-supplied format. Each must ASK
+# `policy_agent`/`rollout_agent` rather than name the singles learner, which `build_player` refuses
+# on a doubles format.
+#
+# This used to live in a docstring, and a docstring cannot fail. `train.selfplay` was omitted from
+# it when the helper was introduced and kept five hardcoded names, which is why M4 died on VGC;
+# `scripts/rpredict_oppmodel_gate` -- the M2 leg of the format-ceiling probe, explicitly documented
+# as a doubles run in `arena._singles_only_agents` -- was still missing after that repair. So the
+# list is data now, and `test_no_dispatch_module_hardcodes_the_singles_learner` reads it.
+MUST_ASK_FOR_THE_AGENT = (
+    "lategame/train/ppo.py",
+    "lategame/train/selfplay.py",
+    "scripts/ppo_continue_gate.py",
+    "scripts/rpredict_oppmodel_gate.py",
+)
 
-    `train.selfplay` joined this list late: it was omitted when the helper was introduced, kept
-    its five hardcoded `offrl` names, and so was the one loop that still died on a VGC format."""
+
+def test_no_dispatch_module_hardcodes_the_singles_learner():
+    """Read as TEXT, not imported: two of the four are `scripts/` modules that pull torch and
+    poke-env at import time, and the assertion is about source anyway.
+
+    The quoted form deliberately does not match a checkpoint PATH like
+    `checkpoints/offrl_gen9randombattle.pt`, which is not a registry name."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    for rel in MUST_ASK_FOR_THE_AGENT:
+        path = root / rel
+        assert path.exists(), f"{rel} moved; update MUST_ASK_FOR_THE_AGENT"
+        assert '"offrl"' not in path.read_text(), (
+            f"{rel} names the singles learner literally; call `arena.policy_agent(fmt)` instead "
+            f"-- `build_player` refuses that name on a doubles format"
+        )
+
+
+def test_agent_dispatch_returns_a_usable_name_for_every_format():
+    """The dispatch helpers `MUST_ASK_FOR_THE_AGENT`'s members are required to call."""
     from lategame.config import is_doubles_format
     from lategame.eval.arena import (
         AGENTS,

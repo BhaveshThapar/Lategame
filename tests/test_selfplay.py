@@ -191,18 +191,10 @@ def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
         assert all(kw.get("team") == "POOL" for _n, kw in calls)
 
 
-def test_the_selfplay_loop_never_hardcodes_the_singles_agent_name():
-    """Pinned literally, because the behavioural test above cannot reach the `PlayerSpec`
-    construction inside `run_selfplay` without torch and a real checkpoint.
-
-    The quoted form deliberately does not match `SelfPlayConfig.init`'s default checkpoint PATH,
-    `"checkpoints/offrl_gen9randombattle.pt"`, which is not a registry name.
-    """
-    import inspect
-
-    from lategame.train import selfplay as sp
-
-    assert '"offrl"' not in inspect.getsource(sp)
+# The literal "never hardcodes `offrl`" pin for this module now lives in
+# `tests/test_arena.py::test_no_dispatch_module_hardcodes_the_singles_learner`, which checks the
+# same thing for every module that builds a learned player from a caller-supplied format. Keeping a
+# selfplay-only copy is how the enumeration drifted in the first place.
 
 
 def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
