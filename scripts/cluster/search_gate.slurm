@@ -37,10 +37,35 @@ SANITY_N="${SANITY_N:-40}"
 FMT="${FMT:-gen9ou}"
 INIT="${INIT:-checkpoints/ppo_v26b_s0/iter_300.pt}"
 TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
+
+# DOUBLES: this same job is the M2 leg of the VGC ceiling probe, and two settings are not optional.
+#
+#   FMT=gen9vgc2025regi INIT=checkpoints/doubles_offrl_vgc_v2.pt \
+#   TEAM_POOL=lategame/teambuilding/data/teams_gen9vgc.packed \
+#   N_PER_SHARD=30 SANITY_N=10 OUT_PREFIX=results/rpredict_search_vgc \
+#   LATEGAME_SHOWDOWN_PORT_BASE=8700 sbatch -p tron --qos=medium --array=0-9 \
+#     scripts/cluster/search_gate.slurm
+#
+# 1. `search` is in `_SINGLES_ONLY_AGENTS` and `build_player` refuses it on a doubles format --
+#    UNLESS LATEGAME_SEARCH_SHAPED_ONLY=1, where the leaf is `data.reward.state_value` (reads the
+#    battle object, no singles encoder), the driver enumerates JOINT orders, and the fallback is
+#    the doubles-capable heuristic rule. Set here rather than left to the caller's environment,
+#    because forgetting it is a hard refusal at build time and an hour of queue wasted.
+# 2. LOOP_PENALTY must be 0. The singles default of 4 builds a 26-wide `LoopGuard` penalizing
+#    indices 0-5; on the doubles layout index 0 is PASS, so it would penalize passing and five of
+#    six switches -- not a weaker guard, a differently-wrong one.
+case "$FMT" in
+  *vgc*|*doubles*)
+    export LATEGAME_SEARCH_SHAPED_ONLY=1
+    LOOP_PENALTY="${LOOP_PENALTY:-0}"
+    echo "[job] doubles format $FMT: shaped-only search leaf, loop_penalty $LOOP_PENALTY"
+    ;;
+esac
 LOOP_PENALTY="${LOOP_PENALTY:-4}"
 DEPTH="${DEPTH:-2}"
 ARMS="${ARMS:-whitebox}"
-OUT="${OUT:-results/rpredict_search_ou_shard${SHARD}.json}"
+OUT_PREFIX="${OUT_PREFIX:-results/rpredict_search_ou}"
+OUT="${OUT:-${OUT_PREFIX}_shard${SHARD}.json}"
 
 # Every shard must exist before anything is pooled, so fail loudly on a missing checkpoint here
 # rather than after hours of battles.
