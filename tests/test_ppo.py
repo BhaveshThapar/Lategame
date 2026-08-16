@@ -316,7 +316,8 @@ def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
     def fake_episodes(player, weights):
         obs = np.zeros(OBS_DIM, dtype=np.float32)
         mask = np.ones(GEN9_ACTION_SPACE_SIZE, dtype=bool)
-        return [([(obs, 0, mask)], [0.0], [0.0], [0.0])]
+        # (recs, rewards, log_probs, values, executed) -- the 5th list is B6f's executed flag.
+        return [([(obs, 0, mask)], [0.0], [0.0], [0.0], [True])]
 
     monkeypatch.setattr(rollout_mod, "build_player", fake_build_player)
     monkeypatch.setattr(rollout_mod, "cross_evaluate", fake_cross_evaluate)

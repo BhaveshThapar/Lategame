@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from format_ceiling_gate import wilson_ci  # type: ignore[import-not-found]
 
-from lategame.eval.arena import build_player, evaluate_built
+from lategame.eval.arena import build_player, evaluate_built, policy_agent
 from lategame.teambuilding.pool import TeamPool
 
 
@@ -177,12 +177,24 @@ async def score_build(
     n: int,
     loop_penalty: float,
     concurrency: int,
+    opponent_checkpoint: str | None = None,
 ) -> dict[str, Any]:
-    """Win-rate of every seed's best checkpoint vs ``opponent``, pooled over seeds."""
+    """Win-rate of every seed's best checkpoint vs ``opponent``, pooled over seeds.
+
+    ``opponent_checkpoint`` makes the opponent a LEARNED policy rather than a fixed baseline --
+    the head-to-head against the arm's own warm start. That contrast is ceiling-INDEPENDENT (both
+    sides are learned policies on one format), which is the only readable one when a format's
+    ceiling is itself in doubt: Build 27 measured search only against the fixed baseline, reported
+    "no effect", and missed that the effect was negative.
+
+    The learner is built with the agent the FORMAT wants (``arena.policy_agent``); ``offrl`` is
+    singles-only and is refused outright on doubles.
+    """
+    learner_name = policy_agent(battle_format)
     per_ckpt: list[dict[str, Any]] = []
     for path in checkpoints:
         learner = build_player(
-            "offrl",
+            learner_name,
             battle_format,
             checkpoint_path=path,
             sample=False,  # eval is greedy, matching the deployed policy
@@ -190,7 +202,14 @@ async def score_build(
             team=team,
             loop_penalty=loop_penalty,
         )
-        opp = build_player(opponent, battle_format, max_concurrent_battles=concurrency, team=team)
+        opp = build_player(
+            opponent,
+            battle_format,
+            checkpoint_path=opponent_checkpoint,
+            sample=False,
+            max_concurrent_battles=concurrency,
+            team=team,
+        )
         rate = await evaluate_built(learner, opp, n)
         wins = int(round(rate * n))
         lo, hi = wilson_ci(wins, n)
@@ -238,6 +257,14 @@ def main() -> None:
         "the default 0.05 off a factorial run",
     )
     ap.add_argument("--opponent", default="heuristic")
+    # B6f: score against a learned CHECKPOINT rather than a fixed baseline -- the arm against its
+    # own warm start. Omitting it reproduces every prior invocation exactly.
+    ap.add_argument(
+        "--opponent-checkpoint",
+        dest="opponent_checkpoint",
+        default=None,
+        help="checkpoint for --opponent, making it a learned policy (e.g. the warm start)",
+    )
     ap.add_argument("--n", type=int, default=300, help="battles per checkpoint")
     ap.add_argument("--format", default="gen9ou")
     ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed")
@@ -253,13 +280,15 @@ def main() -> None:
         print(f"\n{name}: {len(ckpts)} seed-best checkpoints vs {args.opponent} (n={args.n} each)")
         builds[name] = asyncio.run(
             score_build(
-                ckpts, args.opponent, args.format, team, args.n, args.loop_penalty, args.concurrency
+                ckpts, args.opponent, args.format, team, args.n, args.loop_penalty,
+                args.concurrency, args.opponent_checkpoint,
             )
         )
 
     result: dict[str, Any] = {
         "gate": "seed_strength",
         "opponent": args.opponent,
+        "opponent_checkpoint": args.opponent_checkpoint,
         "n_per_checkpoint": args.n,
         "format": args.format,
         "loop_penalty": args.loop_penalty,

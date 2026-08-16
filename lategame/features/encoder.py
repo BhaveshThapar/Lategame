@@ -129,6 +129,10 @@ class ObsLayout:
     global_dim: int
     pokemon_id_channels: int = 0
     move_id_channels: int = 0
+    #: Pokemon on the field per side. 1 on singles -- the default keeps every existing layout,
+    #: checkpoint and dataset byte-identical -- and 2 on doubles, where the move blocks are
+    #: emitted once per active slot rather than once for "the" active.
+    n_active: int = 1
 
     @property
     def pokemon_numeric_dim(self) -> int:
@@ -146,9 +150,14 @@ class ObsLayout:
         return self.team_size * 2
 
     @property
+    def n_move_blocks(self) -> int:
+        """Move blocks in the flat obs: ``n_moves`` per active slot."""
+        return self.n_active * self.n_moves
+
+    @property
     def n_tokens(self) -> int:
         """Total tokens: ego + opp Pokemon, moves, and the single global token."""
-        return self.team_size * 2 + self.n_moves + 1
+        return self.team_size * 2 + self.n_move_blocks + 1
 
     @property
     def moves_start(self) -> int:
@@ -158,7 +167,7 @@ class ObsLayout:
     @property
     def global_start(self) -> int:
         """Flat-obs offset where the global block begins."""
-        return self.moves_start + self.n_moves * self.move_dim
+        return self.moves_start + self.n_move_blocks * self.move_dim
 
 
 OBS_LAYOUT = ObsLayout(

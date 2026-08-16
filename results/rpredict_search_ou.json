@@ -1,0 +1,38 @@
+{
+  "gate": "rpredict_search_pooled",
+  "shards": 10,
+  "format": "gen9ou",
+  "init": "checkpoints/ppo_v26b_s0/iter_300.pt",
+  "depth": 2,
+  "alpha": 0.05,
+  "note": "pre-registered: WIN iff the pooled delta is significant at alpha and positive",
+  "base_vs_heuristic": {
+    "wins": 1922,
+    "n": 2500,
+    "rate": 0.7688
+  },
+  "arms": {
+    "whitebox": {
+      "search_vs_heuristic": {
+        "wins": 1931,
+        "n": 2500,
+        "rate": 0.7724
+      },
+      "search_vs_base": {
+        "wins": 983,
+        "n": 2500,
+        "rate": 0.3932
+      },
+      "search_vs_random": {
+        "rate": 0.895
+      },
+      "contrast_vs_base": {
+        "diff": 0.0036,
+        "z": 0.303,
+        "p_value": 0.762101,
+        "se": 0.0119
+      },
+      "verdict": "NULL"
+    }
+  }
+}

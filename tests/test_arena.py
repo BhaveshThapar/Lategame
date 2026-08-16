@@ -98,3 +98,148 @@ async def test_random_vs_random_completes_a_battle():
     result = await evaluate("random", "random", n_battles=1)
     assert result.n_battles == 1
     assert 0.0 <= result.p1_win_rate <= 1.0
+
+
+# --------------------------------------------------------------------------- #
+# The doubles guard (G4/M6 groundwork)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "battle_format,doubles",
+    [
+        ("gen9randombattle", False),
+        ("gen9ou", False),
+        ("gen9vgc2025regi", True),
+        ("gen9doublesou", True),
+        ("gen9randomdoublesbattle", True),
+        ("gen92v2doubles", True),
+    ],
+)
+def test_doubles_formats_are_recognised(battle_format, doubles):
+    from lategame.config import is_doubles_format
+
+    assert is_doubles_format(battle_format) is doubles
+
+
+def test_a_singles_only_agent_is_refused_on_a_doubles_format():
+    """The refusal exists because the failure is SILENT otherwise.
+
+    On a DoubleBattle poke-env passes `active_pokemon` as a list, so `HeuristicAgent` raises
+    AttributeError -- but poke-env dispatches protocol messages through `asyncio.create_task` and
+    never retrieves the result, so the raise is swallowed exactly as `ShowdownException` is on a
+    failed login. The agent then never answers and the server plays default moves on the timer,
+    which reads as a very weak agent rather than a broken one. A ceiling probe anchored on that
+    would report enormous headroom for the wrong reason.
+    """
+    with pytest.raises(ValueError, match="SINGLES-ONLY"):
+        build_player("bc", "gen9vgc2025regi", checkpoint_path="x.pt")
+    with pytest.raises(ValueError, match="SINGLES-ONLY"):
+        build_player("offrl", "gen9doublesou", checkpoint_path="x.pt")
+
+
+def test_poke_envs_own_baselines_are_allowed_on_doubles(monkeypatch):
+    """`RandomPlayer`, `MaxBasePowerPlayer` and `SimpleHeuristicsPlayer` all branch on DoubleBattle
+    in poke-env itself, so the VGC ceiling probe can be run with them before any doubles code of
+    ours exists -- which is what makes the G4 decision cheap."""
+    import lategame.eval.arena as arena
+
+    for name in ("random", "maxbasepower", "simpleheuristics", "heuristic"):
+        monkeypatch.setitem(arena.AGENTS, name, lambda **kw: object())
+        build_player(name, "gen9vgc2025regi")  # must not raise
+
+
+def test_the_singles_agents_are_still_fine_on_singles(monkeypatch):
+    import lategame.eval.arena as arena
+
+    monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
+    build_player("heuristic", "gen9ou")
+    build_player("heuristic", "gen9randombattle")
+
+
+def test_the_vgc_format_constant_exists_in_the_vendored_simulator():
+    """It did not, until 2026-08-11: `gen9vgc2024regh` was a never-exercised placeholder and the
+    pinned simulator has no such format. Pinned against the simulator's own format table so the
+    constant cannot rot again silently."""
+    import re
+    from pathlib import Path
+
+    from lategame.config import VGC_FORMAT
+
+    formats = Path("third_party/pokemon-showdown/config/formats.ts")
+    if not formats.exists():
+        pytest.skip("vendored simulator not present")
+    ids = {
+        re.sub(r"[^a-z0-9]", "", name.lower())
+        for name in re.findall(r'name:\s*"([^"]+)"', formats.read_text())
+    }
+    assert VGC_FORMAT in ids, f"{VGC_FORMAT!r} is not a format the pinned simulator has"
+
+
+# --------------------------------------------------------------------------- #
+# B6f: the doubles rollout agent, and the dispatch that keeps the singles guard intact.
+# --------------------------------------------------------------------------- #
+def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
+    from lategame.eval.arena import (
+        _CHECKPOINT_AGENTS,
+        _DOUBLES_SAFE_AGENTS,
+        _LOOP_GUARD_AGENTS,
+        _SINGLES_ONLY_AGENTS,
+        AGENTS,
+    )
+
+    assert "doubles_ppo" in AGENTS
+    assert "doubles_ppo" in _CHECKPOINT_AGENTS, "it is loaded from a checkpoint"
+    assert "doubles_ppo" in _DOUBLES_SAFE_AGENTS
+    # NOT in the singles guard set: its members are handed `LoopGuard`, a 26-wide vector
+    # penalizing indices 0-5, which on the doubles layout would penalize PASS and five of the six
+    # switches. Two sets so the mistake is a build-time KeyError, not a plausible penalty vector.
+    assert "doubles_ppo" not in _LOOP_GUARD_AGENTS
+    assert "doubles" not in _LOOP_GUARD_AGENTS
+    # Pinned literally: widening this set is how a singles agent silently reaches a doubles format
+    # and gets scored as "very weak" while the server plays its moves on the timer.
+    assert _SINGLES_ONLY_AGENTS == {"bc", "offrl", "ppo", "search"}
+
+
+def test_agent_dispatch_returns_a_usable_name_for_every_format():
+    """`train.ppo` and `scripts/ppo_continue_gate` must ASK which agent to build rather than
+    hardcode `offrl`, which `build_player` refuses on a doubles format."""
+    from lategame.config import is_doubles_format
+    from lategame.eval.arena import (
+        AGENTS,
+        _singles_only_agents,
+        policy_agent,
+        rollout_agent,
+    )
+
+    for fmt in ("gen9randombattle", "gen9ou", "gen9vgc2025regi", "gen9doublesou"):
+        for name in (policy_agent(fmt), rollout_agent(fmt)):
+            assert name in AGENTS, f"{name} is not registered"
+            if is_doubles_format(fmt):
+                assert name not in _singles_only_agents(), f"{name} would be refused on {fmt}"
+
+    assert policy_agent("gen9ou") == "offrl" and rollout_agent("gen9ou") == "ppo"
+    assert policy_agent("gen9vgc2025regi") == "doubles"
+    assert rollout_agent("gen9vgc2025regi") == "doubles_ppo"
+
+
+def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypatch):
+    """The ceiling is meaningful only where the loop was measured, and `None` is exact identity,
+    so a singles build must not even receive the kwarg."""
+    import lategame.eval.arena as arena
+
+    seen: dict[str, dict] = {}
+
+    class Dummy:
+        def __init__(self, **kwargs):
+            seen.clear()
+            seen.update(kwargs)
+
+    monkeypatch.setitem(arena.AGENTS, "doubles_ppo", Dummy)
+    monkeypatch.setitem(arena.AGENTS, "random", Dummy)
+
+    arena.build_player(
+        "doubles_ppo", "gen9vgc2025regi", checkpoint_path="x.pt", max_battle_turns=99
+    )
+    assert seen["max_battle_turns"] == 99 and seen["loop_penalty"] == 0.0
+
+    arena.build_player("random", "gen9vgc2025regi", max_battle_turns=99)
+    assert "max_battle_turns" not in seen

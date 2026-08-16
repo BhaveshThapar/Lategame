@@ -42,7 +42,29 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
   - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633.
   - **The *ladder* half is now COMPUTED (2026-08-10), on an agent-only eval ladder rather than the human ladder.** GXE and Glicko-1 need a varied opponent field, which no amount of further training can supply — but §12's own last line prefers "a private/agent-only server or eval ladder", and §16 Q5 is answered: there is *no* unranked public ladder, so that route is the only policy-clean one. `lategame/eval/ladder.py` fits a whole field jointly (Bradley-Terry on the Glicko scale, `heuristic` pinned at 1500). Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9, GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000) — see §13.1. Two caveats travel with it: the RD is a **lower bound** (battles cluster by team matchup, so the effective sample is under `n`), and this is an **agent-only** field, so the number is *not* comparable to a Showdown GXE measured against humans. The human-ladder reading remains out of scope under NG3; `lategame/live/` (**G1**) is built and gated for it should that ever change.
 - **G3.** Demonstrate **continual improvement**: model strength measurably increases as self-play volume and replay data grow.
+  - **MET (booked 2026-08-11), and the evidence was already on the record before it was claimed.** §12's continual-improvement row asks for "metric vs self-play/data volume → monotonic improvement". Builds 24–26 are exactly that curve and nobody had written it up as one. Five doses of PPO self-play at a pinned schedule (`anneal_iters` 80, `target_kl` 0.06, from the converged offline init), 3 seeds each, pooled **n = 9000/arm** against the fixed heuristic, chained through the shared `v25b` anchor because absolute rates move between runs (the anchor re-calibrated **+0.0157**, inside the ±0.027 cross-run band) and only within-run differences are trustworthy:
+
+    | updates | 80 | 120 | 160 | 240 | 320 |
+    |---|---|---|---|---|---|
+    | seed-best read | 0.5607 | 0.6301 | 0.6691 | 0.7250 | 0.7420 |
+    | terminal (selection-free) read | 0.5778 | 0.6189 | 0.6883 | 0.7354 | 0.7513 |
+
+    **Monotone at every step on both reads**, which is the claim G3 makes. What it does *not* claim is that the improvement continues: the marginal return per update decays **1.62 → 0.91 → 0.64 → 0.18** (×10⁻³, bias-corrected; the raw chained figures are 1.73/0.98/0.70/0.21 and agree in shape), a ~9× decay that is itself monotone. G3 is met **and** the axis that met it is saturating — see Build 26.
+  - **The curve comes from `seed_strength_gate.py`, NOT from the eval ladder, and that is a measured decision rather than a stylistic one.** The obvious improvement — plot the curve in the Glicko the goal is stated in — was tried and refused by the data. On the 2026-08-11 ladder the Glicko ordering is not even monotone in update count (120 → 1755.0 sits *above* 160 → 1710.7, against the gate's seed-robust move the other way), and the cluster bootstrap shows **no adjacent learned pair separates at 95%**. The ladder is a single-seed field: it separates bands, and cannot speak to build-vs-build at all. It is therefore not evidence against the gate, and not a substitute for it.
+  - **Not demonstrated on the other half of G3's wording.** The goal says "self-play volume *and replay data* grow". Only the self-play axis has a dose-response curve; the replay-data axis was measured once (OU Builds 2–4) and never scaled, so no claim is made for it.
 - **G4.** Generalize the *system* to ≥3 formats spanning singles random, singles teambuilt (OU), and doubles (VGC) by plugging in per-format data, action heads, and team sources — without rewriting the core.
+  - **EXIT CRITERION MET (2026-08-12): three formats play end to end through one core.** Verified against a live local server, 6/6 battles completed on each:
+
+    | format | agent | vs `random` | finished |
+    |---|---|---|---|
+    | `gen9randombattle` (singles random) | `heuristic` | 1.000 | 6/6 |
+    | `gen9ou` (singles teambuilt) | `offrl` @ `v26b` | 1.000 | 6/6 |
+    | `gen9vgc2025regi` (**doubles**) | `doubles` @ init | 0.667 | 6/6 |
+
+  - **"Without rewriting the core" is the substantive half of the claim, and it held.** Doubles plugged in as a per-slot action codec (`features/doubles_action_space`, wrapping `DoublesEnv` exactly as the singles codec wraps `SinglesEnv`), a second encoder (`features/doubles_encoder`, importing every per-mon and per-move block builder from the singles one), and an agent. **The model factory needed no change at all** — `build_model` already took `input_dim`/`n_actions` from checkpoint metadata, so the doubles network is the same architecture at a different width. The one genuine edit to shared code was making `EntityTransformer` take its token layout as a parameter instead of importing the singles constant; it resolves the layout from `input_dim`, so every checkpoint written before doubles existed still builds the model it always did.
+  - **The action space is FACTORED, and that is a choice with one known cost.** Doubles is **107 actions per slot** and a turn commits both, so a joint head would be 107² = **11,449** outputs. The head is instead two independent 107-way distributions (**214 logits**). What factoring cannot represent is a constraint that *couples* the slots, and exactly one matters: both slots switching to the same benched Pokemon. Showdown answers that order with a **default move rather than an error**, so it is a silently lost turn — handled by an explicit post-sampling resolution step, not by the mask.
+  - **Singles is frozen and pinned by test**: `OBS_DIM` 761 / `OBS_VERSION` `v5-` / `GEN9_ACTION_SPACE_SIZE` 26 unchanged. Doubles is separately versioned (`d1-`, 888-d) on **both** fields, so `data.collect`'s fingerprint check rejects a cross-format shard on either one alone.
+  - **What this does NOT claim.** The doubles checkpoint is randomly initialised — G4's exit is "playable end to end", and strength on VGC is a separate question. The 0.667 is 6 battles of a random-init policy and is not a result.
 - **G5.** Encode the competitive skill stack of Section 4 as explicit, testable capabilities (state estimation, prediction/opponent modeling, win-condition planning, precise damage math).
 
 ### 3.2 Non-goals (for v1)
@@ -2733,6 +2755,484 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     this very run was **0.720**, not 0.681. The agreement to 2e-4 is a coincidence of magnitude,
     not an identity, and must not be cited as the ladder reproducing the gate.
 
+- **THE LADDER, RE-RUN ON THE FINISHED BUILD 26 ARMS — G2's HEADLINE REFRESHED, AND THE FIRST
+  MEASUREMENT OF WHAT THE STANDINGS CANNOT ORDER (2026-08-11).** The 2026-08-10 field deliberately
+  excluded `v26a`/`v26b` as in-flight arms. They are no longer in flight, and `v26b` is the
+  project's best configuration while G2's published Glicko still pointed at `v25b`. Re-run on
+  `gen9ou` with the dose ladder as the field (9 agents, 36 pairs × **300** = **10,800** battles,
+  `loop_penalty` 4, anchor `heuristic` = 1500), plus **300 cluster-bootstrap resamples** over the
+  78 team matchups. `results/eval_ladder_gen9ou_v26.json`.
+
+  | agent | score | Glicko | RD | GXE | cluster 95% CI |
+  |---|---|---|---|---|---|
+  | `offrl@ppo_v26a_s0/iter_240` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1732, 1811] |
+  | `offrl@ppo_v26b_s0/iter_320` | 0.696 | **1776.3** | 12.5 | **0.7434** | [1739, 1815] |
+  | `offrl@ppo_v25a_s0/iter_120` | 0.679 | 1755.0 | 12.4 | 0.7275 | [1719, 1791] |
+  | `offrl@ppo_v25b_s0/iter_160` | 0.642 | 1710.7 | 12.2 | 0.6924 | [1676, 1743] |
+  | `offrl@ppo_v23b_s0/iter_80` | 0.593 | 1653.4 | 12.1 | 0.6435 | [1618, 1689] |
+  | `simpleheuristics` | 0.525 | 1572.7 | 12.3 | 0.5695 | [1546, 1600] |
+  | `heuristic` (anchor) | 0.465 | 1500.0 | 12.6 | 0.5000 | — |
+  | `maxbasepower` | 0.166 | 1001.4 | 19.0 | 0.1280 | [938, 1053] |
+  | `random` | 0.039 | 617.0 | 28.6 | 0.0325 | [530, 684] |
+
+  - **G2's headline metric moves to `v26b`: Glicko 1776.3, GXE 0.7434**, from `v25b`'s 1696.9 /
+    0.6809. Both caveats travel unchanged — agent-only field, not comparable to a Showdown GXE.
+  - **RD WAS A LOWER BOUND, AND NOW THERE IS AN INTERVAL THAT IS NOT.** RD is derived from binomial
+    noise alone. On a teambuilt format the battles are clustered by team matchup, so the effective
+    sample is well under `n` — the evidence was already on the record (a pairing moved 0.460 →
+    0.587 across two n=150 runs, ~3.1 binomial SE, while each agent's own GXE moved under 0.004)
+    and unexplained by RD. `eval/ladder.py` now resamples **team matchups**, not battles, and
+    refits the whole field per resample. Resampling battles would merely reproduce the binomial
+    interval RD already gives; pinned by a test where a 1000-battle field whose outcomes are fixed
+    by 10 matchups comes back >5× wider than RD implies, against an unclustered control that does
+    not.
+  - **THE RESULT IS THAT EVERY BAND BOUNDARY SEPARATES AND NOT ONE LEARNED NEIGHBOUR DOES.**
+    learned > `simpleheuristics` > `heuristic` > `maxbasepower` > `random`: all four separated.
+    `v26a`/`v26b`, `v26b`/`v25a`, `v25a`/`v25b`, `v25b`/`v23b`: none separated. The instruction
+    "read the standings as separating BANDS, not as ordering neighbours" has been in the results
+    file since it was written; this is the first run that **measures** it rather than asserting it.
+  - **ONE COINCIDENCE, BOOKED AS ONE SO IT IS NOT MISREAD AS A BUG.** `v26a` and `v26b` post
+    *identical* totals (1671–729), hence identical Glicko and GXE. They are demonstrably different
+    agents: all seven per-opponent records differ and they went **165–135** head to head. `v26b`'s
+    +30 wins across the rest of the field (chiefly **+38** vs `simpleheuristics`) exactly cancel
+    its −30 head to head. A coincidence of arithmetic, not a shared checkpoint.
+
+- **OPEN NEXT (BUILD 27) — DO NOT EXTEND THE DOSE AGAIN; the axis is closed and the remaining
+  goals are elsewhere.** Every build from 16 onward named its successor; Build 26 was the first
+  that did not, because its own result removed the obvious one.
+  - **Why 480 updates is not Build 27.** At the observed 0.18×10⁻³/update, 320 → 480 buys **+0.029
+    nominal**. But the decay ratio across segments runs ~1.8× → 1.4× → 3.6×, so the next segment
+    projects to ~0.05×10⁻³/update ⇒ **~+0.008**, against a per-contrast MDE of ~**0.025** at
+    N=3000. The arm is powered to detect approximately nothing. It would also cost ~33 h per seed
+    across 2–3 resume chunks and ~25 GB of checkpoints — on the shared quota that already cost
+    Build 26 four of six arms. Spending the entire remaining budget to measure an effect the curve
+    predicts is 3× under the resolution limit is the one move this build's own data forbids.
+  - **What is actually left, against the goals rather than against the lever list.** G1 met; G2 met
+    on both halves and refreshed above; G3 booked above. That leaves **G4** (≥3 formats — VGC
+    doubles is the missing third) and **G5** (the skill stack as *demonstrated* rather than merely
+    implemented capabilities), plus **M7/§16 Q2**, where test-time search was retired at parity on
+    gen9-RB — a format Lever 15 subsequently proved FORMAT_BOUND, i.e. the retirement was measured
+    where nothing could beat the heuristic and says nothing about OU.
+
+- **G4 GROUNDWORK, AND A MEASUREMENT THE OBVIOUS PROBE CANNOT MAKE (2026-08-11).** Following the
+  Lever-15 idiom — measure a format's ceiling before spending on it — the VGC probe was built
+  before the doubles pipeline. Three findings, in increasing order of consequence.
+  - **`config.VGC_FORMAT` NAMED A FORMAT THAT DOES NOT EXIST.** It was `gen9vgc2024regh`, written
+    as a Phase-3 placeholder and never exercised, so nothing ever failed. The pinned simulator
+    (rev 393d5c8) offers gen 9 VGC 2023 Reg C/D, **2024 Reg G**, **2025 Reg I**, and the
+    `[Gen 9 Champions]` 2026 Reg M-A/M-B mod — no Reg H. Corrected to **`gen9vgc2025regi`** and
+    pinned by a test against the simulator's own format table. The `...bo3` ids are avoided
+    deliberately: a "battle" there is a best-of-three **series**, which every win/loss counter in
+    `eval/` would miscount without noticing. (`bestOfDefault: true` on Reg I turns out to be only
+    a client-side UI bit — the enforced Bo3 comes from a `'Best of = 3'` ruleset entry that only
+    the explicitly-named Bo3 formats carry.)
+  - **A SINGLES-ONLY AGENT FAILS *SILENTLY* ON DOUBLES, so the refusal is at build time.** On a
+    `DoubleBattle` poke-env passes `active_pokemon` as a list, so `HeuristicAgent` reaches
+    `list.types` and raises `AttributeError`. That exception never reaches a caller: poke-env
+    dispatches every protocol message through `asyncio.create_task` and only attaches
+    `add_done_callback(discard)`, so the raise is logged and swallowed — the same detached-task
+    pathology M5/G1 found for `ShowdownException`. The agent then simply never answers the request
+    and the **server plays a default move for it on the timer**. A ceiling probe anchored on an
+    agent in that state would have measured the timer, read it as enormous headroom, and been
+    wrong in the most expensive possible direction. `arena.build_player` now refuses a singles-only
+    agent on a doubles format, where the format string is in hand and the error is synchronous.
+  - **THE PLANNED CHEAP PROBE CANNOT DECIDE G4, AND THE REASON IS IN THE PUBLISHED BANDS.** The
+    plan was to anchor the VGC M1 sweep on `simpleheuristics` — poke-env's own bots are all
+    doubles-native, so this needs no doubles code of ours. Comparing the RB and OU bands shows why
+    that measures the wrong thing:
+
+    | vs `heuristic` | `random` | `maxbasepower` | `simpleheuristics` |
+    |---|---|---|---|
+    | gen9-RB (FORMAT_BOUND) | 0.007 | 0.107 | **0.523** |
+    | gen9ou (headroom) | 0.030 | 0.060 | **0.643** |
+
+    The two formats are **indistinguishable at the bottom** of the skill gradient — a competent bot
+    crushes naive bots in both. They differ *only at the top*: on RB the last increment of skill
+    buys parity, on OU it buys 0.14. A probe anchored on `simpleheuristics` can only measure
+    `random`/`maxbasepower` *below* it, i.e. precisely the region where FORMAT_BOUND and
+    MODEL_BOUND look the same. **The discriminating measurement needs two agents near the top of
+    the doubles gradient, and poke-env supplies exactly one.** So the VGC ceiling probe is blocked
+    on a doubles-capable `HeuristicAgent` — which is not scope creep but M1's deliverable for a
+    third format, and is the baseline any learned doubles agent would be scored against anyway.
+    A validator-checked `gen9vgc2025regi` team pool (**10/10 legal**, built by the existing
+    `scripts/build_ou_teampool.py` with no new code) supplies the teams.
+  - **THE DOUBLES M1 BASELINE, BUILT.** `HeuristicAgent` now applies the same R-CALC rule per slot
+    and joins the two into a `DoubleBattleOrder`. Doubles forces two things singles never did, both
+    silent failures if got wrong: a move needs a legal **target** (chosen together with the move,
+    since expected damage depends on which foe it lands on, and only used when
+    `get_possible_showdown_targets` agrees — a rejected target costs the turn), and the two slots
+    **may not switch to the same benched Pokemon** (an illegal order the server answers with a
+    default move). Verified live: **0.900 vs `random` over 10 battles, 10/10 finished, 7.1 mean
+    turns in 4 s** — fast enough to rule out the timer-default failure mode above, which is slow
+    by construction.
+
+- **VGC CEILING PROBE — RESULT: `INSUFFICIENT`, and the instrument is the reason (2026-08-11).**
+  M1 on `gen9vgc2025regi`, n=300 per matchup, the 10-team pool, `results/format_ceiling_gate_vgc.json`:
+
+  | vs `heuristic` | gen9-RB (FORMAT_BOUND) | gen9ou (headroom) | **gen9vgc2025regi** |
+  |---|---|---|---|
+  | mirror (sanity) | 0.513 | 0.493 | 0.523 |
+  | `simpleheuristics` | **0.523** [0.467, 0.579] | **0.643** | **0.527** [0.470, 0.582] |
+  | `maxbasepower` | 0.107 | 0.060 | 0.300 |
+  | `random` | 0.007 | 0.030 | 0.017 |
+
+  - **On the discriminating quantity VGC reproduces the gen9-RB signature almost exactly.** The
+    strongest competent bot reaches **0.527 with a CI spanning 0.50** against RB's 0.523 [0.467,
+    0.579] — and against OU's 0.643, whose CI clears the 0.58 headroom bar entirely.
+    `simpleheuristics` is not even distinguishable from the heuristic's own **mirror** (0.523).
+  - **But the verdict is INSUFFICIENT, not FORMAT_BOUND, and the distinction is the whole point of
+    running this honestly.** Two readings fit the same numbers. (a) VGC's achievable ceiling over a
+    competent heuristic really is ~parity, as on RB. (b) **Both bots are equally blind to
+    doubles-specific skill** — target selection, Protect timing, speed control, spread-damage
+    positioning, and the bring-6-pick-4 team-preview decision — so the instrument cannot resolve a
+    gap that exists above both of them. `maxbasepower` at **0.300** on VGC against 0.107 on RB and
+    0.060 on OU is the tell: a *naive* bot is far closer to competent play here than on either
+    singles format, which is what reading (b) predicts and what a genuinely flat ceiling would also
+    produce.
+  - **Nothing breaks the tie, unlike on RB.** Lever 15's FORMAT_BOUND verdict rested on three legs
+    — M1's skill band, **M2** (near-optimal depth-2 search with a white-box opponent model reaching
+    0.500), and **M3** (team strength does not predict the winner, AUC 0.495). Only M1 exists for
+    VGC: there is no doubles forward model, so no M2, and no scraped VGC replays, so no M3. On RB,
+    M2 was what turned a suggestive band into a verdict.
+  - **So G4 is neither greenlit nor descoped by this build, and that is the finding.** The
+    Lever-15 idiom — measure the ceiling before spending on the pipeline — worked on RB because a
+    cheap probe there was *decisive*. On doubles the same probe is **not decisive**, because every
+    agent cheap enough to run before building the pipeline is a singles policy applied per slot.
+    Deciding G4 by measurement therefore costs more than the idiom promised: it needs either a
+    doubles M2 (extend `lategame/search/` to doubles — the forward model already serialises and
+    steps arbitrary battles) or a doubles-competent reference to put at the top of the gradient.
+    Recording the cost honestly is better than reading a suggestive M1 as a verdict it cannot bear.
+
+- **BUILD 27 / GATE B — SEARCH DOES NOT COMPOUND ON gen9ou EITHER (NULL), AND THE HEAD-TO-HEAD
+  SAYS IT IS MILDLY HARMFUL (2026-08-12).** L11–L14 retired test-time search at parity, but every
+  one of those ran on gen9-RB — which Lever 15 then proved FORMAT_BOUND, where near-optimal search
+  reaches 0.500 because *nothing* beats the heuristic. That retirement was therefore measured
+  somewhere it could not have come out otherwise. This re-runs it where headroom is proven and the
+  base is 0.77. Pre-registered before running; `results/rpredict_search_ou.json`.
+  - **THE ARM WAS THE STRONGEST ONE AVAILABLE, DELIBERATELY.** Depth-2 expectimax with
+    `opp_aggregation="model"` and the **white-box** opponent model — the eval opponent *is*
+    `HeuristicAgent`, so it is modeled exactly (L14 measured that model at 0.958 agreement). Same
+    checkpoint on both sides (`ppo_v26b_s0/iter_300`), so any gap is the search procedure and not
+    the weights. n = **2500/arm** (MDE ≈ 0.025, Build 26's resolution), pooled from a 10-shard
+    array because search is serial in its node driver at ~29 s/battle.
+  - **THE RESULT.**
+
+    | | rate | n |
+    |---|---|---|
+    | base (greedy `v26b`) vs `heuristic` | 0.7688 | 2500 |
+    | depth-2 search vs `heuristic` | 0.7724 | 2500 |
+    | **contrast** | **+0.0036** (z 0.303, p 0.76) | — |
+    | search vs its own base, head-to-head | **0.3932** | 2500 |
+    | search vs `random` (sanity) | 0.895 | 400 |
+
+    The contrast is **NULL**, and not marginally: it is positive in **6 of 10** shards, which is a
+    coin flip. **VERDICT: NULL** on the pre-registered rule.
+  - **THE HEAD-TO-HEAD IS THE REAL CONTENT, AND IT IS NOT A NULL.** Search loses to the greedy
+    policy it descends from at **0.3932** — **10.7 SE** below parity, p ≈ 1.3e-26, and below 0.500
+    in **10 of 10** shards. So search is not neutral: it is *worse*, unanimously.
+  - **WHY BOTH CAN BE TRUE, AND IT IS AN INTRANSITIVITY.** Search and its base are
+    indistinguishable against the heuristic while the base beats search decisively head-to-head.
+    Against an opponent that loses ~77% there is slack — a slightly worse policy still converts.
+    Against an opponent strong enough to punish them, the same deviations cost games. The lesson is
+    that **measuring search only against the fixed baseline would have reported "no effect" and
+    missed that the effect is negative**; it took scoring search against its own base to see it.
+    Note also that no single latent strength can represent this — exactly the limitation
+    `eval/ladder.py`'s Bradley-Terry docstring warns about.
+  - **THE ESCAPE HATCH L11/L12 NAMED IS NOW CLOSED.** Those builds retired search with "the
+    opponent model was too weak" as the stated residual. Here the opponent model is *exact*, the
+    forward model is validated at **0 mismatches on this very format** (Gate A′), the format has
+    proven headroom, and the base is the strongest checkpoint the project has. Search still does
+    not help. **§16 Q2 is answered — ship policy-only — and M7 closes on the record**: six
+    independent mechanisms (gradient, depth-1, depth-2, curriculum, real-opponent-model search, and
+    now depth-2-with-exact-model on a format with headroom).
+
+
+- **BUILD 28 / B6 — THE VGC CAMPAIGN, AND THE SHARD THAT WAS 94% ONE BUG (2026-08-14 → 2026-08-15).**
+  G4 was booked MET at `4303803` on the "playable end-to-end without rewriting the core" criterion.
+  This build is the *strength* campaign that criterion deliberately did not require: BC → offline
+  RL → PPO on `gen9vgc2025regi`, reusing `train/` and the `ppo_continue_gate` /
+  `seed_strength_gate` / `merge_gate_seeds` toolchain. It is recorded here in one entry because
+  B6a–B6e landed as commits without a notebook section, and because B6f's first act was to
+  invalidate two of them.
+
+  - **B6a — THE DOUBLES ACTION CODEC IS FACTORED, 2×107, NOT A JOINT 11,449** (`b27c16a`).
+    `DoublesEnv` is 107 actions *per slot* and a turn commits both, so the joint space is
+    107² = 11,449 outputs almost none of which are ever legal together. The head emits 214 logits
+    read as two independent distributions — which is also the shape poke-env's own converters
+    speak. One constraint COUPLES the slots and a factored mask cannot express it: both slots may
+    not switch to the same benched Pokémon. Showdown answers such an order with a default move
+    rather than an error, so it is a silently lost turn; `joint_switch_conflict` is the separate
+    check every decoder and sampler has to apply. Build 5's canonical-move-order divergence is
+    carried across unchanged.
+  - **B6b — THE DOUBLES ENCODER, AND THE SINGLES LAYOUT FROZEN** (`9b196a1`). `OBS_DIM_DOUBLES`
+    888 / `d1-09831e17c378`: the singles blocks reused verbatim, with move blocks per *active
+    slot* (8 rather than 4) and a 12-scalar global block carrying `force_switch`, `maybe_trapped`,
+    `first_turn` and the four targeting-context flags. `EntityTransformer._layout_for` selects the
+    layout from `input_dim` alone, which is the seam that lets one architecture serve three
+    formats.
+  - **B6c — G4 MET: THREE FORMATS PLAY END TO END THROUGH ONE CORE** (`4303803`). The learned
+    doubles agent, the arena's doubles-safety guard, and the exit criterion booked.
+  - **B6d / B6e — BC AND FACTORED AWR ON VGC** (`550c524`, `1c28dec`). Six data-path defects found
+    by measurement, each of which would have produced a trained model rather than an error: the
+    ignored `force_switch` on a partial replacement; the "no mon here" guard rejecting the one slot
+    being asked to act; the half-default read as poke-env's whole-order `-2` sentinel; the action
+    mask read by VALUE instead of by index (a 2-legal-action mask on a turn with 4 moves and 2
+    switches, driving BC's loss to 9.4e8); forced single-legal-action turns trained on as if they
+    were decisions; and illegal-label rows dominating the AWR actor loss at 719,296.
+  - **THESE TWO RESULTS ARE WITHDRAWN, AND B6f's FIRST ACT WAS FINDING OUT WHY.** See the next
+    entry. The defect list above stands; the numbers those commits reported do not.
+
+- **B6f STAGE A — 94.2% OF THE VGC SHARD CAME FROM 100 OF ITS 899 EPISODES, AND THE CAUSE WAS ONE
+  LINE OF OURS (2026-08-15).** `results/vgc_loop_probe.json`. Before porting the policy gradient to
+  a factored head, the shard it would warm-start from was measured directly. It should have been
+  measured before B6d.
+
+  | | `vgc_rl.npz` | `gen9ou_v7_rl.npz` |
+  |---|---|---|
+  | turns / episode, median | 7 | 19 |
+  | turns / episode, max | **12,795** | 205 |
+  | max ÷ median | **1,827.9** | 10.8 |
+  | top-decile turn share | **0.922** | 0.239 |
+  | episode-length Gini | **0.901** | 0.304 |
+  | unique observations ÷ turns | **0.0033** | 1.000 |
+
+  - **THE LONGEST EPISODE CARRIES 12,795 RECORDED TURNS OVER SEVEN UNIQUE OBSERVATION VECTORS.**
+    51.9% of all turns are one signature — slot 0's legal set is `{pass}`, slot 1's is two switches
+    — and 96.6% of all rewards are exactly zero.
+  - **SPLIT BY EPISODE LENGTH THE PICTURE INVERTS.** The non-loop episodes (≤40 turns) are 5,553
+    turns at decision density **0.906** and 14.71 legal actions per slot, against the whole shard's
+    0.571 and 2.62. So VGC doubles is a normal, decision-DENSE format — denser per slot than OU's
+    7.67 — and the "98.4% of recorded turns had exactly one legal action per slot" note written
+    into `data/collect.py` measured the loop, not the format. Corrected in place.
+  - **WHICH AGENT LOOPS, MEASURED RATHER THAN ASSUMED.** Four battles per pair, counting
+    `choose_move` calls against the `battle.turn` actually reached:
+
+        random           vs random               19 calls   turn 17
+        simpleheuristics vs simpleheuristics      9 calls   turn  8
+        maxbasepower     vs maxbasepower          8 calls   turn  6
+        random           vs HEURISTIC           4001 calls   turns 1..7
+        HEURISTIC        vs HEURISTIC           1153 calls   turns 1..4
+
+    poke-env's own baselines never loop. Ours did — and `heuristic` is in every collection pool,
+    which is the entire explanation.
+  - **THE BUG.** `heuristic_agent._choose_doubles_move` gave a slot with no decision a
+    `DefaultBattleOrder()`. That is poke-env's WHOLE-order sentinel: its message is
+    `/choose default`, and `DoubleBattleOrder.message` joins by string surgery, so half a default
+    serialised to `/choose default, move woodhammer 1` — not a legal Showdown command. The server
+    rejected it, poke-env re-requested the identical state, and the agent answered identically,
+    forever. The per-slot "do nothing" is `PassBattleOrder` (`/choose pass`).
+  - **IT IS THE WRITE SIDE OF A BUG B6d FIXED ON THE READ SIDE.**
+    `doubles_action_space.normalize_half_default` exists because poke-env *labels* a half default
+    with `-2`, its whole-order sentinel, where the per-slot layout says "this slot does nothing" is
+    action 0. B6d corrected how a half-default is read and never checked how one is written. The
+    same sentence was the fix in both places, and the second half went unlooked-at for two builds.
+  - **AFTER: `heuristic` vs `heuristic` 1153 → 9 calls; `random` vs `heuristic` 4001 → 14.** Every
+    pair now sits within ~2 calls of `battle.turn`, matching poke-env's baselines. Collection got
+    ~90× faster as a side effect — the loop was the cost.
+  - **STAGE A GATE: LOOP_CLOSED**, on two pre-registered clauses whose bars are set from the two
+    real shards rather than chosen: top-DECILE turn share ≤ 0.45 (top-*ten* is not comparable
+    across shards, since with E episodes it cannot fall below 10/E) and unique-observations ÷ turns
+    ≥ 0.90.
+  - **READ HONESTLY: THE LOOP GUARD AND THE TURN CAP ARE NOT WHAT CLOSED THIS.** Both were built
+    first, on the theory that the loop was a property of forced-replacement states; the capped and
+    uncapped arms are the same shard to within noise (top-decile 0.173 vs 0.160). They are kept as
+    backstops, at exact-identity defaults, and their docstrings say so — because this failure mode
+    is silent and expensive and a second instance would otherwise be found the same way.
+  - **RESOLVED:** 7.6 recorded turns per episode is what a short VGC battle between weak bots looks
+    like, not evidence of dropped turns. The old shard's non-loop subset was 7.1.
+
+
+- **B6f STAGE B — BC AND AWR RE-FIT ON THE CORRECTED SHARD, AND THE STOP RULE FIRES (2026-08-15).**
+  `results/format_ceiling_gate_vgc_v2.json`. New shards: `data/vgc_rl_v2.npz` (70,773 turns /
+  **9,578** episodes, against the old shard's 140,848 / 899) and `data/vgc_bc_v2.npz` (31,135
+  turns). Same architecture, same hyperparameters, same seed — only the data changed.
+
+  | | B6d/B6e (loop shard) | B6f (corrected) |
+  |---|---|---|
+  | BC val accuracy (strict, both slots) | **0.980** | **0.602** |
+  | BC val loss | 0.061 | 1.291 |
+  | AWR val accuracy | **0.975** | **0.476** |
+  | AWR value MAE | **0.341** | **1.744** |
+  | return distribution std the critic saw | **0.80** | **3.14** |
+  | value MAE ÷ return std | 0.426 | 0.555 |
+
+  - **THE ACCURACY WAS NOT MERELY INFLATED, IT WAS MEASURING A DIFFERENT PROBLEM.** 0.980 was
+    scored on a set where 96.6% of rewards were zero and the modal turn was one repeated loop
+    frame. 0.602 is a strict both-slots number over a 2×107 space with **14.0 legal actions per
+    slot**, and it is finally comparable to the singles BC's 0.42.
+  - **THE VALUE MAE WENT UP AND THAT IS THE HONEST DIRECTION.** 0.341 was measured against a
+    target with standard deviation 0.80; the corrected target has std 3.14. Normalised, the critic
+    is slightly *worse* (0.555 vs 0.426 of a standard deviation) — on a target four times wider
+    and no longer near-constant. The earlier figure was not a calibration result.
+  - **THE LADDER, n = 300 PER CELL** (B6d/B6e reported n = 100, SE ≈ 0.05; here SE ≈ 0.029):
+
+    | arm | vs `heuristic` | ci95 | B6d/B6e reported |
+    |---|---|---|---|
+    | `mirror` (sanity) | 0.503 | [0.447, 0.560] | — |
+    | `simpleheuristics` | 0.467 | [0.411, 0.523] | — |
+    | `maxbasepower` | 0.310 | [0.260, 0.364] | — |
+    | `random` | 0.023 | [0.011, 0.047] | — |
+    | **BC** | **0.453** | [0.398, 0.510] | 0.390 |
+    | **AWR** | **0.467** | [0.411, 0.523] | 0.350 |
+
+    Both learned arms are *stronger* than reported, and AWR now sits exactly on
+    `simpleheuristics`. The mirror at 0.503 says the harness is sound.
+  - **THE PRE-REGISTERED STOP RULE FIRES, AND B6d SAID IT DID NOT.** The rule, written before the
+    campaign: *"If the BC agent lands near `simpleheuristics` while `simpleheuristics` is still at
+    parity with the heuristic, that is the FORMAT_BOUND signature arriving early."* Both clauses
+    now hold — BC 0.453 against `simpleheuristics` 0.467 is 0.5 SE, indistinguishable; and
+    `simpleheuristics`'s CI [0.411, 0.523] spans 0.50. B6d adjudicated it "DOES NOT FIRE" **by eye
+    in a commit message**, on loop data, where BC read 0.390 and so looked safely *below* both
+    competent bots. The arm the rule actually names (`format_ceiling_gate --bc-checkpoint`) was
+    never run until now. Two process failures, not one: the rule was evaluated against corrupted
+    numbers, and it was evaluated informally rather than by the instrument it names.
+  - **WHAT THE RULE DOES AND DOES NOT KILL.** It was written to stop a *strength* campaign from
+    plateauing against a flat ceiling, and on the `vs_heuristic` axis it does exactly that: a NULL
+    there is now confounded with a genuinely flat VGC ceiling and cannot be read as "PPO fails on
+    doubles". It says nothing about the **mechanism** question — whether a factored policy gradient
+    improves a doubles policy at all — which is answered by the learner against its own warm start
+    and is ceiling-independent. B6f therefore proceeds with `vs_iter0` **promoted to primary** and
+    `vs_heuristic` demoted to secondary, and the fired stop rule is booked here rather than
+    discovered afterwards.
+
+- **B6f — PRE-REGISTERED (written 2026-08-15, BEFORE running).**
+
+  **Lever:** does the factored policy gradient compound past the AWR ceiling on doubles? Every
+  prior doubles result is off-policy AWR, which can only re-weight actions already present in the
+  data. PPO is on-policy: it can push probability toward actions outside the demonstrator
+  distribution. On OU this was the first method to clear the heuristic band (Build 16 onward). This
+  is the same lever on the third format, through the same core.
+
+  **DESIGN — one arm, three seeds. Nothing is being contrasted against a second hyperparameter
+  setting; the contrast is against the warm start the arm descends from.**
+
+  | field | value |
+  |---|---|
+  | init | `checkpoints/doubles_offrl_vgc_v2.pt` (corrected AWR) |
+  | format / team pool | `gen9vgc2025regi` / `teams_gen9vgc.packed` |
+  | seeds | 0, 1, 2 (sbatch array) |
+  | iters / anneal_iters | 80 / **80 (pinned)** |
+  | games_per_opp / pop_size / anchors | 48 / 2 / `simpleheuristics` |
+  | ent_coef, lr | 0.01 → 0.0, 2.5e-4 → 5e-5 |
+  | target_kl (kl_bar) | 0.03 (0.045) |
+  | loop_penalty | **0** — refused on doubles by `run_ppo`; the doubles guard is a different penalty over a different layout and is not an OU-tuned value |
+  | max_battle_turns | 300 (backstop; measured non-binding) |
+
+  **PRE-REGISTERED CONTRASTS — two, at α = 0.025 (Bonferroni over 2), both scored by
+  `scripts/seed_strength_gate.py` at n = 3000 per checkpoint, both arms in ONE invocation.**
+
+  | # | contrast | isolates | role |
+  |---|---|---|---|
+  | C1 | PPO best-iter vs its own **warm start**, head-to-head | whether the policy gradient moved the policy at all | **PRIMARY** — ceiling-independent |
+  | C2 | PPO best-iter vs `heuristic`, against AWR vs `heuristic` | strength on the fixed gradient | secondary — confounded by the fired stop rule |
+
+  C1 is primary on Build 27's own lesson: measuring only against the fixed baseline reported "no
+  effect" for search and *missed that the effect was negative*; it took scoring against its own
+  base to see it. On a format whose ceiling is in doubt, that is the only contrast that can be read.
+
+  **PRE-REGISTERED GATE.**
+
+  | C1 | C2 | verdict |
+  |---|---|---|
+  | WIN | WIN | **COMPOUNDS** — the factored policy gradient works on doubles and converts to strength |
+  | WIN | NULL | **MECHANISM CONFIRMED, STRENGTH CEILING-BOUND** — the anticipated modal outcome given the fired stop rule |
+  | NULL | any | **NULL** — no evidence the factored gradient improves a doubles policy at this budget |
+  | REGRESSION | any | **REGRESSION** |
+  | final `vs_iter0` < 0.50 late, or entropy → 0 | any | **COLLAPSE** — reported as collapse, never as a NULL |
+
+  **ATTRIBUTABILITY BAR.** A verdict is attributable only if the certificate
+  (`results/ppo_vgc_telemetry_b6f_s{N}.json`) shows: trust region not bound in the great majority
+  of iterations; `lp_drift_max` < 1e-2 (acting and training were the same distribution — measured
+  1.4e-06 on the smoke); `invalid_frac_max` < 0.05 (recorded action was the executed one); and
+  `dec_frac_min` > 0.5 (the reported KL is measured over rows that could move the policy). If any
+  fails, the outcome is reported as unattributable rather than as a verdict.
+
+  **COST, budgeted off a measured smoke rather than assumed.** 2 iterations at
+  `games_per_opp=8, pop_size=1, eval_n=20` ran in 22.5 s wall, i.e. ~96 battles/iteration at ~7.5
+  s. The arm is ~544 battles/iteration (144 rollout + 400 eval), projecting **~45 s/iteration** and
+  **~60 min per 80-iteration seed** — far cheaper than OU's 4.15 min/iteration, because a VGC
+  battle is ~7 recorded turns against OU's 19. Three seeds as one array: ~1 h wall. The n = 3000
+  strength gate adds ~6000 battles, ~15 min. No `--resume` needed at this length.
+
+
+- **B6f — MECHANISM CONFIRMED, STRENGTH CEILING-BOUND (2026-08-15).** The pre-registered gate's
+  own anticipated modal outcome: **C1 WIN, C2 NULL**. `results/ppo_vgc_gate_b6f.json`,
+  `results/seed_strength_gate_b6f_c1.json`, `results/seed_strength_gate_b6f_c2.json`,
+  `results/ppo_vgc_telemetry_b6f_s{0,1,2}.json`. 3 seeds x 80 iterations, ~55 s/iteration, one
+  sbatch array on `tron`.
+
+  - **C1 (PRIMARY) — PPO's best checkpoint beats its own warm start. n = 3000 per seed.**
+
+    | | rate | ci95 |
+    |---|---|---|
+    | seed 0 (`iter_62`) | 0.522 | [0.504, 0.540] |
+    | seed 1 (`iter_63`) | 0.523 | [0.505, 0.541] |
+    | seed 2 (`iter_57`) | 0.544 | [0.526, 0.562] |
+    | **pooled, 4768/9000** | **0.530** | **[0.519, 0.540]** |
+
+    The pooled CI excludes 0.50, and so does **every seed individually** — 3 of 3, no sign
+    disagreement. **VERDICT: WIN.** The factored policy gradient does move a doubles policy off
+    the AWR ceiling. It is a *modest* +3.0 points, and saying "modest and unambiguous" is the
+    whole content: 9,000 battles is what makes +0.030 readable at all.
+
+  - **C2 (SECONDARY) — against the fixed heuristic, NULL.** n = 3000 per checkpoint.
+
+    | arm | rate | ci95 |
+    |---|---|---|
+    | AWR warm start | 0.454 | [0.437, 0.472] |
+    | PPO (pooled over 3 seeds, 4197/9000) | 0.466 | [0.456, 0.477] |
+    | **contrast** | **+0.012** (z +1.14, p 0.254, alpha 0.025) | CIs overlap |
+
+    **VERDICT: NULL** — and, per the stop rule that fired in Stage B, an *uninterpretable* null:
+    `simpleheuristics` sits at 0.467 with a CI spanning 0.50, so there is no established headroom
+    above it for a strength gain to appear in. This is the row the pre-registration named as
+    anticipated, and it is booked as ceiling-bound rather than as evidence against the method.
+
+  - **THE TWO CONTRASTS DISAGREE, AND THAT IS THE FINDING, NOT A PROBLEM.** The same checkpoints
+    beat their own warm start (0.530, 5.7 SE above parity) and are indistinguishable from it
+    against the heuristic (+0.012, 1.1 SE). Both can be true because the heuristic is not a
+    discriminating opponent on this format — it is at parity with `simpleheuristics`, which is at
+    parity with its own mirror. A fixed baseline can only resolve a difference it is strong enough
+    to punish. This is Build 27's Gate B lesson arriving with the opposite sign: there, measuring
+    only against the fixed baseline hid a *negative* effect; here it hides a *positive* one.
+
+  - **SELECTION BIAS, MEASURED RATHER THAN ASSUMED, AND IT IS LARGE.** The in-loop curve reports
+    best-iteration `vs_heuristic` of **0.590 +- 0.014** (seeds 0.58 / 0.58 / 0.61 at iterations
+    62 / 63 / 57). Re-scored at n = 3000, those same checkpoints read **0.466**. The gap is
+    **0.124**, and it is pure argmax-over-80-noisy-estimates bias: `eval_n = 100` has SE ~ 0.05,
+    and taking the maximum over 80 draws inflates by roughly that much. **Reading the curve's
+    headline instead of the re-scored number would have overstated this build by 12 points.** It
+    is what `scripts/pin_gate_checkpoint.py`'s note and `scripts/selection_bias_sim.py` exist to
+    prevent, and it is the largest such gap the project has recorded.
+
+  - **ATTRIBUTABILITY: CLEAN ON ALL FOUR CLAUSES.**
+
+    | | seed 0 | seed 1 | seed 2 | bar |
+    |---|---|---|---|---|
+    | trust region bound | 4/80 | 4/80 | 5/80 | not the great majority |
+    | `epochs_full_fraction` | 0.950 | 0.950 | 0.938 | — |
+    | `approx_kl_max` | 0.0354 | 0.0546 | 0.0290 | bar 0.045 |
+    | `approx_kl_mean_late` | 0.0160 | 0.0170 | 0.0163 | — |
+    | `lp_drift_max` | 8.6e-06 | 6.7e-06 | 6.9e-06 | **< 1e-2** |
+    | `invalid_frac_max` | 0.0262 | 0.0314 | 0.0245 | **< 0.05** |
+    | `dec_frac_min` | 0.890 | 0.878 | 0.884 | **> 0.5** |
+
+    The three doubles-specific clauses are what make this readable at all. `lp_drift` at ~7e-06
+    says the acting distribution and the updated distribution were the *same function*, so the
+    importance ratios the KL summarises are real. `dec_frac ~ 0.88` says the reported KL is
+    measured over rows that could actually move the policy; without the decision-row denominator
+    the same run would have reported a KL an order of magnitude smaller and certified a trust
+    region that never bound. No seed collapsed: final `vs_iter0` 0.51 / 0.48 / 0.56, entropy
+    stable at ~0.9.
+
+  - **NOT CLAIMED.** That VGC's ceiling is flat — the stop rule's signature is *suggestive*, and
+    Lever 15's RB verdict needed three legs (M1 band, M2 near-optimal search, M3 team-strength
+    AUC) where doubles still has only M1. That PPO would not compound with more budget: 80
+    iterations is one dose, and the OU axis needed 320 before it saturated. And nothing here
+    speaks to team preview, which `Player.random_teampreview` still picks 4-of-6 at random on
+    both sides — a large part of VGC skill the policy cannot express, adding variance to every
+    number above.
+
 ---
 
 ## 14. Risks & mitigations
@@ -2766,7 +3266,16 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
    0.50), so G2 is unreachable there whatever the model. The MVP format is **`gen9ou`**, where the
    same diagnostic found genuine headroom (`simpleheuristics` 0.633, whole CI above the 0.58 bar).
    RB remains the format the pipeline was *built* on and every pre-OU build is reported against.
-2. **Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?
+2. ~~**Search vs. pure policy:** ship Phase 1 as policy-only and add search in M7, or invest in search earlier for prediction quality?~~
+   **ANSWERED (Build 27 Gate B, 2026-08-12): POLICY-ONLY — and this time the answer is not
+   confounded by the format.** L11–L14 already found search at parity, but all of that was measured
+   on gen9-RB, which Lever 15 subsequently proved FORMAT_BOUND: near-optimal search reaches 0.500
+   there because nothing beats the heuristic, so the test could not have come out any other way.
+   Re-run on `gen9ou` — proven headroom, a 0.77 base, an *exact* white-box opponent model, and a
+   forward model validated at 0 mismatches on that format — depth-2 search comes back
+   **+0.0036 (p 0.76, positive in 6/10 shards) at n=2500/arm**. And it is worse than neutral: it
+   loses to the greedy policy it descends from **head-to-head at 0.3932, 10/10 shards, ~10.7 SE**.
+   Search is not the missing ingredient at this level of play; **M7 closes**.
 3. **Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?
 4. **Reuse vs. rebuild:** fork Metamon (dataset + baselines + reconstruction) as the foundation, or build the pipeline fresh for full control? (Forking is faster; rebuilding is more educational.)
 5. ~~**Eval environment:** stand up a private Showdown server for clean evaluation, or use anonymized non-ranked live play?~~

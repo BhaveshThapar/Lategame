@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68"]
+# >=77 for PEP 639: the SPDX `license = "MIT"` string below is a hard error under 68-76, and the
+# older `license = {file = ...}` + `License ::` classifier form is deprecated from 77 on. There is
+# no published wheel and nothing pins the floor, so taking the bump is free.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,8 +10,18 @@ name = "lategame"
 version = "0.1.0"
 description = "Competitive Pokemon Showdown ML battle agent (M0 infra + M1 baseline)"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
-authors = [{ name = "Bhavesh" }]
+# 3.11 exactly is what is tested: ruff target-version, mypy python_version and environment.yml all
+# say 3.11, and 3.10 has never been run once.
+requires-python = ">=3.11,<3.13"
+authors = [{ name = "Bhavesh Thapar" }]
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Games/Entertainment :: Turn Based Strategy",
+]
 dependencies = [
     "poke-env>=0.8",
     "orjson>=3.9",
@@ -28,6 +41,10 @@ dev = [
 ml = [
     "torch>=2.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/BhaveshThapar/Lategame"
+Repository = "https://github.com/BhaveshThapar/Lategame"
 
 [project.scripts]
 lategame = "lategame.cli:main"

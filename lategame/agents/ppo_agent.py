@@ -22,7 +22,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import numpy as np
 from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder
 
@@ -31,17 +30,13 @@ from lategame.agents.offline_rl_agent import (
     DEFAULT_CHECKPOINT,
     OfflineRLAgent,
 )
-from lategame.data.reward import RewardWeights, state_value
+from lategame.agents.ppo_record import PPORecordMixin
 from lategame.features.action_space import action_mask, action_to_order
 from lategame.features.encoder import embed_battle
 
-_Record = tuple[np.ndarray, int, np.ndarray]
 
-
-class PPORecordingAgent(OfflineRLAgent):
+class PPORecordingAgent(PPORecordMixin, OfflineRLAgent):
     """``OfflineRLAgent`` that records log-prob + value for on-policy PPO rollouts."""
-
-    _reward_weights: RewardWeights = RewardWeights()
 
     def __init__(
         self,
@@ -58,25 +53,9 @@ class PPORecordingAgent(OfflineRLAgent):
             loop_penalty=loop_penalty,
             **kwargs,
         )
-
-        from lategame.model.actor_critic import value_from_logits, value_support
-
-        # The base agent loads the checkpoint but discards the value support; re-read
-        # it so we can turn value-bin logits into a scalar baseline at action time.
-        path = Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
-        ckpt = self._torch.load(path, map_location="cpu", weights_only=False)
-        self._centers = value_support(
-            float(ckpt["v_min"]), float(ckpt["v_max"]), int(ckpt["n_bins"])
+        self._load_value_support(
+            Path(checkpoint_path or os.environ.get(CHECKPOINT_ENV_VAR, DEFAULT_CHECKPOINT))
         )
-        self._value_from_logits = value_from_logits
-
-        # Per-battle-tag recording, parallel lists (see module docstring).
-        self.records: dict[str, list[_Record]] = {}
-        self.values: dict[str, list[float]] = {}
-        self.log_probs: dict[str, list[float]] = {}
-        self.value_estimates: dict[str, list[float]] = {}
-        self.seen_battles: dict[str, AbstractBattle] = {}
-        self.dropped = 0
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
         if not battle.available_moves and not battle.available_switches:
@@ -105,10 +84,5 @@ class PPORecordingAgent(OfflineRLAgent):
             self.dropped += 1
             return self.choose_default_move()
 
-        tag = battle.battle_tag
-        self.records.setdefault(tag, []).append((obs_np, action, mask_np))
-        self.values.setdefault(tag, []).append(state_value(battle, self._reward_weights))
-        self.log_probs.setdefault(tag, []).append(old_log_prob)
-        self.value_estimates.setdefault(tag, []).append(value)
-        self.seen_battles[tag] = battle
+        self._record(battle, obs_np, action, mask_np, old_log_prob, value)
         return order

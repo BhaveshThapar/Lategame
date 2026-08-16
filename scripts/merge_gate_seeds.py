@@ -57,6 +57,10 @@ ARM_FIELDS = (
     # Build 24: two seeds annealed over different horizons are two experiments, even at equal
     # `iters`. Absent from v20-v23 gate files, so those still pool (None == None).
     "anneal_iters",
+    # B6f: the per-battle decision ceiling changes the DATA DISTRIBUTION -- with it off, a VGC
+    # rollout is dominated by loop frames -- so two seeds run at different caps are two
+    # experiments. Absent from every OU gate file, so those still pool (None == None).
+    "max_battle_turns",
     "iters",
     "games_per_opp",
     "eval_n",

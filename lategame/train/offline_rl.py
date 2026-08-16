@@ -26,8 +26,7 @@ from torch import nn
 from torch.utils.data import DataLoader, random_split
 
 from lategame.data.rl_dataset import RLDataset
-from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from lategame.features.codec import codec_for
 from lategame.model.actor_critic import (
     hl_gauss_target,
     load_actor_critic_weights,
@@ -36,7 +35,13 @@ from lategame.model.actor_critic import (
     value_support,
 )
 from lategame.model.factory import MODEL_ACTOR_CRITIC, build_model, model_metadata
-from lategame.model.policy import masked_logits
+from lategame.model.policy import (
+    factored_accuracy,
+    factored_cross_entropy_none,
+    factored_logits,
+    factored_masked_logits,
+    masked_logits,
+)
 from lategame.train.bc import BC_POLICY, select_device
 
 # A flat-MLP BC checkpoint warm-starts the actor-critic trunk + policy head. Legacy
@@ -146,7 +151,12 @@ def _run_epoch(
                 ret.to(device),
             )
             logits, value_logits = model(obs)
-            logits_masked = masked_logits(logits, mask)
+            factored = mask.dim() == 3  # (B, slots, A) on doubles; (B, A) on singles
+            logits_masked = (
+                factored_masked_logits(factored_logits(logits, mask.shape[1]), mask)
+                if factored
+                else masked_logits(logits, mask)
+            )
 
             target = hl_gauss_target(ret, centers, sigma)
             value_loss = _value_ce(value_logits, target)
@@ -154,7 +164,30 @@ def _run_epoch(
             v = value_from_logits(value_logits, centers)
             adv = ret - v.detach()
             weight = torch.clamp(torch.exp(adv / config.beta), max=config.awr_weight_clip)
-            ce = F.cross_entropy(logits_masked, action, reduction="none")
+            # A turn the demonstrator answered with a whole DefaultBattleOrder carries no action
+            # to imitate -- but it DOES carry a state the value head should see, and dropping it
+            # would break the episode's return scan. So it is excluded from the ACTOR loss by
+            # zeroing its weight, and its label is clamped only so cross-entropy can be evaluated
+            # at all (`Target -2 is out of bounds`). Unlike BC, the RL path keeps every turn.
+            unlearnable = (action < 0).any(dim=1) if action.dim() > 1 else action < 0
+            # ALSO exclude a label that is illegal under its OWN mask: its logit sits at NEG_INF,
+            # so cross-entropy returns ~1e9 for that row and a handful of them dominate the whole
+            # actor loss -- which made the reported figure read 7e5 while the value head trained
+            # fine beside it, and made checkpoint selection pick epoch 1 on noise.
+            action = action.clamp(min=0)
+            gathered = (
+                torch.gather(mask, 2, action.unsqueeze(-1)).squeeze(-1).all(dim=1)
+                if factored
+                else torch.gather(mask, 1, action.unsqueeze(-1)).squeeze(-1)
+            )
+            unlearnable = unlearnable | ~gathered
+            if unlearnable.any():
+                weight = weight * (~unlearnable).to(weight.dtype)
+            ce = (
+                factored_cross_entropy_none(logits_masked, action)
+                if factored
+                else F.cross_entropy(logits_masked, action, reduction="none")
+            )
             actor_loss = (weight * ce).mean()
 
             loss = actor_loss + config.value_coef * value_loss
@@ -166,7 +199,11 @@ def _run_epoch(
             n = obs.shape[0]
             totals["actor"] += actor_loss.item() * n
             totals["value"] += value_loss.item() * n
-            totals["acc"] += int((logits_masked.argmax(dim=1) == action).sum().item())
+            if factored:
+                # Strict: a turn counts only if BOTH slots match the demonstrator.
+                totals["acc"] += factored_accuracy(logits_masked, action)[0]
+            else:
+                totals["acc"] += int((logits_masked.argmax(dim=1) == action).sum().item())
             totals["value_mae"] += float((v - ret).abs().sum().item())
             count += n
     return {k: v / count for k, v in totals.items()}
@@ -178,6 +215,8 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     print(f"training on {device}")
 
     dataset = RLDataset(data_path)
+    codec = codec_for(dataset.battle_format)
+    print(f"codec: {codec.name} (obs {codec.obs_dim}, {codec.n_actions} logits)")
     if config.v_min is not None and config.v_max is not None:
         v_min, v_max = config.v_min, config.v_max
     else:
@@ -198,8 +237,8 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     # init checkpoint's architecture so the carried-over weights load exactly.
     model_meta: dict = {
         "model_type": config.model_type,
-        "input_dim": OBS_DIM,
-        "n_actions": GEN9_ACTION_SPACE_SIZE,
+        "input_dim": codec.obs_dim,
+        "n_actions": codec.n_actions,
         "n_bins": config.n_bins,
         "dropout": config.dropout,
         "hidden_dim": config.hidden_dim,
@@ -209,7 +248,10 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     init_kind = "bc"
     if config.bc_init:
         init_ckpt = torch.load(config.bc_init, map_location="cpu", weights_only=False)
-        if init_ckpt.get("obs_version") != OBS_VERSION or init_ckpt.get("input_dim") != OBS_DIM:
+        if (
+            init_ckpt.get("obs_version") != codec.obs_version
+            or init_ckpt.get("input_dim") != codec.obs_dim
+        ):
             raise ValueError("Warm-start checkpoint encoder mismatch; cannot warm-start. Retrain.")
         init_state = init_ckpt["state_dict"]
         init_kind = str(init_ckpt.get("model_type", "bc"))
@@ -241,8 +283,8 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
                 )
             model_meta = {
                 "model_type": init_kind,
-                "input_dim": OBS_DIM,
-                "n_actions": int(init_ckpt.get("n_actions", GEN9_ACTION_SPACE_SIZE)),
+                "input_dim": codec.obs_dim,
+                "n_actions": int(init_ckpt.get("n_actions", codec.n_actions)),
                 "n_bins": int(init_ckpt["n_bins"]),
                 "dropout": config.dropout,
                 "hidden_dim": int(init_ckpt.get("hidden_dim", config.hidden_dim)),
@@ -293,6 +335,7 @@ def _save_checkpoint(
 ) -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    codec = codec_for(battle_format)
     # model_type / arch / dims come from the actual model (which an AC->AC
     # warm-start may have built from the init checkpoint, not from config).
     meta = model_metadata(model)
@@ -301,13 +344,13 @@ def _save_checkpoint(
             "state_dict": model.state_dict(),
             "model_type": meta["model_type"],
             "arch": meta["arch"],
-            "input_dim": OBS_DIM,
+            "input_dim": codec.obs_dim,
             "hidden_dim": meta["hidden_dim"],
             "n_actions": meta["n_actions"],
             "n_bins": meta["n_bins"],
             "v_min": v_min,
             "v_max": v_max,
-            "obs_version": OBS_VERSION,
+            "obs_version": codec.obs_version,
             "battle_format": battle_format,
             "metrics": metrics,
         },

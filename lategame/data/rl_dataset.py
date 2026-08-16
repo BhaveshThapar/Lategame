@@ -18,7 +18,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from lategame.features.codec import codec_for
 
 
 def discounted_returns(reward: np.ndarray, done: np.ndarray, gamma: float) -> np.ndarray:
@@ -38,10 +38,13 @@ class RLDataset(Dataset):
         data = np.load(Path(path), allow_pickle=False)
         version = str(data["obs_version"].item())
         dim = int(data["obs_dim"].item())
-        if version != OBS_VERSION or dim != OBS_DIM:
+        battle_format = str(data["battle_format"].item())
+        codec = codec_for(battle_format)
+        if version != codec.obs_version or dim != codec.obs_dim:
             raise ValueError(
                 f"Dataset encoder mismatch: shard is {version}/dim {dim}, "
-                f"encoder is {OBS_VERSION}/dim {OBS_DIM}. Re-collect the data."
+                f"the {codec.name} codec for {battle_format!r} is {codec.obs_version}/dim "
+                f"{codec.obs_dim}. Re-collect the data."
             )
         self.gamma = float(data["gamma"].item())
         self.battle_format = str(data["battle_format"].item())

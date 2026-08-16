@@ -202,14 +202,39 @@ def _set_search_env(args: argparse.Namespace, opp_model: str) -> None:
     os.environ["LATEGAME_SEARCH_SEED"] = str(args.seed)
 
 
-async def _winrate(p1: str, p2: str, n: int, ckpt: str, fmt: str, concurrency: int) -> float:
-    from lategame.eval.arena import build_player, evaluate_built
+async def _winrate(
+    p1: str,
+    p2: str,
+    n: int,
+    ckpt: str,
+    fmt: str,
+    concurrency: int,
+    team_pool: str | None = None,
+    loop_penalty: float = 0.0,
+    pool_seed: int = 0,
+) -> float:
+    from lategame.eval.arena import _LOOP_GUARD_AGENTS, build_player, evaluate_built
 
-    a = build_player(p1, fmt, checkpoint_path=ckpt if p1 in ("search", "offrl") else None,
-                     max_concurrent_battles=concurrency)
-    b = build_player(p2, fmt, checkpoint_path=ckpt if p2 in ("search", "offrl") else None,
-                     max_concurrent_battles=concurrency)
-    return await evaluate_built(a, b, n)
+    def _team(seed: int) -> object | None:
+        # A teambuilt format needs a team; both sides draw independently from the same pool so the
+        # matchup varies and the mirror stays fair in expectation, as the ceiling gate does.
+        if not team_pool:
+            return None
+        from lategame.teambuilding.pool import TeamPool
+
+        return TeamPool.from_packed_file(team_pool, seed=2 * pool_seed + seed)
+
+    def _mk(name: str, seed: int) -> object:
+        return build_player(
+            name,
+            fmt,
+            checkpoint_path=ckpt if name in ("search", "offrl") else None,
+            max_concurrent_battles=concurrency,
+            team=_team(seed),  # type: ignore[arg-type]
+            loop_penalty=loop_penalty if name in _LOOP_GUARD_AGENTS else 0.0,
+        )
+
+    return await evaluate_built(_mk(p1, 0), _mk(p2, 1), n)  # type: ignore[arg-type]
 
 
 async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
@@ -221,7 +246,8 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
     ckpt = args.init
 
     cc = args.concurrency
-    base_vs_heur = await _winrate("offrl", "heuristic", args.n, ckpt, fmt, cc)
+    tp, lp, ps = args.team_pool, args.loop_penalty, args.seed
+    base_vs_heur = await _winrate("offrl", "heuristic", args.n, ckpt, fmt, cc, tp, lp, ps)
     print(f"base vs heuristic = {base_vs_heur:.3f}  (shared reference, concurrency={cc})")
 
     arms: dict[str, Any] = {}
@@ -229,9 +255,12 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
         _set_search_env(args, opp_model)
         print(f"\n=== arm: opp_model={opp_model} (depth={args.depth}, concurrency={cc}) ===")
         r: dict[str, Any] = {
-            "search_vs_random": await _winrate("search", "random", args.sanity_n, ckpt, fmt, cc),
-            "search_vs_heuristic": await _winrate("search", "heuristic", args.n, ckpt, fmt, cc),
-            "search_vs_base": await _winrate("search", "offrl", args.n, ckpt, fmt, cc),
+            "search_vs_random":
+                await _winrate("search", "random", args.sanity_n, ckpt, fmt, cc, tp, lp, ps),
+            "search_vs_heuristic":
+                await _winrate("search", "heuristic", args.n, ckpt, fmt, cc, tp, lp, ps),
+            "search_vs_base":
+                await _winrate("search", "offrl", args.n, ckpt, fmt, cc, tp, lp, ps),
         }
         delta = r["search_vs_heuristic"] - base_vs_heur
         if delta > 0.03 and r["search_vs_base"] > 0.52:
@@ -252,7 +281,12 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
         "gate": "rpredict_oppmodel_gate_b",
         "init": args.init,
         "n": args.n,
+        "sanity_n": args.sanity_n,
         "depth": args.depth,
+        "seed": args.seed,
+        "format": fmt,
+        "team_pool": args.team_pool,
+        "loop_penalty": args.loop_penalty,
         "base_vs_heuristic": round(base_vs_heur, 4),
         "arms": arms,
     }
@@ -291,6 +325,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--shaped", type=float, default=3.0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--format", dest="battle_format", default=None)
+    p.add_argument("--team-pool", default=None,
+                   help="packed team pool; REQUIRED for a teambuilt format such as gen9ou")
+    p.add_argument("--loop-penalty", type=float, default=0.0,
+                   help="Build-14 LoopGuard. Use 4 on gen9ou so this scores the SAME policy "
+                        "every published OU win rate scored")
     p.add_argument("--out", default=None)
     args = p.parse_args(argv)
 

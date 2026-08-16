@@ -1,0 +1,822 @@
+{
+  "schema": "lategame.eval.ladder/1",
+  "field_spec": "random,maxbasepower,simpleheuristics,heuristic,offrl@checkpoints/ppo_v23b_s0/iter_80.pt,offrl@checkpoints/ppo_v25a_s0/iter_120.pt,offrl@checkpoints/ppo_v25b_s0/iter_160.pt,offrl@checkpoints/ppo_v26a_s0/iter_240.pt,offrl@checkpoints/ppo_v26b_s0/iter_320.pt",
+  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "concurrency": 20,
+  "sample": false,
+  "loop_penalty": 4.0,
+  "bootstrap_resamples": 300,
+  "bootstrap_seed": 0,
+  "battle_format": "gen9ou",
+  "n_battles_per_pair": 300,
+  "field": [
+    "random",
+    "maxbasepower",
+    "simpleheuristics",
+    "heuristic",
+    "offrl@ppo_v23b_s0/iter_80",
+    "offrl@ppo_v25a_s0/iter_120",
+    "offrl@ppo_v25b_s0/iter_160",
+    "offrl@ppo_v26a_s0/iter_240",
+    "offrl@ppo_v26b_s0/iter_320"
+  ],
+  "pairs": 36,
+  "anchor": "heuristic",
+  "converged": true,
+  "sweeps": 51,
+  "max_delta": 8.06e-07,
+  "unbounded": [],
+  "clamped": [],
+  "agents": [
+    {
+      "label": "offrl@ppo_v26a_s0/iter_240",
+      "agent": "offrl",
+      "checkpoint": "checkpoints/ppo_v26a_s0/iter_240.pt",
+      "games": 2400,
+      "wins": 1671,
+      "losses": 729,
+      "ties": 0,
+      "score_rate": 0.6963,
+      "glicko": 1776.3,
+      "glicko_rd": 12.5,
+      "gxe": 0.7434,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1732.4,
+        1811.3
+      ],
+      "gxe_ci95": [
+        0.7099,
+        0.7682
+      ]
+    },
+    {
+      "label": "offrl@ppo_v26b_s0/iter_320",
+      "agent": "offrl",
+      "checkpoint": "checkpoints/ppo_v26b_s0/iter_320.pt",
+      "games": 2400,
+      "wins": 1671,
+      "losses": 729,
+      "ties": 0,
+      "score_rate": 0.6963,
+      "glicko": 1776.3,
+      "glicko_rd": 12.5,
+      "gxe": 0.7434,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1739.4,
+        1815.3
+      ],
+      "gxe_ci95": [
+        0.7154,
+        0.771
+      ]
+    },
+    {
+      "label": "offrl@ppo_v25a_s0/iter_120",
+      "agent": "offrl",
+      "checkpoint": "checkpoints/ppo_v25a_s0/iter_120.pt",
+      "games": 2400,
+      "wins": 1629,
+      "losses": 771,
+      "ties": 0,
+      "score_rate": 0.6787,
+      "glicko": 1755.0,
+      "glicko_rd": 12.4,
+      "gxe": 0.7275,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1718.8,
+        1791.0
+      ],
+      "gxe_ci95": [
+        0.699,
+        0.7541
+      ]
+    },
+    {
+      "label": "offrl@ppo_v25b_s0/iter_160",
+      "agent": "offrl",
+      "checkpoint": "checkpoints/ppo_v25b_s0/iter_160.pt",
+      "games": 2400,
+      "wins": 1540,
+      "losses": 860,
+      "ties": 0,
+      "score_rate": 0.6417,
+      "glicko": 1710.7,
+      "glicko_rd": 12.2,
+      "gxe": 0.6924,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1675.7,
+        1743.1
+      ],
+      "gxe_ci95": [
+        0.6629,
+        0.7183
+      ]
+    },
+    {
+      "label": "offrl@ppo_v23b_s0/iter_80",
+      "agent": "offrl",
+      "checkpoint": "checkpoints/ppo_v23b_s0/iter_80.pt",
+      "games": 2400,
+      "wins": 1423,
+      "losses": 977,
+      "ties": 0,
+      "score_rate": 0.5929,
+      "glicko": 1653.4,
+      "glicko_rd": 12.1,
+      "gxe": 0.6435,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1618.0,
+        1689.0
+      ],
+      "gxe_ci95": [
+        0.6116,
+        0.6743
+      ]
+    },
+    {
+      "label": "simpleheuristics",
+      "agent": "simpleheuristics",
+      "checkpoint": null,
+      "games": 2400,
+      "wins": 1259,
+      "losses": 1141,
+      "ties": 0,
+      "score_rate": 0.5246,
+      "glicko": 1572.7,
+      "glicko_rd": 12.3,
+      "gxe": 0.5695,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1546.1,
+        1600.3
+      ],
+      "gxe_ci95": [
+        0.5443,
+        0.5953
+      ]
+    },
+    {
+      "label": "heuristic",
+      "agent": "heuristic",
+      "checkpoint": null,
+      "games": 2400,
+      "wins": 1116,
+      "losses": 1284,
+      "ties": 0,
+      "score_rate": 0.465,
+      "glicko": 1500.0,
+      "glicko_rd": 12.6,
+      "gxe": 0.5,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        1500.0,
+        1500.0
+      ],
+      "gxe_ci95": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "label": "maxbasepower",
+      "agent": "maxbasepower",
+      "checkpoint": null,
+      "games": 2400,
+      "wins": 398,
+      "losses": 2002,
+      "ties": 0,
+      "score_rate": 0.1658,
+      "glicko": 1001.4,
+      "glicko_rd": 19.0,
+      "gxe": 0.128,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        937.8,
+        1053.1
+      ],
+      "gxe_ci95": [
+        0.1031,
+        0.1519
+      ]
+    },
+    {
+      "label": "random",
+      "agent": "random",
+      "checkpoint": null,
+      "games": 2400,
+      "wins": 93,
+      "losses": 2307,
+      "ties": 0,
+      "score_rate": 0.0387,
+      "glicko": 617.0,
+      "glicko_rd": 28.6,
+      "gxe": 0.0325,
+      "unbounded": false,
+      "clamped": false,
+      "glicko_ci95": [
+        529.7,
+        684.4
+      ],
+      "gxe_ci95": [
+        0.0235,
+        0.0416
+      ]
+    }
+  ],
+  "matrix": {
+    "random": {
+      "maxbasepower": {
+        "wins": 57,
+        "losses": 243,
+        "ties": 0,
+        "games": 300,
+        "score": 0.19
+      },
+      "simpleheuristics": {
+        "wins": 3,
+        "losses": 297,
+        "ties": 0,
+        "games": 300,
+        "score": 0.01
+      },
+      "heuristic": {
+        "wins": 8,
+        "losses": 292,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0267
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 5,
+        "losses": 295,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0167
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 7,
+        "losses": 293,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0233
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 8,
+        "losses": 292,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0267
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 2,
+        "losses": 298,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0067
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 3,
+        "losses": 297,
+        "ties": 0,
+        "games": 300,
+        "score": 0.01
+      }
+    },
+    "maxbasepower": {
+      "random": {
+        "wins": 243,
+        "losses": 57,
+        "ties": 0,
+        "games": 300,
+        "score": 0.81
+      },
+      "simpleheuristics": {
+        "wins": 19,
+        "losses": 281,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0633
+      },
+      "heuristic": {
+        "wins": 21,
+        "losses": 279,
+        "ties": 0,
+        "games": 300,
+        "score": 0.07
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 26,
+        "losses": 274,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0867
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 33,
+        "losses": 267,
+        "ties": 0,
+        "games": 300,
+        "score": 0.11
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 19,
+        "losses": 281,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0633
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 22,
+        "losses": 278,
+        "ties": 0,
+        "games": 300,
+        "score": 0.0733
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 15,
+        "losses": 285,
+        "ties": 0,
+        "games": 300,
+        "score": 0.05
+      }
+    },
+    "simpleheuristics": {
+      "random": {
+        "wins": 297,
+        "losses": 3,
+        "ties": 0,
+        "games": 300,
+        "score": 0.99
+      },
+      "maxbasepower": {
+        "wins": 281,
+        "losses": 19,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9367
+      },
+      "heuristic": {
+        "wins": 189,
+        "losses": 111,
+        "ties": 0,
+        "games": 300,
+        "score": 0.63
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 140,
+        "losses": 160,
+        "ties": 0,
+        "games": 300,
+        "score": 0.4667
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 103,
+        "losses": 197,
+        "ties": 0,
+        "games": 300,
+        "score": 0.3433
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 101,
+        "losses": 199,
+        "ties": 0,
+        "games": 300,
+        "score": 0.3367
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 93,
+        "losses": 207,
+        "ties": 0,
+        "games": 300,
+        "score": 0.31
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 55,
+        "losses": 245,
+        "ties": 0,
+        "games": 300,
+        "score": 0.1833
+      }
+    },
+    "heuristic": {
+      "random": {
+        "wins": 292,
+        "losses": 8,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9733
+      },
+      "maxbasepower": {
+        "wins": 279,
+        "losses": 21,
+        "ties": 0,
+        "games": 300,
+        "score": 0.93
+      },
+      "simpleheuristics": {
+        "wins": 111,
+        "losses": 189,
+        "ties": 0,
+        "games": 300,
+        "score": 0.37
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 109,
+        "losses": 191,
+        "ties": 0,
+        "games": 300,
+        "score": 0.3633
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 90,
+        "losses": 210,
+        "ties": 0,
+        "games": 300,
+        "score": 0.3
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 91,
+        "losses": 209,
+        "ties": 0,
+        "games": 300,
+        "score": 0.3033
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 69,
+        "losses": 231,
+        "ties": 0,
+        "games": 300,
+        "score": 0.23
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 75,
+        "losses": 225,
+        "ties": 0,
+        "games": 300,
+        "score": 0.25
+      }
+    },
+    "offrl@ppo_v23b_s0/iter_80": {
+      "random": {
+        "wins": 295,
+        "losses": 5,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9833
+      },
+      "maxbasepower": {
+        "wins": 274,
+        "losses": 26,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9133
+      },
+      "simpleheuristics": {
+        "wins": 160,
+        "losses": 140,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5333
+      },
+      "heuristic": {
+        "wins": 191,
+        "losses": 109,
+        "ties": 0,
+        "games": 300,
+        "score": 0.6367
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 121,
+        "losses": 179,
+        "ties": 0,
+        "games": 300,
+        "score": 0.4033
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 139,
+        "losses": 161,
+        "ties": 0,
+        "games": 300,
+        "score": 0.4633
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 126,
+        "losses": 174,
+        "ties": 0,
+        "games": 300,
+        "score": 0.42
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 117,
+        "losses": 183,
+        "ties": 0,
+        "games": 300,
+        "score": 0.39
+      }
+    },
+    "offrl@ppo_v25a_s0/iter_120": {
+      "random": {
+        "wins": 293,
+        "losses": 7,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9767
+      },
+      "maxbasepower": {
+        "wins": 267,
+        "losses": 33,
+        "ties": 0,
+        "games": 300,
+        "score": 0.89
+      },
+      "simpleheuristics": {
+        "wins": 197,
+        "losses": 103,
+        "ties": 0,
+        "games": 300,
+        "score": 0.6567
+      },
+      "heuristic": {
+        "wins": 210,
+        "losses": 90,
+        "ties": 0,
+        "games": 300,
+        "score": 0.7
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 179,
+        "losses": 121,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5967
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 171,
+        "losses": 129,
+        "ties": 0,
+        "games": 300,
+        "score": 0.57
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 150,
+        "losses": 150,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 162,
+        "losses": 138,
+        "ties": 0,
+        "games": 300,
+        "score": 0.54
+      }
+    },
+    "offrl@ppo_v25b_s0/iter_160": {
+      "random": {
+        "wins": 292,
+        "losses": 8,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9733
+      },
+      "maxbasepower": {
+        "wins": 281,
+        "losses": 19,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9367
+      },
+      "simpleheuristics": {
+        "wins": 199,
+        "losses": 101,
+        "ties": 0,
+        "games": 300,
+        "score": 0.6633
+      },
+      "heuristic": {
+        "wins": 209,
+        "losses": 91,
+        "ties": 0,
+        "games": 300,
+        "score": 0.6967
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 161,
+        "losses": 139,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5367
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 129,
+        "losses": 171,
+        "ties": 0,
+        "games": 300,
+        "score": 0.43
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 132,
+        "losses": 168,
+        "ties": 0,
+        "games": 300,
+        "score": 0.44
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 137,
+        "losses": 163,
+        "ties": 0,
+        "games": 300,
+        "score": 0.4567
+      }
+    },
+    "offrl@ppo_v26a_s0/iter_240": {
+      "random": {
+        "wins": 298,
+        "losses": 2,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9933
+      },
+      "maxbasepower": {
+        "wins": 278,
+        "losses": 22,
+        "ties": 0,
+        "games": 300,
+        "score": 0.9267
+      },
+      "simpleheuristics": {
+        "wins": 207,
+        "losses": 93,
+        "ties": 0,
+        "games": 300,
+        "score": 0.69
+      },
+      "heuristic": {
+        "wins": 231,
+        "losses": 69,
+        "ties": 0,
+        "games": 300,
+        "score": 0.77
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 174,
+        "losses": 126,
+        "ties": 0,
+        "games": 300,
+        "score": 0.58
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 150,
+        "losses": 150,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 168,
+        "losses": 132,
+        "ties": 0,
+        "games": 300,
+        "score": 0.56
+      },
+      "offrl@ppo_v26b_s0/iter_320": {
+        "wins": 165,
+        "losses": 135,
+        "ties": 0,
+        "games": 300,
+        "score": 0.55
+      }
+    },
+    "offrl@ppo_v26b_s0/iter_320": {
+      "random": {
+        "wins": 297,
+        "losses": 3,
+        "ties": 0,
+        "games": 300,
+        "score": 0.99
+      },
+      "maxbasepower": {
+        "wins": 285,
+        "losses": 15,
+        "ties": 0,
+        "games": 300,
+        "score": 0.95
+      },
+      "simpleheuristics": {
+        "wins": 245,
+        "losses": 55,
+        "ties": 0,
+        "games": 300,
+        "score": 0.8167
+      },
+      "heuristic": {
+        "wins": 225,
+        "losses": 75,
+        "ties": 0,
+        "games": 300,
+        "score": 0.75
+      },
+      "offrl@ppo_v23b_s0/iter_80": {
+        "wins": 183,
+        "losses": 117,
+        "ties": 0,
+        "games": 300,
+        "score": 0.61
+      },
+      "offrl@ppo_v25a_s0/iter_120": {
+        "wins": 138,
+        "losses": 162,
+        "ties": 0,
+        "games": 300,
+        "score": 0.46
+      },
+      "offrl@ppo_v25b_s0/iter_160": {
+        "wins": 163,
+        "losses": 137,
+        "ties": 0,
+        "games": 300,
+        "score": 0.5433
+      },
+      "offrl@ppo_v26a_s0/iter_240": {
+        "wins": 135,
+        "losses": 165,
+        "ties": 0,
+        "games": 300,
+        "score": 0.45
+      }
+    }
+  },
+  "gxe_basis": "AGENT-ONLY eval ladder: a round-robin over the field below, fitted jointly (Bradley-Terry score equation, reported on the Glicko-1 scale) with 'heuristic' pinned at 1500 to fix the additive gauge. Because the field VARIES, GXE here is a measurement rather than a reparameterisation of a win rate -- which is what it degenerates to against a single fixed baseline. Two things it is NOT: (1) comparable to a Showdown GXE, which is measured against HUMANS on the public ladder, not against bots; (2) a replacement for scripts/seed_strength_gate.py, which remains the authoritative build-vs-build statistic. RD IS A LOWER BOUND ON THE UNCERTAINTY, not an interval: it is derived from binomial noise alone, but on a teambuilt format the battles are CLUSTERED BY TEAM MATCHUP (a small pool plus archetype counters), so the effective sample is well under n. Measured across two independent n=150 gen9ou runs, one pairing moved 0.127 -- about 3.1 binomial SE -- while each agent's own GXE moved under 0.004. Read the standings as separating BANDS, not as ordering neighbours.",
+  "bootstrap": {
+    "method": "cluster bootstrap over team matchups",
+    "n_resamples": 300,
+    "n_cells": 82,
+    "skipped": 0,
+    "ci": 0.95,
+    "adjacent_separation": [
+      {
+        "above": "offrl@ppo_v26a_s0/iter_240",
+        "below": "offrl@ppo_v26b_s0/iter_320",
+        "gap": 0.0,
+        "separated": false
+      },
+      {
+        "above": "offrl@ppo_v26b_s0/iter_320",
+        "below": "offrl@ppo_v25a_s0/iter_120",
+        "gap": 21.3,
+        "separated": false
+      },
+      {
+        "above": "offrl@ppo_v25a_s0/iter_120",
+        "below": "offrl@ppo_v25b_s0/iter_160",
+        "gap": 44.3,
+        "separated": false
+      },
+      {
+        "above": "offrl@ppo_v25b_s0/iter_160",
+        "below": "offrl@ppo_v23b_s0/iter_80",
+        "gap": 57.3,
+        "separated": false
+      },
+      {
+        "above": "offrl@ppo_v23b_s0/iter_80",
+        "below": "simpleheuristics",
+        "gap": 80.7,
+        "separated": true
+      },
+      {
+        "above": "simpleheuristics",
+        "below": "heuristic",
+        "gap": 72.7,
+        "separated": true
+      },
+      {
+        "above": "heuristic",
+        "below": "maxbasepower",
+        "gap": 498.6,
+        "separated": true
+      },
+      {
+        "above": "maxbasepower",
+        "below": "random",
+        "gap": 384.4,
+        "separated": true
+      }
+    ],
+    "note": "Resampling unit is the TEAM MATCHUP, not the battle, because that is the level the dependence lives at -- resampling battles would just reproduce the binomial interval RD already reports. `separated` is true only where the two 95% intervals do not overlap; everywhere else the table's order is not evidence of an ordering."
+  }
+}

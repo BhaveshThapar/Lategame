@@ -32,6 +32,7 @@ from lategame.features.encoder import (
     OBS_DIM,
     OBS_LAYOUT,
     POKEMON_ID_FIELDS,
+    ObsLayout,
 )
 from lategame.features.vocab import vocab_sizes
 
@@ -53,6 +54,22 @@ def _make_encoder(
     return nn.TransformerEncoder(layer, num_layers=n_layers, enable_nested_tensor=False)
 
 
+def _flat_dim(layout: ObsLayout) -> int:
+    """Flat observation width implied by a token layout."""
+    return layout.global_start + layout.global_dim
+
+
+def _layout_for(input_dim: int) -> ObsLayout:
+    """The layout a flat width implies -- singles unless it is the doubles width.
+
+    Keyed on the dim rather than carried in the checkpoint because every checkpoint written before
+    doubles existed stores only `input_dim`; resolving here means none of them need rewriting.
+    """
+    from lategame.features.doubles_encoder import OBS_LAYOUT_DOUBLES
+
+    return OBS_LAYOUT_DOUBLES if input_dim == _flat_dim(OBS_LAYOUT_DOUBLES) else OBS_LAYOUT
+
+
 class EntityTransformer(nn.Module):
     """Entity-token transformer with a decoupled (two-tower) critic."""
 
@@ -69,11 +86,19 @@ class EntityTransformer(nn.Module):
         id_embed: bool = True,
         id_embed_dim: int = 32,
         id_embed_init: str = "random",
+        layout: ObsLayout | None = None,
     ) -> None:
         super().__init__()
-        if input_dim != OBS_DIM:
+        # The token layout is a PARAMETER, defaulting to singles. G4 asks for a third format
+        # "without rewriting the core", and this is the seam: doubles is the same architecture over
+        # a layout with two active slots (21 tokens, 888-d) rather than one (17 tokens, 761-d).
+        # Resolved from `input_dim` when not given, so every existing checkpoint -- which stores
+        # only input_dim -- keeps building exactly the model it always did.
+        layout = layout or _layout_for(input_dim)
+        if input_dim != _flat_dim(layout):
             raise ValueError(
-                f"EntityTransformer expects flat obs of {OBS_DIM} (OBS_LAYOUT), got {input_dim}."
+                f"EntityTransformer expects flat obs of {_flat_dim(layout)} for the given layout, "
+                f"got {input_dim}."
             )
         self.input_dim = input_dim
         self.n_actions = n_actions
@@ -86,7 +111,7 @@ class EntityTransformer(nn.Module):
         self.id_embed_dim = id_embed_dim
         self.id_embed_init = id_embed_init
 
-        layout = OBS_LAYOUT
+        self._layout = layout
         self._n_tokens = layout.n_tokens
 
         # Identity embeddings (R-ENCODE): learn a vector per species/move/item/ability so
@@ -184,14 +209,14 @@ class EntityTransformer(nn.Module):
 
     def _tokenize(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Flat obs -> (tokens (B, n_tokens, d_model), padding_mask (B, n_tokens))."""
-        layout = OBS_LAYOUT
+        layout = self._layout
         batch = obs.shape[0]
 
         poke_flat = obs[:, : layout.moves_start].reshape(
             batch, layout.n_pokemon_tokens, layout.pokemon_dim
         )
         move_flat = obs[:, layout.moves_start : layout.global_start].reshape(
-            batch, layout.n_moves, layout.move_dim
+            batch, layout.n_move_blocks, layout.move_dim
         )
         global_flat = obs[:, layout.global_start :]
 

@@ -1,0 +1,102 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "opponent_checkpoint": null,
+  "n_per_checkpoint": 3000,
+  "format": "gen9vgc2025regi",
+  "loop_penalty": 0.0,
+  "builds": {
+    "awr_v2": {
+      "wins": 1363,
+      "n": 3000,
+      "rate": 0.4543,
+      "ci95": [
+        0.4365855501967675,
+        0.4721979222739514
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/doubles_offrl_vgc_v2.pt",
+          "wins": 1363,
+          "n": 3000,
+          "rate": 0.4543,
+          "ci95": [
+            0.4365855501967675,
+            0.4721979222739514
+          ]
+        }
+      ]
+    },
+    "ppo_b6f": {
+      "wins": 4197,
+      "n": 9000,
+      "rate": 0.4663,
+      "ci95": [
+        0.45604322337090264,
+        0.4766521718923814
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s0/iter_62.pt",
+          "wins": 1414,
+          "n": 3000,
+          "rate": 0.4713,
+          "ci95": [
+            0.4535185443049215,
+            0.4892214457131941
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s1/iter_63.pt",
+          "wins": 1397,
+          "n": 3000,
+          "rate": 0.4657,
+          "ci95": [
+            0.4478719008485126,
+            0.48354924998713744
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s2/iter_57.pt",
+          "wins": 1386,
+          "n": 3000,
+          "rate": 0.462,
+          "ci95": [
+            0.44421942103153567,
+            0.47987777503898965
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too. TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' is the same contrast paired by seed, and is the claim about the TRAINING PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise, so procedure-level evidence is far weaker than the pooled p reads, and raising --n does not fix it (only more SEEDS would). Report both; the verdict field reflects the pooled test alone.",
+  "alpha": 0.025,
+  "comparisons": [
+    {
+      "baseline": "awr_v2",
+      "candidate": "ppo_b6f",
+      "disjoint_ci": false,
+      "alpha": 0.025,
+      "significant": false,
+      "diff": 0.012,
+      "z": 1.141,
+      "p_value": 0.2537,
+      "se": 0.0105,
+      "verdict": "NULL",
+      "seed_level": null
+    }
+  ],
+  "comparison": {
+    "baseline": "awr_v2",
+    "candidate": "ppo_b6f",
+    "disjoint_ci": false,
+    "alpha": 0.025,
+    "significant": false,
+    "diff": 0.012,
+    "z": 1.141,
+    "p_value": 0.2537,
+    "se": 0.0105,
+    "verdict": "NULL",
+    "seed_level": null
+  }
+}
