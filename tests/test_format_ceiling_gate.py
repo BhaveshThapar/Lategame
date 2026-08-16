@@ -398,3 +398,52 @@ def test_load_m2_says_how_to_produce_a_missing_record(tmp_path):
     """The old hardcoded path meant a missing M2 was a bare FileNotFoundError from a json read."""
     with pytest.raises(SystemExit, match="rpredict_oppmodel_gate"):
         gate.load_m2(tmp_path / "absent.json")
+
+
+# --------------------------------------------------------------------------- #
+# The verdict text and branch were written for gen9-RB and asserted RB-only things.
+# --------------------------------------------------------------------------- #
+def test_a_record_with_no_format_key_is_still_read_as_random_battles():
+    """`run_m1` only began writing `format` when teambuilt support landed, so the record holding
+    the ORIGINAL FORMAT_BOUND verdict has none. A generic fallback would re-derive that historical
+    decision with a different branch the next time anyone re-ran the gate."""
+    d = gate.compute_verdict(*_signals(s=0.51, w=0.50, g=0.47, a=0.45))
+    assert d["format"] == "gen9randombattle"
+    assert d["next_branch"] == "ou_pivot"
+
+
+def test_a_teambuilt_format_is_not_told_to_pivot_to_ou():
+    """"ou_pivot" is advice for a format measured BEFORE the OU pivot. On a teambuilt format the
+    actionable branch is to stop spending on the strength axis, not to pivot again."""
+    m1 = {
+        "format": "gen9vgc2025regi",
+        "simpleheuristics": {"rate": 0.493},
+        "offrl_ou": {"rate": 0.447},
+        "mirror": {"rate": 0.497},
+    }
+    d = gate.compute_verdict(m1, {"search_vs_heuristic": 0.353}, {"auc": 0.520})
+    assert d["verdict"] == "FORMAT_BOUND"
+    assert d["next_branch"] == "stop_strength_axis"
+
+
+def test_the_reason_only_says_at_parity_when_m2_is_actually_at_parity():
+    """The FORMAT_BOUND template interpolated M2 as "at parity" unconditionally. True of RB's
+    0.500; simply false of a w nowhere near 0.50, and a verdict line stating a wrong number is
+    worse than one stating none."""
+    at_parity = gate.compute_verdict(*_signals(s=0.51, w=0.50, g=0.47, a=0.45))
+    assert "at parity" in at_parity["reason"]
+
+    far = gate.compute_verdict(*_signals(s=0.51, w=0.353, g=0.47, a=0.45))
+    assert "at parity" not in far["reason"]
+    assert "reaches only 0.353" in far["reason"]
+
+
+def test_the_verdict_carries_which_search_leaf_backed_its_m2():
+    """`ShapedOnlyPolicy` is a weaker instrument than a trained value head, and its pre-registered
+    consequence is that a NULL is suggestive only. The caveat has to travel with the branch."""
+    m1 = {"format": "gen9vgc2025regi", "simpleheuristics": {"rate": 0.49},
+          "mirror": {"rate": 0.50}}
+    d = gate.compute_verdict(
+        m1, {"search_vs_heuristic": 0.35, "search_leaf": "shaped_only"}, {"auc": 0.5}
+    )
+    assert d["m2_leaf"] == "shaped_only"
