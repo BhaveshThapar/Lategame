@@ -34,10 +34,14 @@ import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from poke_env.teambuilder.teambuilder import Teambuilder
+
 from lategame.config import DEFAULT_FORMAT
 from lategame.data.collect import PlayerSpec, collect_selfplay, concat_rl_shards, save_rl
 from lategame.data.reward import RewardWeights
-from lategame.eval.arena import build_player, evaluate_built
+from lategame.eval.arena import build_player, evaluate_built, policy_agent
+from lategame.features.codec import codec_for
+from lategame.teambuilding.pool import TeamPool
 
 CurvePoint = dict[str, float]
 
@@ -48,6 +52,7 @@ class SelfPlayConfig:
     out_dir: str = "checkpoints/selfplay"
     data_dir: str = "data/selfplay"
     battle_format: str = DEFAULT_FORMAT
+    team_pool: str | None = None  # packed-team pool; REQUIRED on a teambuilt format (gen9ou, VGC)
     iters: int = 8
     games_per_opp: int = 30
     pop_size: int = 2  # league checkpoints sampled per iteration (fictitious play)
@@ -66,6 +71,9 @@ class SelfPlayConfig:
     device: str = "auto"
     seed: int = 0
     weights: RewardWeights = field(default_factory=RewardWeights)
+    # B6f's backstop, reachable at last: `collect_selfplay` has accepted this since the VGC loop
+    # was found, and nothing on the M4 path could set it. None is exact identity.
+    max_battle_turns: int | None = None
 
 
 def _sample_league(league: list[str], pop_size: int, rng: random.Random) -> list[str]:
@@ -83,38 +91,95 @@ def _write_curve(path: Path, curve: list[CurvePoint]) -> None:
     path.write_text(json.dumps(curve, indent=2))
 
 
-async def _eval_point(iteration: int, ckpt_path: str, config: SelfPlayConfig) -> CurvePoint:
-    """Win-rate of the iteration's checkpoint (greedy) vs each baseline + vs iter 0."""
+async def _eval_point(
+    iteration: int,
+    ckpt_path: str,
+    config: SelfPlayConfig,
+    team: str | Teambuilder | None = None,
+) -> CurvePoint:
+    """Win-rate of the iteration's checkpoint (greedy) vs each baseline + vs iter 0.
+
+    The greedy agent is ASKED for, not named: ``build_player`` refuses ``offrl`` on a doubles
+    format, so hardcoding it made this the first thing a VGC self-play run hit -- a ValueError
+    from iteration 0's eval point, before a battle was ever requested.
+
+    ``team`` reaches every player including the fixed baselines, which have no teams of their
+    own; on a teambuilt format a baseline without one cannot start a battle. The turn cap goes
+    to the learner builds only, matching ``train.ppo._eval_point``.
+    """
     point: CurvePoint = {"iter": iteration}
+    learned = policy_agent(config.battle_format)
     for base in config.eval_baselines:
         learner = build_player(
-            "offrl",
+            learned,
             config.battle_format,
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            max_battle_turns=config.max_battle_turns,
         )
         opponent = build_player(
-            base, config.battle_format, max_concurrent_battles=config.max_concurrent
+            base, config.battle_format, max_concurrent_battles=config.max_concurrent, team=team
         )
         point[f"vs_{base}"] = round(await evaluate_built(learner, opponent, config.eval_n), 4)
     if iteration > 0:
         learner = build_player(
-            "offrl",
+            learned,
             config.battle_format,
             checkpoint_path=ckpt_path,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            max_battle_turns=config.max_battle_turns,
         )
         iter0 = build_player(
-            "offrl",
+            learned,
             config.battle_format,
             checkpoint_path=config.init,
             sample=False,
             max_concurrent_battles=config.max_concurrent,
+            team=team,
+            max_battle_turns=config.max_battle_turns,
         )
         point["vs_iter0"] = round(await evaluate_built(learner, iter0, config.eval_n), 4)
     return point
+
+
+def _check_warm_start(ckpt: dict, config: SelfPlayConfig) -> None:
+    """Refuse an init the loop cannot honour, before the first battle.
+
+    Mirrors ``train.ppo.run_ppo``'s first two checks. M4 had neither: a singles warm start on a
+    doubles format got as far as building players, and the mismatch surfaced as a shape error
+    inside the fine-tune step -- after a full iteration of collection had already been paid for.
+
+    ``run_ppo``'s THIRD check, which refuses a singles-tuned ``loop_penalty`` on doubles, has no
+    counterpart here on purpose: ``SelfPlayConfig`` carries no ``loop_penalty``. Its only honest
+    doubles value would be 0.0, since ``DoublesLoopGuard`` is a per-slot penalty over a different
+    action layout, so the field would be a knob with one correct setting.
+    """
+    # Checked FIRST: the encoder check below is only meaningful once we know which format's codec
+    # to check against. A checkpoint with no `battle_format` key is a legacy RB warm start and
+    # passes, which is what keeps every pre-B6f arm runnable.
+    battle_format = str(ckpt.get("battle_format", config.battle_format))
+    if battle_format != config.battle_format:
+        raise ValueError(
+            f"format mismatch: init checkpoint is '{battle_format}' but config is "
+            f"'{config.battle_format}'; collection/eval would differ -- pass --format "
+            f"{battle_format}"
+        )
+    codec = codec_for(battle_format)
+    if (
+        ckpt.get("obs_version") != codec.obs_version
+        or ckpt.get("input_dim") != codec.obs_dim
+        or ckpt.get("n_actions") != codec.n_actions
+    ):
+        raise ValueError(
+            f"init checkpoint encoder mismatch (ckpt {ckpt.get('obs_version')}/"
+            f"{ckpt.get('input_dim')}/{ckpt.get('n_actions')} vs {codec.name} codec "
+            f"{codec.obs_version}/{codec.obs_dim}/{codec.n_actions}); cannot warm-start "
+            f"self-play. Retrain."
+        )
 
 
 async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
@@ -132,7 +197,12 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
     # Pin the value support + bin count to the warm-start checkpoint so the value head
     # carries over consistently as we warm-start AC -> AC each iteration.
     ckpt = torch.load(init_path, map_location="cpu", weights_only=False)
+    _check_warm_start(ckpt, config)
     v_min, v_max, n_bins = float(ckpt["v_min"]), float(ckpt["v_max"]), int(ckpt["n_bins"])
+
+    # One pool for eval (poke-env re-draws per battle, so the players sharing it is fine);
+    # collection builds its own two, seeded apart, inside `collect_selfplay`.
+    team = TeamPool.from_packed_file(config.team_pool) if config.team_pool else None
 
     out_dir = Path(config.out_dir)
     data_dir = Path(config.data_dir)
@@ -144,17 +214,20 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
     league = [str(init_path)]  # all checkpoints usable as opponents
     shard_paths: list[str] = []
 
-    curve: list[CurvePoint] = [await _eval_point(0, latest, config)]
+    curve: list[CurvePoint] = [await _eval_point(0, latest, config, team=team)]
     _print_curve_row(curve[0])
     _write_curve(out_dir / "curve.json", curve)
 
+    # The league name, asked for once. `policy_agent`, not `rollout_agent`: M4 records through
+    # `_build_recording_player`'s codec-driven mixin, not PPO's log-prob rollout path.
+    league_agent = policy_agent(config.battle_format)
     for k in range(1, config.iters + 1):
         opponents = [
-            PlayerSpec("offrl", checkpoint_path=p, sample=True)
+            PlayerSpec(league_agent, checkpoint_path=p, sample=True)
             for p in _sample_league(league, config.pop_size, rng)
         ]
         opponents += [PlayerSpec(a) for a in config.anchors]
-        learner = PlayerSpec("offrl", checkpoint_path=latest, sample=True)
+        learner = PlayerSpec(league_agent, checkpoint_path=latest, sample=True)
 
         dataset = await collect_selfplay(
             learner,
@@ -164,6 +237,8 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
             config.weights,
             config.gamma,
             max_concurrent=config.max_concurrent,
+            max_battle_turns=config.max_battle_turns,
+            team_pool=config.team_pool,
         )
         shard_path = str(data_dir / f"iter_{k:02d}.npz")
         save_rl(dataset, shard_path)
@@ -193,7 +268,7 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
         latest = ckpt_path
         league.append(ckpt_path)
 
-        point = await _eval_point(k, latest, config)
+        point = await _eval_point(k, latest, config, team=team)
         curve.append(point)
         _print_curve_row(point)
         _write_curve(out_dir / "curve.json", curve)

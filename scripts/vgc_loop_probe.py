@@ -59,6 +59,7 @@ from typing import Any
 import numpy as np
 
 from lategame.config import VGC_FORMAT
+from lategame.teambuilding.pool import DEFAULT_VGC_POOL
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
 
@@ -248,7 +249,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--team-pool",
         dest="team_pool",
-        default="lategame/teambuilding/data/teams_gen9vgc.packed",
+        default=str(DEFAULT_VGC_POOL),
         help="Packed-team pool; required for a teambuilt format",
     )
     parser.add_argument(

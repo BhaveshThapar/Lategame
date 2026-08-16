@@ -110,5 +110,15 @@
       },
       "model_gap": 0.0
     }
+  },
+  "_provenance": {
+    "backfilled": true,
+    "backfilled_on": "2026-08-15",
+    "note": "ADDED BY HAND AFTER THE FACT -- NOT MEASURED. run_m1 did not record checkpoint paths when this ran; it does now (scripts/format_ceiling_gate.py::_arm_record). The two learned labels are OU-era schema keys, not descriptions: on this gen9vgc2025regi run both arms were built as the 'doubles' agent, which is why each of those rows reads p1='doubles'.",
+    "arms": {
+      "bc_v11": "checkpoints/doubles_bc_vgc_v2.pt",
+      "offrl_ou": "checkpoints/doubles_offrl_vgc_v2.pt"
+    },
+    "evidence": "measured in 85a3a01; this file's mtime 2026-08-15 21:11:03 postdates both checkpoints (14:17:43 and 14:28:08), so it was scored on the corrected post-18fe55c shard"
   }
 }
