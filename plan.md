@@ -66,6 +66,18 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
   - **Singles is frozen and pinned by test**: `OBS_DIM` 761 / `OBS_VERSION` `v5-` / `GEN9_ACTION_SPACE_SIZE` 26 unchanged. Doubles is separately versioned (`d1-`, 888-d) on **both** fields, so `data.collect`'s fingerprint check rejects a cross-format shard on either one alone.
   - **What this does NOT claim.** The doubles checkpoint is randomly initialised — G4's exit is "playable end to end", and strength on VGC is a separate question. The 0.667 is 6 battles of a random-init policy and is not a result.
 - **G5.** Encode the competitive skill stack of Section 4 as explicit, testable capabilities (state estimation, prediction/opponent modeling, win-condition planning, precise damage math).
+  - **EXIT CRITERION (written 2026-08-16, and it did not exist before that).** G5 is the only goal that was stated without one — no threshold, no gate script, no results file, and two references to it as "open" — so "demonstrated rather than merely implemented" had nothing behind it to check. The criterion: **each capability names a gate that runs, a number from a committed results file, and THAT GATE'S OWN pre-registered pass criterion, met.** Every threshold is read out of the record it judges (`threshold`, `pass_rate`, `verdict`, `gate_a_pass`); none is introduced by the G5 gate. Any bar written now would be written after the measurements exist, and B6d is on the record for what that costs — a pre-registered stop rule adjudicated by eye, in a commit message, against numbers later withdrawn. `tests/test_g5_capability_gate.py` rewrites the floors inside fake records and asserts the verdict follows them, which a hardcoded threshold would survive.
+  - **MET (2026-08-16)**, `results/g5_capability_gate.json`, promoted to a `check_artifacts` headline:
+
+    | capability | requirement | gate | number | verdict |
+    |---|---|---|---|---|
+    | state estimation | R-STATE / R-PRIORS | `search/recon_check.py` | RB 0.999952 (145,400 checks) / OU 1.000 / VGC 0.9991 | PASS ×3 |
+    | prediction / opponent modeling | R-PREDICT | `rpredict_oppmodel_gate --gate a` | POV fidelity 1.000, decodable 1.000, agreement 0.9582 (n=239) | PASS |
+    | win-condition planning | R-PLAN | `search/expectimax.py` via `--gate b` | pooled n=2500/arm, 0.7724 vs base 0.7688 | **NULL** |
+    | precise damage math | R-CALC | `search/fidelity.py` + `engine/damage.py` | 9,734 transitions, core match 1.000 | PASS |
+
+  - **What MET does NOT mean.** Win-condition planning is the case that separates *demonstrated* from *beneficial*: the search runs at n = 2500/arm over a forward model separately gated at 1.000 core-transition agreement, and its pre-registered rule returns NULL (diff +0.0036, p = 0.762). G5 asks for an explicit testable capability, not for a win rate — so it passes, and the null stays in the record and in the printed summary. Dropping it would be precisely the "merely implemented" claim the goal exists to replace. Also not claimed: team preview is a **fixed rule**, not a learned capability (the codec has no slot and the model no head for it).
+  - **Coverage gap, recorded rather than papered over.** The replay-driven damage-math gate is `gen9randombattle` only, because it re-sims an `inputlog` and public replays for the teambuilt formats carry none. Live-play reconstruction covers OU and VGC instead, under state estimation.
 
 ### 3.2 Non-goals (for v1)
 - **NG1.** A single model that plays *all* formats well simultaneously. Out of scope; each format is trained separately.
@@ -3281,6 +3293,131 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
     citing a missing path, 4/4 headlines OK. A moved digit there would have meant the retention
     rules deleted something a result cites, since rule 1 keeps anything cited. The post-prune dry
     run reports `TOTAL 0 0.00G`.
+
+- **CLOSING THE OPEN LIST — TEAM PREVIEW MODELLED, THE VGC CEILING PROBE GETS ITS SECOND AND THIRD
+  LEGS, AND G5 GETS AN EXIT CRITERION (2026-08-16).** The four-tier list left after the release
+  follow-ups, worked in order of cost. Three defects found were not on it, and two of them are the
+  same defect as the one the previous session repaired, one module further along.
+
+  - **THE STANDING mypy CLAIM WAS WRONG IN TWO PLACES AND IS NOW UNWRITEABLE.** README and ci.yml
+    both said `scripts/` carried "2 known pre-existing errors". It carried **10**, in 8 files, and
+    it carried 10 at `b2a0c81` too — 7 of the 8 erroring files predate `5cd193e`, which is where
+    the count was written, so it was stale on arrival rather than drifted. All ten were mechanical
+    (4 redundant `# type: ignore`, an invariant `list[Parameter]`, a `sys.exit(main())` over a
+    None-returning `main`, two monkeypatch assignments-to-a-type, and one `Sequence[Decision]` that
+    wanted a protocol). The fix is not `2 -> 10`: the bar is now `mypy lategame scripts` in both
+    places and the count is deleted. Same reasoning as `113c07a` — a number nobody runs is a claim
+    nobody can check.
+
+  - **CI RAN ON NO BRANCH BUT `main`, AND WAS NEVER OBSERVED.** `push: branches: [main,
+    eval-ladder]` plus `pull_request`, and with no `gh` on this host no PR is opened either — so
+    none of the eleven commits that FIXED a red CI were seen by CI. The bar first executed on the
+    merge commit. Now every branch. The other half: "CI is green" was assumed, and the previous
+    failure was a bar measured the wrong way reading green. No `gh` is needed — the runs are public
+    and the REST API is unauthenticated. Run 3 (`main` @ `58ad056`) `success`, runs 1-2 `failure`;
+    the `pytest -q` STEP conclusion is what distinguishes "collection aborted" from "tests ran".
+    Only the log text needs a token, so the pass/skip split is still not readable remotely. Both
+    commands are in README's Develop block, and both were run before being written down.
+
+  - **THE WARM-START GUARD HAD A HOLE IN THE SHAPE OF THE BUG IT FIXES.** `663e080` added
+    `_check_warm_start` so a warm start the loop cannot honour is named before the first battle.
+    It checked format and encoder, not the value support — and `doubles_bc_vgc_v2.pt`, the first
+    checkpoint a VGC operator reaches for, clears both and then dies one statement later on
+    `KeyError: 'v_min'`. BC stamps `n_bins` and no support, because BC fits no critic. Measured on
+    the two real checkpoints: BC **REFUSED** by name, AWR **PASSES**.
+
+  - **`rpredict_oppmodel_gate` WAS THE NEXT MODULE HARDCODING `offrl`, AND ITS TEST WAS A
+    DOCSTRING.** This gate is the **M2 leg** of the ceiling probe, and `arena._singles_only_agents`
+    names shaped-only mode as "exactly what the VGC M2 ceiling probe runs" — so a doubles run was
+    designed for and could not happen: the base arm called `_winrate("offrl", ...)`, which
+    `build_player` refuses on doubles. Worse than the refusal was `name in ("search", "offrl")`
+    gating checkpoint forwarding: on doubles the learner would have been built WITHOUT its weights
+    and scored as a random-init policy — a plausible wrong number, not a crash. The reason this
+    survived the previous repair is that `test_agent_dispatch_returns_a_usable_name_for_every_
+    format` enumerated the modules that must ask **in its docstring**, and a docstring cannot fail.
+    It is a tuple now, read by a test that greps each file, and it catches this one on HEAD:
+    `rpredict_oppmodel_gate.py` hits at lines 231/250/263, the other three clean.
+
+  - **AND THE SEARCH FALLBACK ITSELF WAS SINGLES-ONLY, WHICH ITS OWN DOCSTRING DENIED.** Found by
+    running the probe, not by reading it. `arena._singles_only_agents` justifies letting `search`
+    onto doubles because "the fallback is the doubles-capable heuristic rule — so no singles
+    assumption survives anywhere on that path". The fallback called `heuristic_pick`, the singles
+    rule, which on a `DoubleBattle` is handed `available_moves` as a list of per-slot lists:
+    `AttributeError: 'list' object has no attribute 'base_power'`. **Silent** — poke-env's detached
+    message task swallows it, the agent never answers, and the server plays a default move on the
+    timer. An M2 arm in that state does not crash; it returns "near-optimal search is very weak on
+    doubles", which is the direction that would have made the ceiling verdict look decided. The
+    doubles join is now one free function shared by both agents, pinned by test.
+
+  - **TEAM PREVIEW IS MODELLED, ON THE WHOLE FIELD, AND IT DOES NOT MOVE THE VERDICT.** Nothing
+    here had ever overridden `Player.teampreview`; every VGC number on the record opened with
+    4-of-6 chosen at random on both sides. The selector scores our known moves into their previewed
+    six for offense and their STAB into ours for threat, **multiplicatively** — the first draft
+    added the terms and a test caught it bringing Magikarp and Sunkern over Scizor, because under a
+    sum a mon with no damaging move still banks its resistances. Applied by `build_player` to every
+    player on a doubles format, poke-env's baselines included: a preview policy on our arm alone
+    would have let it bring a better four and had that read as *play* strength.
+
+    The contrast, n = 300/cell, both halves back-to-back in one session on one server and one pool:
+
+    | arm | preview OFF | preview ON | ON − OFF |
+    |---|---|---|---|
+    | mirror | 0.497 | 0.497 | +0.000 |
+    | `simpleheuristics` | 0.520 | 0.493 | −0.027 |
+    | `maxbasepower` | 0.280 | 0.290 | +0.010 |
+    | `random` | 0.057 | 0.013 | −0.043 |
+    | AWR | 0.387 | **0.447** | **+0.060** |
+    | BC | 0.467 | 0.453 | −0.013 |
+
+    Each cell is *both* sides gaining a preview, so a delta is the net. `random` loses most because
+    preview skill compounds with play skill and it has none; the learned AWR arm gains most, which
+    is the expected ordering. Harness sanity unchanged, competent bot 0.520 OFF / 0.493 ON against
+    HEADROOM 0.58 — **INSUFFICIENT either way and not close**. So the caveat is *retired*, not
+    inherited: modelling preview does not rescue the doubles ceiling, and the published BC/AWR
+    ladder is not invalidated by having been measured without it.
+
+    **Why both halves had to run in one session, and this is the part worth keeping.** Against the
+    on-record v2 ladder — same configuration, different day — the preview-OFF rerun drifts by up to
+    **0.080** (`offrl_ou` 0.467 → 0.387). That cross-run band is **larger than the largest preview
+    effect measured**. Comparing v3-ON against the v2 record would have credited run-to-run noise
+    to team preview and produced a bigger, cleaner-looking answer than the truth.
+
+  - **THE TEAMBUILT PATH CAN REACH THE THREE-LEG VERDICT NOW.** It used to `return` before M2 or M3
+    could run, so VGC only ever got `assess_ou` — M1 alone, and structurally unable to return
+    FORMAT_BOUND. Four things blocked it and none was the measurement: the early return; `load_m2`
+    reading one hardcoded RB path (the producer has taken `--format` for a while); `run_m3`'s
+    hardcoded `replays/gen9randombattle/*.json` glob; and `compute_verdict` reading
+    `m1["offrl_green"]` by literal key, which on a teambuilt record is `offrl_ou` — KeyError, not a
+    verdict. Read by **alias**, since those names are the on-disk schema of every record ever
+    written and renaming them would make old and new gates incomparable.
+
+  - **M3 ON DOUBLES IS CHEAPER THAN THE RB PATH, NOT HARDER.** Public Showdown replays carry **no
+    `inputlog`** (measured: the VGC 2025 Reg I index returns none with one), so the re-sim path
+    cannot run on them at all. It does not need to — a teambuilt doubles format declares both
+    complete rosters in `|poke|` lines before turn 1 and every mon is L50, so the level-blind
+    base-stat z-sum (the RB path's own *robustness* proxy) is the primary and defensible measure.
+    Dispatch is on the **data**, not the format string, and one mode is chosen per batch: mixing a
+    level-adjusted proxy with a species-level one inside one AUC compares incomparable numbers.
+    **AUC 0.520 [0.482, 0.556], n = 997**, against `AUC_HI` 0.65 — gross team strength does not
+    predict the winner, the same shape as RB's 0.4946. Two limits are written into the record
+    rather than left to a reader: it scores the brought **six**, not the played **four**, so a real
+    preview effect biases the AUC toward 0.5; and the sample is **unrated**, because the replay
+    index reports no rating for this format, where RB's M3 used a rated ≥ 1200 sample.
+
+  - **G5 — MET, and the exit criterion had to be written first.** See §3.1. The one thing worth
+    repeating here: `check_artifacts` verifies a headline by the checkpoints its records name, so
+    the G5 record had to cite a real one (`ppo_v26b_s0/iter_300.pt`, the init its weakest leg
+    stands on) or it would have registered as vacuously OK over an empty set — the trap `16aa893`
+    repaired for the VGC ladder, one release earlier.
+
+  - **THE TEST BAR MOVED AND BOTH PLACES THAT DECLARE IT MOVED WITH IT.** The doubles self-play
+    smoke is server-gated like its singles sibling, so a bare clone goes **15 → 16** skips; README
+    and ci.yml each called a 16th skip a regression, and leaving that would have made CI's own
+    documentation contradict CI. Two other numbers in that block were wrong and are now measured:
+    "0 skipped with the env active" was never true (the opt-in live smoke skips unless
+    `LATEGAME_LIVE_TEST=1`), and `node` merely being *installed* is not enough — it has to be **on
+    PATH**, or six simulator tests self-skip with `dist/` built and the count reads 719/7 instead
+    of 725/1. Measured: **710 pass / 16 skip** bare clone, **725 pass / 1 skip** with env + server.
 
 ---
 
