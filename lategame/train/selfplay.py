@@ -40,6 +40,7 @@ from lategame.config import DEFAULT_FORMAT
 from lategame.data.collect import PlayerSpec, collect_selfplay, concat_rl_shards, save_rl
 from lategame.data.reward import RewardWeights
 from lategame.eval.arena import build_player, evaluate_built, policy_agent
+from lategame.features.codec import codec_for
 from lategame.teambuilding.pool import TeamPool
 
 CurvePoint = dict[str, float]
@@ -145,6 +146,42 @@ async def _eval_point(
     return point
 
 
+def _check_warm_start(ckpt: dict, config: SelfPlayConfig) -> None:
+    """Refuse an init the loop cannot honour, before the first battle.
+
+    Mirrors ``train.ppo.run_ppo``'s first two checks. M4 had neither: a singles warm start on a
+    doubles format got as far as building players, and the mismatch surfaced as a shape error
+    inside the fine-tune step -- after a full iteration of collection had already been paid for.
+
+    ``run_ppo``'s THIRD check, which refuses a singles-tuned ``loop_penalty`` on doubles, has no
+    counterpart here on purpose: ``SelfPlayConfig`` carries no ``loop_penalty``. Its only honest
+    doubles value would be 0.0, since ``DoublesLoopGuard`` is a per-slot penalty over a different
+    action layout, so the field would be a knob with one correct setting.
+    """
+    # Checked FIRST: the encoder check below is only meaningful once we know which format's codec
+    # to check against. A checkpoint with no `battle_format` key is a legacy RB warm start and
+    # passes, which is what keeps every pre-B6f arm runnable.
+    battle_format = str(ckpt.get("battle_format", config.battle_format))
+    if battle_format != config.battle_format:
+        raise ValueError(
+            f"format mismatch: init checkpoint is '{battle_format}' but config is "
+            f"'{config.battle_format}'; collection/eval would differ -- pass --format "
+            f"{battle_format}"
+        )
+    codec = codec_for(battle_format)
+    if (
+        ckpt.get("obs_version") != codec.obs_version
+        or ckpt.get("input_dim") != codec.obs_dim
+        or ckpt.get("n_actions") != codec.n_actions
+    ):
+        raise ValueError(
+            f"init checkpoint encoder mismatch (ckpt {ckpt.get('obs_version')}/"
+            f"{ckpt.get('input_dim')}/{ckpt.get('n_actions')} vs {codec.name} codec "
+            f"{codec.obs_version}/{codec.obs_dim}/{codec.n_actions}); cannot warm-start "
+            f"self-play. Retrain."
+        )
+
+
 async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
     """Run the self-play improvement loop; return (and persist) the per-iter curve."""
     import torch
@@ -160,6 +197,7 @@ async def run_selfplay(config: SelfPlayConfig) -> list[CurvePoint]:
     # Pin the value support + bin count to the warm-start checkpoint so the value head
     # carries over consistently as we warm-start AC -> AC each iteration.
     ckpt = torch.load(init_path, map_location="cpu", weights_only=False)
+    _check_warm_start(ckpt, config)
     v_min, v_max, n_bins = float(ckpt["v_min"]), float(ckpt["v_max"]), int(ckpt["n_bins"])
 
     # One pool for eval (poke-env re-draws per battle, so the players sharing it is fine);
