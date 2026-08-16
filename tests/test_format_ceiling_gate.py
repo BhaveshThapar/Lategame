@@ -11,6 +11,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 _GATE_PATH = Path(__file__).resolve().parent.parent / "scripts" / "format_ceiling_gate.py"
 _spec = importlib.util.spec_from_file_location("format_ceiling_gate", _GATE_PATH)
@@ -353,3 +354,47 @@ def test_auc_bootstrap_ci_reports_undefined_instead_of_crashing_on_one_class():
     # NaN != NaN, so the empty case is checked the same way rather than by tuple equality.
     elo, ehi = gate.auc_bootstrap_ci(np.array([]), np.array([]))
     assert math.isnan(elo) and math.isnan(ehi)
+
+
+# --------------------------------------------------------------------------- #
+# M2 is echoed from two different record shapes.
+# --------------------------------------------------------------------------- #
+def test_load_m2_reads_both_the_single_run_and_the_pooled_shape(tmp_path):
+    """`rpredict_oppmodel_gate` writes scalar rates and a top-level `n`; `merge_search_shards`
+    writes {wins, n, rate} objects and no top-level `n`, because once shards are summed the n is
+    per-arm. Reading only the first shape is what made "echo the pooled search run as the M2 leg"
+    impossible without hand-editing JSON -- and the pooled run is the larger measurement."""
+    import json as _json
+
+    single = tmp_path / "single.json"
+    single.write_text(_json.dumps({
+        "n": 120, "depth": 2, "base_vs_heuristic": 0.4833,
+        "arms": {"whitebox": {"search_vs_heuristic": 0.5, "search_vs_base": 0.3167}},
+    }))
+    pooled = tmp_path / "pooled.json"
+    pooled.write_text(_json.dumps({
+        "shards": 10, "format": "gen9ou", "depth": 2,
+        "base_vs_heuristic": {"wins": 1922, "n": 2500, "rate": 0.7688},
+        "arms": {"whitebox": {
+            "search_vs_heuristic": {"wins": 1931, "n": 2500, "rate": 0.7724},
+            "search_vs_base": {"wins": 983, "n": 2500, "rate": 0.3932},
+            "contrast_vs_base": {"diff": 0.0036, "p_value": 0.762101},
+            "verdict": "NULL",
+        }},
+    }))
+
+    a = gate.load_m2(single)
+    assert a["search_vs_heuristic"] == 0.5 and a["n"] == 120
+
+    b = gate.load_m2(pooled)
+    assert b["search_vs_heuristic"] == 0.7724, "the rate, not the {wins,n,rate} object"
+    assert b["n"] == 2500, "per-arm n, since a pooled record has no top-level n"
+    assert b["shards"] == 10 and b["verdict"] == "NULL"
+    # Whatever the shape, compute_verdict only ever needs a float here.
+    assert isinstance(b["search_vs_heuristic"], float)
+
+
+def test_load_m2_says_how_to_produce_a_missing_record(tmp_path):
+    """The old hardcoded path meant a missing M2 was a bare FileNotFoundError from a json read."""
+    with pytest.raises(SystemExit, match="rpredict_oppmodel_gate"):
+        gate.load_m2(tmp_path / "absent.json")
