@@ -48,9 +48,13 @@ jobs:
       # is a claim nobody can check, so the count is gone and the checker covers both trees instead.
       - run: mypy lategame scripts
 
-      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 15 tests
-      # self-skip and 709 pass -- measured on a fresh clone, not inferred. A 16th skip means an
+      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 16 tests
+      # self-skip and 710 pass -- measured on a fresh clone, not inferred. A 17th skip means an
       # environment gate started firing that should not have, which is a regression, not noise.
+      #
+      # 15/709 until the doubles self-play smoke landed. That test is server-gated like its singles
+      # sibling, so it self-skips here by design; the bar moves with it in the same commit rather
+      # than reading as the regression it is not.
       - run: pytest -q
 
       # NOT run here: `python scripts/check_artifacts.py`. A runner has no checkpoints/ at all, so
