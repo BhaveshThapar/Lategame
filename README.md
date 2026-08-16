@@ -966,6 +966,14 @@ neither M2 nor M3 exists here. **G4 is therefore neither greenlit nor descoped**
 that on doubles the cheap probe is *not decisive*, because every agent cheap enough to run before
 building the pipeline is a singles policy applied per slot.
 
+> **SUPERSEDED (2026-08-16): both missing legs exist now, and the tie is broken.** The doubles
+> forward model runs under `ShapedOnlyPolicy`, and VGC replays turn out to need no forward model at
+> all for M3 — a teambuilt format declares both rosters in `|poke|` lines before turn 1. M2 lands at
+> **0.373** (n = 300) and M3 at **0.520** (n = 997), and the three-leg rule returns
+> **`FORMAT_BOUND`**. See [the three-leg verdict below](#the-vgc-ceiling-stands-on-three-legs-now--format_bound).
+> The `INSUFFICIENT` above is not withdrawn — it was the correct verdict on one leg — but it is no
+> longer the current one.
+
 ### Build 27 / Gate B — search does not compound on OU either, and the h2h says it is harmful
 
 L11–L14 retired test-time search at parity, but all of it was measured on gen9-RB — which Lever 15
@@ -1190,6 +1198,83 @@ configuration, a different day — the preview-OFF rerun drifts by up to **0.080
 effect measured**. Comparing v3-ON against the v2 record would have attributed run-to-run noise to
 team preview and gotten a bigger, cleaner-looking answer than the truth.
 
+### The VGC ceiling stands on three legs now — FORMAT_BOUND
+
+The doubles ceiling probe has reported `INSUFFICIENT` since it was built, and that was never a
+finding about VGC: it is `assess_ou` saying it cannot tell, from **M1 alone**, on a path that
+structurally could not return `FORMAT_BOUND` at all. Lever 15's RB verdict needed three legs.
+Doubles has three (`results/format_ceiling_gate_vgc_v3.json`):
+
+| leg | what it measures | value | instrument |
+|---|---|---|---|
+| **M1** | best competent bot vs `heuristic` | **0.493** | n=300/cell, mirror 0.497, gradient ordered |
+| **M2** | near-optimal depth-2 search vs `heuristic` | **0.373** | n=300 pooled over 10 shards, sanity vs `random` 0.94 |
+| **M3** | team-strength → winner AUC | **0.520** [0.482, 0.556] | n=997 human replays |
+
+`competent = max(0.493, 0.373, 0.453) = 0.493 ≤ BAND_TOP 0.53` →
+**`FORMAT_BOUND` → `stop_strength_axis`.** Not `ou_pivot`: that branch is advice for a format
+measured *before* the OU pivot, and handing it to a format reached long after is an instruction to
+redo finished work.
+
+**M2 is the weaker leg, and the caveat was written before the run.** It evaluates leaves with
+`ShapedOnlyPolicy` — shaped state value from HP and faints, no encoder, no priors — because that is
+the only mode in which `search` is admitted to a doubles format at all. `expectimax.py` pre-registers
+what follows: *a WIN is decisive, a NULL is suggestive only, because a shallower leaf could produce
+a null on its own.* RB's M2 used GREEN's trained value head, so **VGC's FORMAT_BOUND is less
+strongly evidenced than RB's**, and the verdict carries `m2_leaf` so that travels with the branch
+rather than living in a docstring two modules away.
+
+**M3 corroborates the mechanism and cannot gate the branch** — pinned since Lever 15 by
+`test_verdict_format_bound_even_with_low_auc`. Its *meaning* changes on a teambuilt format, though,
+and the note now says so instead of repeating RB's: nobody assigned these teams, so a low AUC is a
+claim about the metagame's breadth rather than about server-side level equalisation. It also scores
+the brought **six**, not the played **four**, and the sample is **unrated** — the replay index
+reports no rating for this format at all, where RB's M3 used a rated ≥ 1200 sample.
+
+*The Random Battles record is untouched, and that was checked rather than assumed.* An absent
+`format` key means gen9-RB — `run_m1` only began writing that field when teambuilt support landed,
+so the record carrying the original FORMAT_BOUND verdict has none. Re-deriving its decision from its
+own M1/M2/M3 reproduces verdict, branch, reason, mirror sanity and the M3 note identically.
+
+
+### M4 runs on doubles as a build — a capability record, not a strength claim
+
+`run_selfplay` writes a curve to `<out_dir>` and nothing to `results/`, so every M4 run before this
+one left an artifact `check_artifacts` could not see and a later build could not cite. The one
+bridge from the loop to `results/` is `scripts/curriculum_gate.py`, and it was singles-hardcoded
+three ways; `scripts/cluster/selfplay_gate.slurm` is new, because there was no cluster job for
+self-play at all. `results/curriculum_gate_m4_vgc_cap.json`:
+
+| stage | reads |
+|---|---|
+| Gate A pre-flight | **PASS** — 160 episodes, 80 win / 80 loss, return gap 6.86, 1,124 turns |
+| curve (iter 0 → 2) | vs `random` 0.950 → 0.983, vs `heuristic` 0.500 → 0.367 |
+| Gate C ladder | `random` 0.967, `maxbasepower` 0.733, `simpleheuristics` 0.567, `heuristic` 0.600 |
+
+**One seed, two iterations, on purpose.** The three-leg verdict above is `FORMAT_BOUND →
+stop_strength_axis`; spending a full three-seed arm on a format whose own ceiling probe says there
+is no headroom is exactly what the Lever-15 idiom exists to prevent. This run exists to show the
+doubles M4 path runs end to end and produces a citable record.
+
+**Its two `vs heuristic` reads must not be compared, and that is measured rather than asserted.**
+The curve says 0.367 and the ladder 0.600 for the same checkpoint. Two plausible causes were tested
+and both fail: the asymmetric turn cap (learner-capped-only 0.4167 vs neither-capped 0.4167 — a VGC
+battle never reaches 60 decisions) and sharing one `TeamPool` across both players (means 0.490 vs
+0.457, inside both spreads). What is left is the spread itself — ten independent n = 60 reads of one
+checkpoint against one opponent range **0.367 – 0.550**:
+
+```
+separate pools, 5 seed pairs   0.5167  0.4167  0.3667  0.4833  0.5000   spread 0.150
+shared pool,    5 seeds        0.4833  0.5167  0.5500  0.4833  0.4167   spread 0.133
+```
+
+n = 60 on a ten-team pool cannot support a comparison between two reads. plan.md already records the
+same clustering caveat for the OU ladder at n = 150 — battles cluster by team matchup, so the
+effective sample is well under n — and VGC with ten teams is worse. The 0.600 sits just above the
+observed range, so this is mostly but not provably entirely sampling noise, and no cause is claimed
+for the remainder. The record carries all of it under `_read_as`.
+
+
 ## Artifacts & reproducibility
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
@@ -1213,8 +1298,8 @@ a gate can be re-pinned and a result file cannot:
 Every checkpoint those records name is present on the machine that produced them, and none of them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
-**58 of the 121 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-224 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+**58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
+236 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
