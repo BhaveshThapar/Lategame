@@ -3154,6 +3154,85 @@ Evaluate on a **private/agent-only server or eval ladder** wherever possible.
   battle is ~7 recorded turns against OU's 19. Three seeds as one array: ~1 h wall. The n = 3000
   strength gate adds ~6000 battles, ~15 min. No `--resume` needed at this length.
 
+
+- **B6f — MECHANISM CONFIRMED, STRENGTH CEILING-BOUND (2026-08-15).** The pre-registered gate's
+  own anticipated modal outcome: **C1 WIN, C2 NULL**. `results/ppo_vgc_gate_b6f.json`,
+  `results/seed_strength_gate_b6f_c1.json`, `results/seed_strength_gate_b6f_c2.json`,
+  `results/ppo_vgc_telemetry_b6f_s{0,1,2}.json`. 3 seeds x 80 iterations, ~55 s/iteration, one
+  sbatch array on `tron`.
+
+  - **C1 (PRIMARY) — PPO's best checkpoint beats its own warm start. n = 3000 per seed.**
+
+    | | rate | ci95 |
+    |---|---|---|
+    | seed 0 (`iter_62`) | 0.522 | [0.504, 0.540] |
+    | seed 1 (`iter_63`) | 0.523 | [0.505, 0.541] |
+    | seed 2 (`iter_57`) | 0.544 | [0.526, 0.562] |
+    | **pooled, 4768/9000** | **0.530** | **[0.519, 0.540]** |
+
+    The pooled CI excludes 0.50, and so does **every seed individually** — 3 of 3, no sign
+    disagreement. **VERDICT: WIN.** The factored policy gradient does move a doubles policy off
+    the AWR ceiling. It is a *modest* +3.0 points, and saying "modest and unambiguous" is the
+    whole content: 9,000 battles is what makes +0.030 readable at all.
+
+  - **C2 (SECONDARY) — against the fixed heuristic, NULL.** n = 3000 per checkpoint.
+
+    | arm | rate | ci95 |
+    |---|---|---|
+    | AWR warm start | 0.454 | [0.437, 0.472] |
+    | PPO (pooled over 3 seeds, 4197/9000) | 0.466 | [0.456, 0.477] |
+    | **contrast** | **+0.012** (z +1.14, p 0.254, alpha 0.025) | CIs overlap |
+
+    **VERDICT: NULL** — and, per the stop rule that fired in Stage B, an *uninterpretable* null:
+    `simpleheuristics` sits at 0.467 with a CI spanning 0.50, so there is no established headroom
+    above it for a strength gain to appear in. This is the row the pre-registration named as
+    anticipated, and it is booked as ceiling-bound rather than as evidence against the method.
+
+  - **THE TWO CONTRASTS DISAGREE, AND THAT IS THE FINDING, NOT A PROBLEM.** The same checkpoints
+    beat their own warm start (0.530, 5.7 SE above parity) and are indistinguishable from it
+    against the heuristic (+0.012, 1.1 SE). Both can be true because the heuristic is not a
+    discriminating opponent on this format — it is at parity with `simpleheuristics`, which is at
+    parity with its own mirror. A fixed baseline can only resolve a difference it is strong enough
+    to punish. This is Build 27's Gate B lesson arriving with the opposite sign: there, measuring
+    only against the fixed baseline hid a *negative* effect; here it hides a *positive* one.
+
+  - **SELECTION BIAS, MEASURED RATHER THAN ASSUMED, AND IT IS LARGE.** The in-loop curve reports
+    best-iteration `vs_heuristic` of **0.590 +- 0.014** (seeds 0.58 / 0.58 / 0.61 at iterations
+    62 / 63 / 57). Re-scored at n = 3000, those same checkpoints read **0.466**. The gap is
+    **0.124**, and it is pure argmax-over-80-noisy-estimates bias: `eval_n = 100` has SE ~ 0.05,
+    and taking the maximum over 80 draws inflates by roughly that much. **Reading the curve's
+    headline instead of the re-scored number would have overstated this build by 12 points.** It
+    is what `scripts/pin_gate_checkpoint.py`'s note and `scripts/selection_bias_sim.py` exist to
+    prevent, and it is the largest such gap the project has recorded.
+
+  - **ATTRIBUTABILITY: CLEAN ON ALL FOUR CLAUSES.**
+
+    | | seed 0 | seed 1 | seed 2 | bar |
+    |---|---|---|---|---|
+    | trust region bound | 4/80 | 4/80 | 5/80 | not the great majority |
+    | `epochs_full_fraction` | 0.950 | 0.950 | 0.938 | — |
+    | `approx_kl_max` | 0.0354 | 0.0546 | 0.0290 | bar 0.045 |
+    | `approx_kl_mean_late` | 0.0160 | 0.0170 | 0.0163 | — |
+    | `lp_drift_max` | 8.6e-06 | 6.7e-06 | 6.9e-06 | **< 1e-2** |
+    | `invalid_frac_max` | 0.0262 | 0.0314 | 0.0245 | **< 0.05** |
+    | `dec_frac_min` | 0.890 | 0.878 | 0.884 | **> 0.5** |
+
+    The three doubles-specific clauses are what make this readable at all. `lp_drift` at ~7e-06
+    says the acting distribution and the updated distribution were the *same function*, so the
+    importance ratios the KL summarises are real. `dec_frac ~ 0.88` says the reported KL is
+    measured over rows that could actually move the policy; without the decision-row denominator
+    the same run would have reported a KL an order of magnitude smaller and certified a trust
+    region that never bound. No seed collapsed: final `vs_iter0` 0.51 / 0.48 / 0.56, entropy
+    stable at ~0.9.
+
+  - **NOT CLAIMED.** That VGC's ceiling is flat — the stop rule's signature is *suggestive*, and
+    Lever 15's RB verdict needed three legs (M1 band, M2 near-optimal search, M3 team-strength
+    AUC) where doubles still has only M1. That PPO would not compound with more budget: 80
+    iterations is one dose, and the OU axis needed 320 before it saturated. And nothing here
+    speaks to team preview, which `Player.random_teampreview` still picks 4-of-6 at random on
+    both sides — a large part of VGC skill the policy cannot express, adding variance to every
+    number above.
+
 ---
 
 ## 14. Risks & mitigations

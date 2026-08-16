@@ -1,0 +1,52 @@
+{
+  "gate": "seed_strength",
+  "opponent": "doubles",
+  "opponent_checkpoint": "checkpoints/doubles_offrl_vgc_v2.pt",
+  "n_per_checkpoint": 3000,
+  "format": "gen9vgc2025regi",
+  "loop_penalty": 0.0,
+  "builds": {
+    "ppo_b6f": {
+      "wins": 4768,
+      "n": 9000,
+      "rate": 0.5298,
+      "ci95": [
+        0.5194554939435202,
+        0.5400746515001759
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s0/iter_62.pt",
+          "wins": 1566,
+          "n": 3000,
+          "rate": 0.522,
+          "ci95": [
+            0.5041083337843784,
+            0.5398353948063703
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s1/iter_63.pt",
+          "wins": 1569,
+          "n": 3000,
+          "rate": 0.523,
+          "ci95": [
+            0.5051086637334049,
+            0.5408325070660142
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_b6f_s2/iter_57.pt",
+          "wins": 1633,
+          "n": 3000,
+          "rate": 0.5443,
+          "ci95": [
+            0.5264661462315819,
+            0.562087125019472
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too. TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' is the same contrast paired by seed, and is the claim about the TRAINING PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise, so procedure-level evidence is far weaker than the pooled p reads, and raising --n does not fix it (only more SEEDS would). Report both; the verdict field reflects the pooled test alone."
+}
