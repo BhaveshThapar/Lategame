@@ -245,12 +245,12 @@ than reporting them as a failed download.
 ## Develop
 
 ```bash
-pytest            # 777 tests. With the env active (node ON PATH) + a local server up: 776 pass,
+pytest            # 783 tests. With the env active (node ON PATH) + a local server up: 782 pass,
                   #   1 skip -- the opt-in live-client smoke, which LATEGAME_LIVE_TEST=1 enables
-                  #   for 777/0. `node` on PATH is load-bearing: without it six simulator tests
+                  #   for 783/0. `node` on PATH is load-bearing: without it six simulator tests
                   #   self-skip even with dist/ built.
                   #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
-                  #   and 761 pass. That is what CI runs; a 17th skip is a regression, not noise.
+                  #   and 767 pass. That is what CI runs; a 17th skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form.
 ruff check .

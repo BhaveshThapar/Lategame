@@ -61,7 +61,7 @@ jobs:
       - run: mypy lategame scripts
 
       # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 16 tests
-      # self-skip and 761 pass -- measured on a fresh clone, not inferred. A 17th skip means an
+      # self-skip and 767 pass -- measured on a fresh clone, not inferred. A 17th skip means an
       # environment gate started firing that should not have, which is a regression, not noise.
       #
       # 15/709 until the doubles self-play smoke landed. That test is server-gated like its singles
