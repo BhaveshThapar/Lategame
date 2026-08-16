@@ -192,6 +192,25 @@ def auc_bootstrap_ci(
     return (float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5)))
 
 
+def _why_balanced(fmt: str) -> str:
+    """The MECHANISM behind a low M3, which is not the same one in every format.
+
+    The note used to read "(RB balances via level)" on every record. On Random Battles that is the
+    explanation -- the format equalises via level assignment. On a teambuilt format nobody assigned
+    anything: both players chose their six, so a low AUC says the legal metagame is broad rather
+    than that the server flattened it, and the two readings imply different next moves.
+    """
+    if "randombattle" in fmt:
+        return " (RB balances via level)"
+    if "vgc" in fmt or "doubles" in fmt:
+        return (
+            " (teambuilt: nobody assigned these teams, so this is a claim about the metagame's "
+            "breadth, not about server-side equalisation -- and the proxy scores the brought six "
+            "rather than the played four)"
+        )
+    return " (teambuilt: players chose these teams, so this is a claim about the metagame)"
+
+
 def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) -> dict[str, Any]:
     """Decide FORMAT vs MODEL bound. M1 (skill band) + M2 (inference ceiling) are primary;
     M3 (team-strength AUC) corroborates the *mechanism* but does not gate the branch -- a
@@ -260,8 +279,8 @@ def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) 
         "-> RNG-boundedness corroborated"
         if rng_corroborates
         else f"team-strength AUC {a:.3f} < {AUC_HI}: gross team strength does NOT predict the "
-        "winner (RB balances via level) -> the format is balanced; wins come from matchup/"
-        "variance + fine play a competent heuristic already captures, not from a stronger team"
+        f"winner{_why_balanced(fmt)} -> the format is balanced; wins come from matchup/variance "
+        "+ fine play a competent heuristic already captures, not from a stronger team"
     )
 
     return {
@@ -747,6 +766,7 @@ def load_m2(path: Path | None = None) -> dict[str, Any]:
         "depth": data["depth"],
         "format": data.get("format"),
         "shards": data.get("shards"),
+        "search_leaf": data.get("search_leaf"),
         "base_vs_heuristic": _rate(data["base_vs_heuristic"]),
         "search_vs_heuristic": _rate(wb["search_vs_heuristic"]),
         "search_vs_base": _rate(wb["search_vs_base"]) if "search_vs_base" in wb else None,

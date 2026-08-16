@@ -1,0 +1,49 @@
+{
+  "gate": "rpredict_search_pooled",
+  "shards": 10,
+  "format": "gen9vgc2025regi",
+  "init": "checkpoints/doubles_offrl_vgc_v2.pt",
+  "depth": 2,
+  "search_leaf": "shaped_only",
+  "alpha": 0.05,
+  "note": "pre-registered: WIN iff the pooled delta is significant at alpha and positive",
+  "base_vs_heuristic": {
+    "wins": 123,
+    "n": 300,
+    "rate": 0.41
+  },
+  "arms": {
+    "whitebox": {
+      "search_vs_heuristic": {
+        "wins": 112,
+        "n": 300,
+        "rate": 0.3733
+      },
+      "search_vs_base": {
+        "wins": 140,
+        "n": 300,
+        "rate": 0.4667
+      },
+      "search_vs_random": {
+        "rate": 0.94
+      },
+      "contrast_vs_base": {
+        "diff": -0.0367,
+        "z": -0.92,
+        "p_value": 0.357573,
+        "se": 0.0399
+      },
+      "verdict": "NULL"
+    }
+  },
+  "_provenance": {
+    "backfilled": [
+      "search_leaf"
+    ],
+    "backfilled_on": "2026-08-16",
+    "note": "ADDED BY HAND -- NOT READ FROM THE SHARDS. The array (slurm 7258893) predates the `search_leaf` field by one commit, so its shards carry no value to pool.",
+    "evidence": "scripts/cluster/search_gate.slurm exports LATEGAME_SEARCH_SHAPED_ONLY=1 for any *vgc*/*doubles* format, and `arena._singles_only_agents` admits `search` to a doubles format ONLY in that mode -- so a doubles search run cannot have used any other leaf. Later runs record it themselves.",
+    "why_it_matters": "ShapedOnlyPolicy is a weaker instrument than a trained value head. `expectimax.ShapedOnlyPolicy` pre-registers the asymmetry: a WIN is decisive, a NULL is suggestive only, because a shallower leaf could produce a null on its own.",
+    "slurm_job": "7258893"
+  }
+}

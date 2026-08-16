@@ -75,7 +75,7 @@ def _curve(start: float, per_iter: list[tuple[float, float]]) -> list[dict]:
 
 def test_seed_record_picks_best_iter_and_final_iter0():
     curve = _curve(0.45, [(0.50, 0.52), (0.58, 0.61), (0.54, 0.55)])
-    rec = gate._seed_record("checkpoints/green.pt", 0, curve)
+    rec = gate._seed_record("checkpoints/green.pt", 0, curve, "curriculum_et_prior")
     assert rec["start_vs_heuristic"] == pytest.approx(0.45)
     assert rec["best_iter"] == 2  # 0.58 is the best vs_heuristic
     assert rec["best_vs_heuristic"] == pytest.approx(0.58)
@@ -86,19 +86,19 @@ def test_seed_record_picks_best_iter_and_final_iter0():
 
 def test_verdict_green_amber_red():
     green = [
-        gate._seed_record("g", s, _curve(0.46, [(0.57, 0.58), (0.60, 0.62)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.57, 0.58), (0.60, 0.62)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(green)) == "GREEN"
 
     amber = [
-        gate._seed_record("g", s, _curve(0.46, [(0.47, 0.49), (0.46, 0.48)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.47, 0.49), (0.46, 0.48)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(amber)) == "AMBER"
 
     red = [
-        gate._seed_record("g", s, _curve(0.46, [(0.33, 0.30), (0.31, 0.28)]))
+        gate._seed_record("g", s, _curve(0.46, [(0.33, 0.30), (0.31, 0.28)]), "curriculum_et_prior")
         for s in range(3)
     ]
     assert gate.verdict(gate._summarize(red)) == "RED"

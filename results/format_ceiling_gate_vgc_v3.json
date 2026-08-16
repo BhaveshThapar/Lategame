@@ -68,7 +68,7 @@
     }
   },
   "ou_assessment": {
-    "note": "M1-only teambuilt smoke; M2 (OU near-optimal search) + M3 (OU replays) deferred",
+    "note": "M1 teambuilt harness read, not a verdict. The three-leg FORMAT/MODEL rule is `decision` (compute_verdict), present only when M2 and M3 are also in this record.",
     "mirror_sanity_ok": true,
     "gradient_ok": true,
     "harness_ok": true,
@@ -111,6 +111,66 @@
         ]
       },
       "model_gap": 0.04666666666666669
+    }
+  },
+  "m3": {
+    "n_replays_scanned": 1000,
+    "n_battles_used": 997,
+    "oov_species": 0,
+    "p1_win_frac": 0.5386158475426279,
+    "auc": 0.5197372682373896,
+    "auc_ci95": [
+      0.4823717662636423,
+      0.556001317956829
+    ],
+    "auc_bst_z": 0.5197372682373896,
+    "strength_proxy": "raw base-stat z-sum over the BROUGHT SIX, from |poke| preview lines",
+    "mode": "preview",
+    "caveats": [
+      "scores the brought six, not the played four -- blind to the bring-4 decision",
+      "UNRATED sample: the replay index reports no rating for this format"
+    ]
+  },
+  "m2": {
+    "source": "results/rpredict_search_vgc.json",
+    "n": 300,
+    "depth": 2,
+    "format": "gen9vgc2025regi",
+    "shards": 10,
+    "search_leaf": "shaped_only",
+    "base_vs_heuristic": 0.41,
+    "search_vs_heuristic": 0.3733,
+    "search_vs_base": 0.4667,
+    "contrast_vs_base": {
+      "diff": -0.0367,
+      "z": -0.92,
+      "p_value": 0.357573,
+      "se": 0.0399
+    },
+    "verdict": "NULL",
+    "note": "depth-2 expectimax, near-perfect white-box opponent (ceiling from above)"
+  },
+  "decision": {
+    "verdict": "FORMAT_BOUND",
+    "next_branch": "stop_strength_axis",
+    "reason": "nothing beats the heuristic: best competent agent 0.493 <= 0.53 (white-box near-optimal inference reaches only 0.373) -> the ceiling is the format",
+    "mirror_sanity_ok": true,
+    "m3_corroboration": {
+      "rng_bound_corroborated": false,
+      "note": "team-strength AUC 0.520 < 0.65: gross team strength does NOT predict the winner (teambuilt: nobody assigned these teams, so this is a claim about the metagame's breadth, not about server-side equalisation -- and the proxy scores the brought six rather than the played four) -> the format is balanced; wins come from matchup/variance + fine play a competent heuristic already captures, not from a stronger team"
+    },
+    "format": "gen9vgc2025regi",
+    "signals": {
+      "simpleheuristics_s": 0.49333333333333335,
+      "offrl_green_g": 0.4533333333333333,
+      "whitebox_w": 0.3733,
+      "auc_a": 0.5197372682373896
+    },
+    "m2_leaf": "shaped_only",
+    "thresholds": {
+      "band_top": 0.53,
+      "headroom": 0.58,
+      "auc_hi": 0.65
     }
   }
 }
