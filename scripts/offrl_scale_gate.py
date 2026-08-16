@@ -2,7 +2,7 @@
 
 Retrains the value+AWR offline-RL policy on the full all-turns RL shard (winners AND
 losers, with shaped Monte-Carlo returns) and measures win-rate vs the heuristic. This is
-the "learning target / data composition" lever from plan.md 13.1: pure winners-only BC
+the "learning target / data composition" lever from docs/RESULTS.md: pure winners-only BC
 saturates ~0.42 val-acc and never moved win-rate off the ~27-34% plateau; advantage-
 weighting can use losers' turns and deviate from imitation, so it is the untested lever
 all eight prior levers point at. Every offrl checkpoint on disk predates the 9.65x-scaled

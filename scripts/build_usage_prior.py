@@ -1,4 +1,4 @@
-"""Build the committed Smogon usage-prior artifact (Build 4, plan.md 13.1).
+"""Build the committed Smogon usage-prior artifact (Build 4, docs/RESULTS.md).
 
 Fetches one month's chaos-stats JSON from smogon.com (cached raw under gitignored
 ``replays/usage/``), distills it to per-species top-K item/ability/move usage lists via

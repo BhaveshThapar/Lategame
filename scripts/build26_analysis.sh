@@ -27,7 +27,7 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
 
-# ---- Pre-registered constants (plan.md 13, Build 26). Do not edit to fit the data. ----
+# ---- Pre-registered constants (docs/RESULTS.md, Build 26). Do not edit to fit the data. ----
 ANCHOR="v25b";  ANCHOR_ITERS=160
 ARM_A="v26a";   ARM_A_ITERS=240
 ARM_B="v26b";   ARM_B_ITERS=320
@@ -44,7 +44,7 @@ LADDER_SRC="results/ppo_ou_gate_v25b.json"
 # a verdict, and nothing about the output says it could not have found the effect.
 #
 # At alpha=0.0125 the measured MDE at 80% power is 0.079 / 0.045 / 0.032 for N = 300 / 900 / 1800,
-# and Build 25 pre-registered N=3000 (MDE ~0.025) with the reasoning recorded in plan.md 13: "the
+# and Build 25 pre-registered N=3000 (MDE ~0.025) with the reasoning recorded in docs/RESULTS.md: "the
 # per-step doses here are plausibly ~0.02-0.04, where N=1800 has ~48% power". Build 25's own doses
 # came in at +0.0649 and +0.0362, and Build 26's should be SMALLER if the curve is flattening --
 # which is the whole hypothesis under test. So at N=300 both contrasts would land under the

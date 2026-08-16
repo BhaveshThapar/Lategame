@@ -92,7 +92,7 @@ _TURN_CAP_AGENTS = {"doubles", "doubles_ppo"}
 # That exception never reaches a caller. poke-env dispatches every protocol message through
 # `asyncio.create_task` and only calls `add_done_callback(discard)` -- nobody retrieves the result
 # -- so the raise is logged and swallowed, exactly as `ShowdownException` is on a failed login
-# (plan.md 13.1, M5/G1). The agent then simply never answers the request and the SERVER plays a
+# (docs/RESULTS.md, M5/G1). The agent then simply never answers the request and the SERVER plays a
 # default move for it on the timer. A ceiling probe anchored on an agent in that state would
 # measure the timer, read it as enormous headroom, and be wrong in the most expensive direction.
 #
@@ -223,7 +223,7 @@ def build_player(
             f"server plays default moves on the timer instead -- which reads as a very weak agent "
             f"rather than as a broken one.\n"
             f"Doubles-native agents: {', '.join(_DOUBLES_SAFE_AGENTS)}.\n"
-            f"Making the learned agents doubles-capable is the G4/M6 build (plan.md 13): a "
+            f"Making the learned agents doubles-capable is the G4/M6 build (docs/RESULTS.md): a "
             f"per-slot action head and a two-active encoder."
         )
     cls = _with_team_preview(AGENTS[name], battle_format)
@@ -282,7 +282,7 @@ async def evaluate_built(p1: Player, p2: Player, n_battles: int) -> float:
     ``win_rate`` is ``n_won_battles / n_finished_battles`` -- so a tie sits in the denominator
     without contributing to the numerator and is scored as a *loss*. The correct score gives it a
     half, which is what ``eval/ladder.py``'s ``PairResult`` has always done and what the Glicko /
-    Bradley-Terry fit downstream assumes. Booked in plan.md 13.1 (M5/G1) at the time and deferred
+    Bradley-Terry fit downstream assumes. Booked in docs/RESULTS.md (M5/G1) at the time and deferred
     only because ``arena`` was on the frozen path of the in-flight Build 26 jobs.
 
     **Identical to the old number on any tie-free record** (``(w + 0.5*0)/f == w/f``), which is

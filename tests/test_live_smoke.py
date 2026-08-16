@@ -11,25 +11,19 @@ LATEGAME_SHOWDOWN_PORT (default 8000) and takes a few seconds.
 
 import json
 import os
-import socket
 
 import pytest
 
 from lategame.config import SHOWDOWN_PORT
+from tests.conftest import server_up
 
 _WS = f"ws://localhost:{SHOWDOWN_PORT}/showdown/websocket"
 
 
-def _server_up(port: int = SHOWDOWN_PORT, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection(("localhost", port), timeout=timeout):
-            return True
-    except OSError:
-        return False
 
 
 requires_live = pytest.mark.skipif(
-    not os.environ.get("LATEGAME_LIVE_TEST") or not _server_up(),
+    not os.environ.get("LATEGAME_LIVE_TEST") or not server_up(port=SHOWDOWN_PORT),
     reason="opt-in: set LATEGAME_LIVE_TEST=1 with a local Showdown server running",
 )
 

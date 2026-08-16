@@ -7,48 +7,13 @@ when the server is not running.
 """
 
 import json
-import socket
 
 import pytest
 
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from lategame.features.encoder import OBS_DIM
+from tests.conftest import requires_server, write_ac_checkpoint
 
-
-def _server_up(host: str = "localhost", port: int = 8000, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _server_up(), reason="local Showdown server not running on :8000"
-)
-
-
-def _write_ac_checkpoint(path, hidden_dim=32, n_bins=21, v_min=-5.0, v_max=5.0):
-    import torch
-
-    from lategame.model.actor_critic import ActorCritic
-
-    model = ActorCritic(OBS_DIM, hidden_dim=hidden_dim, n_bins=n_bins)
-    torch.save(
-        {
-            "state_dict": model.state_dict(),
-            "model_type": "actor_critic",
-            "input_dim": OBS_DIM,
-            "hidden_dim": hidden_dim,
-            "n_actions": model.n_actions,
-            "n_bins": n_bins,
-            "v_min": v_min,
-            "v_max": v_max,
-            "obs_version": OBS_VERSION,
-            "battle_format": "gen9randombattle",
-            "metrics": {},
-        },
-        path,
-    )
+pytestmark = requires_server
 
 
 async def test_ppo_one_iteration_end_to_end(tmp_path):
@@ -56,7 +21,7 @@ async def test_ppo_one_iteration_end_to_end(tmp_path):
     from lategame.train.ppo import PPOConfig, run_ppo
 
     init = tmp_path / "iter0.pt"
-    _write_ac_checkpoint(init)
+    write_ac_checkpoint(init, OBS_DIM)
 
     config = PPOConfig(
         init=str(init),

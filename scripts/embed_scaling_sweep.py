@@ -3,7 +3,7 @@
 Trains the EntityTransformer by behaviour cloning on nested subsets of a winners-only
 BC shard at several sample counts N, both ``id_embed`` ON and OFF, across seeds. Reports
 mean +/- std val-acc per (N, arm) and the OFF-ON gap, to test whether the gap *closes*
-as N grows -- the data-starvation hypothesis from plan.md 13.1 (the R-ENCODE gate showed
+as N grows -- the data-starvation hypothesis from docs/RESULTS.md (the R-ENCODE gate showed
 ON 26.9% < OFF 36.0% at ~4196 samples; if that was starvation, the gap should shrink with
 more data).
 

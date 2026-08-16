@@ -1,4 +1,4 @@
-"""Unit tests for the Build-10 train-time pp augmentation (plan.md 13).
+"""Unit tests for the Build-10 train-time pp augmentation (docs/RESULTS.md).
 
 ``augment_pp_full`` forces the active mon's pp channels to full on a random fraction of
 attack-labeled, deep-turn rows -- and must leave everything else (switch rows, shallow

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build 22 STAGE A -- the pre-registered discriminator (plan.md 13.1).
+# Build 22 STAGE A -- the pre-registered discriminator (docs/RESULTS.md).
 #
 # Probe |G|^2 at iter_0 (the WARM START, before any PPO) for both nets. H22 says the wide net is
 # BORN flat -- that the offline objective, not PPO, manufactures the stationary point.

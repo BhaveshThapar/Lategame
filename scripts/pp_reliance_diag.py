@@ -1,4 +1,4 @@
-"""pp-reliance diagnostic (plan.md 13, Build 11) -- promoted from the Build-10 inline snippet.
+"""pp-reliance diagnostic (docs/RESULTS.md, Build 11) -- promoted from the Build-10 inline snippet.
 
 Measures how much a policy's live switch mass is carried by the *exactly-full* pp cue, on a
 frozen set of behavior-probe states. For each present move-pp channel we replace the live value

@@ -247,7 +247,7 @@ class HeuristicAgent(Player):
     doubles skill gradient and poke-env supplies exactly one (``SimpleHeuristicsPlayer``). The
     published RB and OU bands differ only at the top of the gradient -- both formats crush naive
     bots equally -- so a probe that can only measure below the strongest available bot cannot tell
-    FORMAT_BOUND from MODEL_BOUND. See plan.md 13.1 (G4 groundwork).
+    FORMAT_BOUND from MODEL_BOUND. See docs/RESULTS.md (G4 groundwork).
     """
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:

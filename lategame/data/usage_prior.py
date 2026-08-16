@@ -1,4 +1,4 @@
-"""Smogon usage-prior imputation of own-team kit (Build 4, plan.md 13.1).
+"""Smogon usage-prior imputation of own-team kit (Build 4, docs/RESULTS.md).
 
 Two-pass own-team completion (``data.ingest``) closes only the *revealed* part of the
 own-team POV gap: public logs top out around item 0.30 / ability 0.47 / moves 2.78 per

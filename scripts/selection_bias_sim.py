@@ -1,4 +1,4 @@
-"""Differential selection bias between PPO arms of different length (plan.md §13).
+"""Differential selection bias between PPO arms of different length (docs/RESULTS.md).
 
 WHY THIS EXISTS. Each seed reports the ``argmax`` over its curve of noisy ``eval_n``-battle
 evaluations, then that one checkpoint is re-scored at large N. Re-scoring kills the winner's curse

@@ -1,4 +1,4 @@
-"""Build 20 (plan.md 20): is the PPO plateau a per-iteration SAMPLE-BUDGET ceiling?
+"""Build 20 (docs/RESULTS.md): is the PPO plateau a per-iteration SAMPLE-BUDGET ceiling?
 
 Build 18 plateaued PPO self-play at ``vs_heuristic`` ~0.45 (n=300) and Build 19's ent/lr
 schedule did not move it (NULL). The remaining cheap suspect is the rollout budget:
@@ -60,7 +60,7 @@ Gradients are evaluated AT THE ROLLOUT POLICY (theta_old), where the PPO ratio i
 clipped surrogate reduces to the vanilla policy gradient -- that is exactly the first update the
 iteration would take, and it makes the measured gradient unambiguous.
 
-Pre-registered read (plan.md 20), on the POLICY-term gradient:
+Pre-registered read (docs/RESULTS.md, Build 20), on the POLICY-term gradient:
   NOISE_LIMITED  -- cos < 0.30 at the budget and B_simple > 2x the buffer: the direction is
                     noise-bound. Run Stage B (--games-per-opp 48) with the mechanism confirmed.
   SIGNAL_LIMITED -- cos > 0.50 and B_simple < the buffer: the direction is already well
@@ -111,7 +111,7 @@ from lategame.train.offline_rl import _value_ce
 from lategame.train.ppo import PPOConfig, _policy_stats, compute_gae
 from lategame.train.selfplay import _sample_league
 
-# Pre-registered thresholds (plan.md 20), read on the POLICY-term split-half cosine.
+# Pre-registered thresholds (docs/RESULTS.md, Build 20), read on the POLICY-term split-half cosine.
 NOISY_COS = 0.30  # below this, the update direction is noise-dominated at this batch size
 CLEAN_COS = 0.50  # above this, the direction is already well estimated
 # B_simple is compared against the buffer size N: > NOISE_SCALE_MULT * N argues for more samples.
@@ -311,7 +311,8 @@ def _std(xs: list[float]) -> float:
 
 
 def verdict(policy_stats: dict[str, Any], n: int) -> tuple[str, str]:
-    """Pre-registered NOISE_LIMITED / SIGNAL_LIMITED call (plan.md 20) on the policy gradient.
+    """NOISE_LIMITED / SIGNAL_LIMITED, pre-registered (docs/RESULTS.md, Build 20), on the
+    policy gradient.
 
     Read on the SAME_MIX arm on purpose: ``--games-per-opp`` buys more battles against the opponent
     set an iteration has already drawn, so within-mix sampling noise is the only variance it can

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Re-probe an EXISTING checkpoint's |G|^2(0) at a different probe seed.
 #
-# Why this exists: plan.md 13.1 records that cos read 0.182 on one probe and 0.429 on a RERUN of
+# Why this exists: docs/RESULTS.md records that cos read 0.182 on one probe and 0.429 on a RERUN of
 # the same checkpoint -- the cosine is noisy ACROSS PROBE RUNS, not just across checkpoints. Any
 # gate decided by cos clearing the 0.3 floor by a small margin therefore needs a second seed
 # before it is spent on an expensive build.

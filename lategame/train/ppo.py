@@ -84,7 +84,7 @@ class PPOConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
     ent_coef: float = 0.01
-    # Build 19 (plan.md 19): linear schedules over the run. ``None`` holds the value constant,
+    # Build 19 (docs/RESULTS.md): linear schedules over the run. ``None`` holds the value constant,
     # which is exactly the Build 16-18 behavior. Rollout SAMPLES but eval takes the ARGMAX, so a
     # fixed entropy bonus optimizes a policy we never deploy: on the v18 plateau the sampled
     # policy scored 0.347 vs the argmax's 0.487 (scripts/policy_sharpness_diag.py). Annealing

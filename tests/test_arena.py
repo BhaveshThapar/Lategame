@@ -1,19 +1,10 @@
 """Arena smoke test. The end-to-end battle test needs a local Showdown server
 on :8000; it is skipped automatically when the server is not running."""
 
-import socket
-
 import pytest
 
 from lategame.eval.arena import build_player, evaluate
-
-
-def _server_up(host: str = "localhost", port: int = 8000, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+from tests.conftest import requires_server
 
 
 def test_build_player_rejects_unknown_agent():
@@ -95,7 +86,7 @@ async def test_a_pair_where_nothing_finished_scores_zero_rather_than_dividing_by
     assert await evaluate_built(p1, _FakePlayer(0, 0, 0), n_battles=10) == 0.0
 
 
-@pytest.mark.skipif(not _server_up(), reason="local Showdown server not running on :8000")
+@requires_server
 async def test_random_vs_random_completes_a_battle():
     result = await evaluate("random", "random", n_battles=1)
     assert result.n_battles == 1

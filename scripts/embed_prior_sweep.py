@@ -1,6 +1,6 @@
 """Identity-prior BC gate: embeddings OFF vs random-init vs dex-prior warm-start.
 
-The data-scaling sweep (plan.md 13.1) left identity embeddings *starved but emerging* --
+The data-scaling sweep (docs/RESULTS.md) left identity embeddings *starved but emerging* --
 at the exhausted replay ceiling, random-init ON (0.401) trailed OFF (0.418) by ~1.7pp. This
 gate tests the cheap remedy: warm-start the species/move embeddings from dex-feature priors
 (``features.embed_prior``) so they don't have to learn identity from scratch.

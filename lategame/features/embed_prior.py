@@ -1,6 +1,6 @@
 """Dex-feature identity priors for the R-ENCODE embeddings (pre-initialization).
 
-The data-scaling sweep (plan.md 13.1) showed identity embeddings are *starved*: they
+The data-scaling sweep (docs/RESULTS.md) showed identity embeddings are *starved*: they
 emerge with scale but, at the exhausted replay ceiling, land just short of the no-embedding
 baseline. The cheap remedy that needs no more scrape is to **warm-start** the species/move
 embedding tables from what each entity actually *is* -- base stats + types for species,

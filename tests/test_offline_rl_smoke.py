@@ -5,7 +5,6 @@ train 1 epoch -> the `offrl` agent loads the checkpoint and plays a full battle.
 Skipped automatically when the server is not running.
 """
 
-import socket
 
 import pytest
 
@@ -13,19 +12,9 @@ from lategame.data.collect import collect_trajectories, save_rl
 from lategame.data.rl_dataset import RLDataset
 from lategame.eval.arena import evaluate
 from lategame.features.encoder import OBS_DIM
+from tests.conftest import requires_server
 
-
-def _server_up(host: str = "localhost", port: int = 8000, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _server_up(), reason="local Showdown server not running on :8000"
-)
+pytestmark = requires_server
 
 
 def _write_bc_checkpoint(path, hidden_dim=32):

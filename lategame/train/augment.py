@@ -1,4 +1,4 @@
-"""Train-time feature augmentation for BC (plan.md 13, Build 10).
+"""Train-time feature augmentation for BC (docs/RESULTS.md, Build 10).
 
 The Gen 9 OU switch loop is a *joint out-of-distribution* input: the looping agent
 never attacks, so all four of the active mon's moves stay at *exactly* full pp deep
@@ -84,7 +84,8 @@ def augment_pp_noise(
 ) -> Tensor:
     """Return a clone of ``obs`` with Gaussian jitter added to the active mon's pp channels.
 
-    Build 11 (plan.md 13): a *global* regularizer -- applied to every present-move pp channel in
+    Build 11 (docs/RESULTS.md): a *global* regularizer -- applied to every present-move pp
+    channel in
     *every* row (no attack/deep gate, unlike ``augment_pp_full``) so it blunts the sharp
     ``exactly-1.0 -> switch`` extrapolation in all contexts, including the unseen loop corner.
     The ``[0, 1]`` clamp biases full-pp rows downward (up-noise clamps away), directly softening
@@ -115,7 +116,7 @@ def augment_pp_resample(
     """Return a clone of ``obs`` with a random ``frac`` of present pp channels resampled from the
     batch's own present-move pp distribution.
 
-    Build 11 (plan.md 13): the second *global* regularizer, mirroring the proven neutralization
+    Build 11 (docs/RESULTS.md): the second *global* regularizer, mirroring the proven neutralization
     counterfactual (which resampled pp from the shard pool ~50% full). The batch is itself an
     empirical draw from the shard, so its present-move pp values are an unbiased pool. Applied to
     every present-move pp channel in every row (no attack/deep gate). Replaced values are always

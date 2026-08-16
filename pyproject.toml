@@ -53,6 +53,23 @@ lategame = "lategame.cli:main"
 [tool.setuptools.packages.find]
 include = ["lategame*"]
 
+# THE RUNTIME DATA IS NOT OPTIONAL AND DOES NOT SHIP WITHOUT THIS. Every file below is loaded
+# positionally at import/first-use -- `Path(__file__).with_name("data") / ...` in
+# `features/vocab.py`, `features/embed_prior.py`, `data/usage_prior.py`, `teambuilding/pool.py`,
+# and the three node drivers spawned by `search/forward.py`, `search/fidelity.py`,
+# `data/resim.py`. Measured before this existed: a built wheel carried 71 entries and none of
+# these eight, so `pip install lategame` produced a package that died at the first vocab load.
+# `check-manifest`-style drift is caught by tests/test_packaging.py, which builds a wheel and
+# asserts each one is in it.
+[tool.setuptools.package-data]
+lategame = [
+    "features/data/*.json",
+    "features/data/*.npz",
+    "teambuilding/data/*.packed",
+    "teambuilding/data/*.txt",
+    "*/*.js",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
@@ -63,6 +80,9 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# `slow` is registered rather than merely used, so an unknown-marker warning cannot hide a typo in
+# the marker name -- which would silently make a test run when it was meant to be selectable.
+markers = ["slow: shells out to a real build or a long external process"]
 # Four test modules do `from tests.conftest import requires_showdown`, and `tests/` is not a
 # package (no `__init__.py`) and is not installed -- `packages.find` above ships `lategame*` only,
 # which makes the editable install finder-based rather than a root-on-sys.path `.pth`. So the repo

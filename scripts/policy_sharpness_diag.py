@@ -1,4 +1,4 @@
-"""Build 19 (plan.md 19): is the PPO plateau an OPTIMIZATION ceiling?
+"""Build 19 (docs/RESULTS.md): is the PPO plateau an OPTIMIZATION ceiling?
 
 Build 18 plateaued PPO self-play at ``vs_heuristic`` ~0.45 (n=300). The pre-registered
 suspect is the *fixed* ``ent_coef=0.01`` / ``lr=2.5e-4`` schedule (ppo.py) -- but the naive
@@ -21,7 +21,7 @@ Two measurements on the SHIPPED v18 checkpoints (no training, no code change to 
   A2 greedy-vs-sampled -- win-rate of the same checkpoint vs the eval opponent under
                    argmax (the SCORED policy) and under sampling (the TRAINED policy).
 
-Pre-registered read (plan.md 19):
+Pre-registered read (docs/RESULTS.md, Build 19):
   LIVE -> the converged policy is still soft (H_ratio >= 0.40) and/or sampled << greedy:
           the entropy bonus is holding the distribution soft. Run the schedule.
   DEAD -> the policy is already sharp (H_ratio <= 0.15) and sampled ~= greedy: annealing
@@ -52,7 +52,8 @@ import switch_mass_gate as smg
 
 from lategame.features.encoder import OBS_DIM, OBS_VERSION
 
-# Pre-registered thresholds (plan.md 19). H_ratio = mean entropy / mean uniform-over-legal
+# Pre-registered thresholds (docs/RESULTS.md, Build 19). H_ratio = mean entropy / mean
+# uniform-over-legal
 # entropy, i.e. 1.0 = uniform over the legal set, 0.0 = deterministic.
 SOFT_H_RATIO = 0.40  # >= this and the entropy bonus is still holding the policy soft
 SHARP_H_RATIO = 0.15  # <= this and the policy is effectively deterministic already
@@ -134,7 +135,7 @@ async def win_rates(
 
 
 def verdict(policy_sharp: dict, rates: dict | None) -> tuple[str, str]:
-    """Pre-registered LIVE / DEAD call (plan.md 19)."""
+    """Pre-registered LIVE / DEAD call (docs/RESULTS.md, Build 19)."""
     h = float(policy_sharp["h_ratio"])
     soft = h >= SOFT_H_RATIO
     sharp = h <= SHARP_H_RATIO

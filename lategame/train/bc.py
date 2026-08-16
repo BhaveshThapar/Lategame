@@ -63,12 +63,12 @@ class TrainConfig:
     id_embed_dim: int = 32
     id_embed_init: str = "random"  # entity_transformer only: "random" | "prior" (dex warm-start)
     max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
-    # Build 10 (plan.md 13): train-time pp augmentation. On this fraction of attack-labeled,
+    # Build 10 (docs/RESULTS.md): train-time pp augmentation. On this fraction of attack-labeled,
     # deep-turn rows, force the active mon's pp channels to full -- making "full pp deep in a
     # game -> attack" in-distribution. 0.0 disables it (train-time only; validation stays clean).
     pp_aug_frac: float = 0.0
     pp_aug_turn_threshold: float = 0.15  # normalized turn (~turn 15) above which a row is "deep"
-    # Build 11 (plan.md 13): global pp regularizers -- perturb every present-move pp channel in
+    # Build 11 (docs/RESULTS.md): global pp regularizers -- perturb every present-move pp channel in
     # every context to blunt the "exactly-1.0 -> switch" extrapolation (incl. the loop corner).
     # Mutually exclusive with each other and with pp_aug_frac in practice; 0.0 disables.
     pp_noise_std: float = 0.0  # Gaussian jitter std added to pp, clamped to [0, 1]

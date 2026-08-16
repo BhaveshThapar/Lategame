@@ -5,7 +5,6 @@ agent loads the checkpoint and plays a full battle. Skipped automatically when
 the server is not running.
 """
 
-import socket
 
 import pytest
 
@@ -14,19 +13,9 @@ from lategame.data.collect import save as save_dataset
 from lategame.data.dataset import BCDataset
 from lategame.eval.arena import evaluate
 from lategame.features.encoder import OBS_DIM
+from tests.conftest import requires_server
 
-
-def _server_up(host: str = "localhost", port: int = 8000, timeout: float = 0.5) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _server_up(), reason="local Showdown server not running on :8000"
-)
+pytestmark = requires_server
 
 
 async def test_bc_pipeline_end_to_end(tmp_path, monkeypatch):

@@ -102,3 +102,24 @@ def test_the_committed_record_matches_a_fresh_run():
     stale when one of them is re-run. Recomputing must reproduce it."""
     committed = json.loads((_ROOT / "results" / "g5_capability_gate.json").read_text())
     assert committed == g5.run()
+
+
+@requires_results
+def test_every_capability_names_a_runnable_reproduction_command():
+    """The reason three producing scripts read as orphans until now.
+
+    The record named the *library* a capability rests on (`lategame/search/recon_check.py`) and not
+    the command that regenerates the JSON, so a mechanical reference scan flagged
+    `rpredict_recon_gate.py`, `rpredict_recon_live_gate.py` and `rpredict_fidelity_gate.py` as
+    referenced by nothing — while they are the reproduction path for a `check_artifacts` headline.
+    Deleting them would have left the claim standing and its evidence unreproducible.
+    """
+    import re
+
+    out = g5.run()
+    for cap in out["capabilities"]:
+        cmds = cap.get("reproduce")
+        assert cmds, f"{cap['capability']} names no reproduction command"
+        for cmd in cmds:
+            for script in re.findall(r"scripts/[\w/]+\.(?:py|slurm)", cmd):
+                assert (_ROOT / script).exists(), f"{cap['capability']} -> missing {script}"

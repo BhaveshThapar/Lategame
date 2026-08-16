@@ -39,6 +39,62 @@ requires_showdown = pytest.mark.skipif(
     reason="needs node + a built vendored simulator",
 )
 
+def server_up(host: str = "localhost", port: int = 8000, timeout: float = 0.5) -> bool:
+    """Is a Showdown server listening? Used by every module-level gate on a live battle.
+
+    Was copy-pasted byte-identical into five test modules (`test_arena`, `test_bc_smoke`,
+    `test_offline_rl_smoke`, `test_ppo_smoke`, `test_selfplay_smoke`) and near-identically into a
+    sixth. One copy means one place to change the port if the harness ever moves off 8000 --
+    `scripts/cluster/_job_common.sh` already runs jobs on 8100+ and these probes do not follow it,
+    which is why the smoke tests self-skip inside a cluster job.
+    """
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+#: Skip marker for tests that need a live local server. Evaluated at import, like
+#: ``requires_showdown`` -- starting a server mid-session will not un-skip an already-collected run.
+requires_server = pytest.mark.skipif(
+    not server_up(), reason="local Showdown server not running on :8000"
+)
+
+
+def write_ac_checkpoint(path, obs_dim, *, hidden_dim=32, n_bins=21, v_min=-5.0, v_max=5.0,
+                        battle_format="gen9randombattle"):
+    """A minimal actor-critic checkpoint on disk, for the loop smokes that need a warm start.
+
+    Identical copies lived in `test_ppo_smoke` and `test_selfplay_smoke`. Stamps the same keys
+    `train.ppo._save_checkpoint` does, so `_check_warm_start` accepts it -- including the value
+    support, whose absence is what a BC checkpoint gets refused for.
+    """
+    import torch
+
+    from lategame.model.actor_critic import ActorCritic
+
+    model = ActorCritic(obs_dim, hidden_dim=hidden_dim, n_bins=n_bins)
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "model_type": "actor_critic",
+            "input_dim": obs_dim,
+            "hidden_dim": hidden_dim,
+            "n_actions": model.n_actions,
+            "n_bins": n_bins,
+            "v_min": v_min,
+            "v_max": v_max,
+            "obs_version": __import__("lategame.features.encoder", fromlist=["x"]).OBS_VERSION,
+            "battle_format": battle_format,
+            "metrics": {},
+        },
+        path,
+    )
+
+
 #: A complete gen9randombattle, generated against the pinned rev (25 turns, natural winner).
 #: Drives 32 clean decision rounds through the fidelity driver and reconstructs 58 labelled turns
 #: across both POVs through the resim driver.

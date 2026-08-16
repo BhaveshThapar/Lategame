@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build 22 STAGE B-0 -- the cheap qualifier (plan.md 13.1, pre-registered 2026-07-20).
+# Build 22 STAGE B-0 -- the cheap qualifier (docs/RESULTS.md, pre-registered 2026-07-20).
 #
 # Stage A confirmed H22: the wide net is BORN FLAT (|G|^2(0) = 0.064 ~ its Build-21 iter_10 value
 # 0.057; cos 0.186, BELOW the 0.3 floor). B-0 asks whether the OFFLINE FIT is what flattens it, by

@@ -79,6 +79,11 @@ def _state_estimation() -> dict[str, Any]:
         "capability": "state estimation",
         "requirement": "R-STATE / R-PRIORS (plan.md 7)",
         "gate": "lategame/search/recon_check.py",
+        "reproduce": [
+            "python scripts/rpredict_recon_gate.py",
+            "python scripts/rpredict_recon_live_gate.py --format gen9ou",
+            "python scripts/rpredict_recon_live_gate.py --format gen9vgc2025regi",
+        ],
         "records": rows,
         "ok": all(r["ok"] for r in rows),
         "note": "all three formats, same comparison criteria, so the rates are comparable",
@@ -101,6 +106,7 @@ def _prediction() -> dict[str, Any]:
         "capability": "prediction / opponent modeling",
         "requirement": "R-PREDICT (plan.md 7)",
         "gate": "scripts/rpredict_oppmodel_gate.py --gate a",
+        "reproduce": ["python scripts/rpredict_oppmodel_gate.py --gate a --limit 40"],
         "records": [{
             "record": "rpredict_oppmodel_gate_a.json",
             "opp_pov_team_fidelity": a["opp_pov_team_fidelity"],
@@ -138,6 +144,11 @@ def _planning() -> dict[str, Any]:
         "capability": "win-condition planning",
         "requirement": "R-PLAN (plan.md 7)",
         "gate": "lategame/search/expectimax.py via scripts/rpredict_oppmodel_gate.py --gate b",
+        "reproduce": [
+            "N_PER_SHARD=250 sbatch --array=0-9 scripts/cluster/search_gate.slurm",
+            "python scripts/merge_search_shards.py "
+            "--glob 'results/rpredict_search_ou_shard*.json' --out results/rpredict_search_ou.json",
+        ],
         "records": [{
             "record": "rpredict_search_ou.json",
             "format": s["format"],
@@ -177,6 +188,7 @@ def _damage_math() -> dict[str, Any]:
         "capability": "precise damage math",
         "requirement": "R-CALC (plan.md 7)",
         "gate": "lategame/search/fidelity.py + lategame/engine/damage.py",
+        "reproduce": ["python scripts/rpredict_fidelity_gate.py --limit 300"],
         "records": [{
             "record": "rpredict_fidelity.json",
             "replays": d["replays"],

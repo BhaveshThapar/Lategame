@@ -337,7 +337,7 @@ def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# Build 19 (plan.md 19): linear ent_coef / lr schedules.
+# Build 19 (docs/RESULTS.md): linear ent_coef / lr schedules.
 #
 # Motivation is measured, not assumed: on the Build-18 plateau the SAMPLED policy PPO
 # optimizes scored 0.347 vs the ARGMAX we deploy at 0.487 (scripts/policy_sharpness_diag.py),
