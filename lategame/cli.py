@@ -160,6 +160,8 @@ async def _run_selfplay(args: argparse.Namespace) -> None:
         out_dir=args.out_dir,
         data_dir=args.data_dir,
         battle_format=args.battle_format,
+        team_pool=args.team_pool,
+        max_battle_turns=args.max_battle_turns,
         iters=args.iters,
         games_per_opp=args.games_per_opp,
         pop_size=args.pop_size,
@@ -642,6 +644,19 @@ def build_parser() -> argparse.ArgumentParser:
     selfplay.add_argument("--seed", type=int, default=0)
     selfplay.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT, help="Showdown format string"
+    )
+    selfplay.add_argument(
+        "--team-pool",
+        dest="team_pool",
+        default=None,
+        help="Packed-team pool for teambuilt formats (gen9ou, VGC); omit for Random Battles",
+    )
+    selfplay.add_argument(
+        "--max-battle-turns",
+        dest="max_battle_turns",
+        type=int,
+        default=None,
+        help="Forfeit a battle past this many decisions (omit = no ceiling, the OU behavior)",
     )
 
     ppo = sub.add_parser("ppo", help="Run the M5 on-policy PPO self-play loop")

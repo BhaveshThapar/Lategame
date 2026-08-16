@@ -73,6 +73,67 @@ def test_recording_player_forwards_checkpoint_kwargs(monkeypatch):
     assert captured["sample"] is True
 
 
+def test_selfplay_config_has_the_teambuilt_and_cap_fields():
+    """Both default to None, so every RB/OU arm ever run is bit-identical."""
+    from lategame.train.selfplay import SelfPlayConfig
+
+    cfg = SelfPlayConfig()
+    assert cfg.team_pool is None
+    assert cfg.max_battle_turns is None
+
+
+def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
+    """`_eval_point` was the first thing a VGC self-play run hit, and it hardcoded `offrl`.
+
+    `build_player` refuses a singles-only name on a doubles format, so `run_selfplay` raised at
+    iteration 0's eval point -- before a battle was ever requested. Pins both directions: the
+    doubles format gets a doubles-safe name, and the singles path is unchanged.
+    """
+    import asyncio
+
+    from lategame.train import selfplay as sp
+
+    async def fake_eval(a, b, n):
+        return 0.5
+
+    def calls_for(fmt: str) -> list[tuple[str, dict]]:
+        calls: list[tuple[str, dict]] = []
+
+        def fake_build(name, battle_format, **kwargs):
+            calls.append((name, kwargs))
+            return object()
+
+        monkeypatch.setattr(sp, "build_player", fake_build)
+        monkeypatch.setattr(sp, "evaluate_built", fake_eval)
+        asyncio.run(sp._eval_point(1, "ck.pt", sp.SelfPlayConfig(battle_format=fmt), team="POOL"))
+        return calls
+
+    for fmt, expected in (("gen9vgc2025regi", "doubles"), ("gen9randombattle", "offrl")):
+        calls = calls_for(fmt)
+        learner_names = {n for n, kw in calls if "checkpoint_path" in kw}
+        assert learner_names == {expected}
+        for name, _kw in calls:
+            assert name in arena.AGENTS
+            assert name not in arena._singles_only_agents() or fmt == "gen9randombattle"
+        # Every player, baselines included: on a teambuilt format a baseline with no team
+        # cannot start a battle, and only the learner builds were ever going to be looked at.
+        assert all(kw.get("team") == "POOL" for _n, kw in calls)
+
+
+def test_the_selfplay_loop_never_hardcodes_the_singles_agent_name():
+    """Pinned literally, because the behavioural test above cannot reach the `PlayerSpec`
+    construction inside `run_selfplay` without torch and a real checkpoint.
+
+    The quoted form deliberately does not match `SelfPlayConfig.init`'s default checkpoint PATH,
+    `"checkpoints/offrl_gen9randombattle.pt"`, which is not a registry name.
+    """
+    import inspect
+
+    from lategame.train import selfplay as sp
+
+    assert '"offrl"' not in inspect.getsource(sp)
+
+
 def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
     """A teambuilt M4 arm must reach BOTH sides, and the two must not draw in lockstep.
 
