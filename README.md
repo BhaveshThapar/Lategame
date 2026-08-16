@@ -1050,6 +1050,46 @@ are the same shard to within noise. Both are kept as backstops at exact-identity
 the failure mode is silent and a second instance would otherwise be found the same way: by noticing
 94% of a shard inside 11% of its episodes, after training on it.
 
+### Build 28 / B6f — factored PPO on VGC: mechanism confirmed, strength ceiling-bound
+
+Three seeds, 80 iterations each, from the corrected AWR warm start. Two pre-registered contrasts
+at alpha = 0.025, both scored at n = 3000 per checkpoint.
+
+**C1 (primary) — PPO's best checkpoint vs its own warm start.** Ceiling-independent: both sides
+are learned policies on one format.
+
+| | rate | ci95 |
+|---|---|---|
+| seed 0 | 0.522 | [0.504, 0.540] |
+| seed 1 | 0.523 | [0.505, 0.541] |
+| seed 2 | 0.544 | [0.526, 0.562] |
+| **pooled (4768/9000)** | **0.530** | **[0.519, 0.540]** |
+
+Pooled CI excludes 0.50, and so does every seed individually. **WIN** — the factored policy
+gradient moves a doubles policy off the AWR ceiling. Modest (+3.0 points) and unambiguous; 9,000
+battles is what makes +0.030 readable.
+
+**C2 (secondary) — vs the fixed `heuristic`.** AWR 0.454 [0.437, 0.472], PPO 0.466 [0.456, 0.477],
+diff +0.012 (z 1.14, p 0.25). **NULL** — and an uninterpretable one: the pre-registered stop rule
+fired before this ran, because `simpleheuristics` sits at 0.467 with a CI spanning 0.50. There is
+no established headroom above it for a strength gain to appear in.
+
+**The two contrasts disagree, and that is the result.** The same checkpoints beat their own warm
+start by 5.7 SE and are indistinguishable from it against the heuristic. A fixed baseline can only
+resolve a difference it is strong enough to punish. Build 27's Gate B taught this with the opposite
+sign — there, measuring only against the baseline hid a *negative* effect.
+
+**Selection bias, measured, and large.** The in-loop curve's best-iteration `vs_heuristic` reads
+0.590 +- 0.014 at `eval_n = 100`. Re-scored at n = 3000 the same checkpoints read **0.466** — a
+**0.124** gap, pure argmax-over-80-noisy-estimates inflation. Reading the curve's headline instead
+of the re-scored number would have overstated the build by 12 points.
+
+**Attributability clean on all four clauses**, including three that are new and doubles-specific:
+`lp_drift_max` 6.7e-06 to 8.6e-06 (acting and training were the same function, so the importance
+ratios are real), `invalid_frac_max` <= 0.031 against a 0.05 ceiling, `dec_frac_min` >= 0.878.
+Without the decision-row denominator the same run would have reported a KL an order of magnitude
+smaller and certified a trust region that never bound.
+
 ## Setup
 
 ```bash

@@ -1,0 +1,14 @@
+{
+  "_note": "Synthetic arm file: the corrected AWR warm start (B6f Stage B) in the gate schema so seed_strength_gate can score it beside the PPO arm in ONE invocation. It has ONE record because it is one checkpoint -- not three seeds -- and the per_checkpoint block in the output says so.",
+  "arm": "awr_v2",
+  "format": "gen9vgc2025regi",
+  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "init": "checkpoints/doubles_bc_vgc_v2.pt",
+  "records": [
+    {
+      "seed": 0,
+      "best_iter": 3,
+      "best_checkpoint": "checkpoints/doubles_offrl_vgc_v2.pt"
+    }
+  ]
+}
