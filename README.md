@@ -24,8 +24,16 @@ training can supply, so it came from an **agent-only eval ladder** (`lategame ev
 NG3 puts out of scope. Over 9 agents × 36 pairs × 300 battles on `gen9ou`, **`v26b` reaches Glicko
 1776.3, GXE 0.7434**, above `simpleheuristics` (1572.7 / 0.5695) and the `heuristic` anchor
 (1500 / 0.5000). **G3 is booked** on the five-dose continual-improvement curve (80 → 320 updates,
-monotone on both inference reads). **G1** is built and verified. That leaves **G4** — VGC doubles,
-the missing third format — and **G5**, as *demonstrated* rather than merely implemented capability.
+monotone on both inference reads). **G1** is built and verified. **G4 is MET** — three formats play
+end to end through one core, and Build 28 then ran the *strength* campaign on the third
+(`gen9vgc2025regi`) that G4's exit criterion deliberately did not require: BC → offline RL →
+factored PPO. That campaign's headline is a **correction**, not a win: the VGC shards it started
+from were 94% frames from one looping bug of ours, so the previously reported doubles BC/AWR
+numbers are withdrawn and re-run. On corrected data, factored PPO beats its own warm start
+**0.530** [0.519, 0.540] over 9,000 battles (all three seeds individually clear 0.50) but is
+**NULL** against the fixed heuristic — a format whose competent bots sit at parity with each
+other, so the pre-registered stop rule fires and the strength axis is ceiling-bound. That leaves
+**G5**, as *demonstrated* rather than merely implemented capability.
 
 **Key finding: a learned method finally clears the heuristic plateau.** For eight levers
 every approach stalled at ~27–34% win rate vs the heuristic (human-replay imitation did
