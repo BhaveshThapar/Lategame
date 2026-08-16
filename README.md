@@ -1168,6 +1168,16 @@ were never candidates. **No headline claim is among the 58** — they back super
 builds whose measured numbers remain in the JSON. A reader following an older record to a file will
 find nothing; that is a known state, recorded here rather than left to be discovered.
 
+**What pruning is allowed to take.** Distinct from the above, and now load-bearing: 234 intermediate
+checkpoints (0.657 GiB) *were* deleted by that script, from the three `ppo_b6f_*` arms. An arm
+directory keeps four things — any checkpoint a committed `results/*.json` names, the arm's terminal
+iteration whether or not a result names it, `curve.json`, and any file it does not recognise. Every
+top-level `checkpoints/*.pt` is out of scope entirely. What goes is the rest: intermediates that
+existed so `argmax` had something to range over. Dry run is the default and `--apply` is required,
+because an arm is ~40 h of wall-clock and cannot be re-derived from its curve. The rules themselves
+live in `scripts/prune_checkpoints.py`'s docstring; `python scripts/prune_checkpoints.py` re-derives
+them rather than trusting this paragraph.
+
 **What a clean clone can and cannot reproduce.** It can run the whole pipeline end to end — setup,
 collect, train, gate — against a pinned simulator, with the pools, vocab and prior it needs already
 committed. It cannot bit-exactly re-derive a published build: an arm is ~40 h of wall-clock and the
