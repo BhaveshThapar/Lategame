@@ -2,7 +2,7 @@
 
 poke-env's LocalhostServerConfiguration pins ws://localhost:8000. Two runs sharing a host
 therefore share one server and silently see each other's battles -- which is what forces seeds
-to run one at a time. LATEGAME_SHOWDOWN_PORT lets each job bring its own server (scripts/cluster/),
+to run one at a time. ROTOMAI_SHOWDOWN_PORT lets each job bring its own server (scripts/cluster/),
 turning a sequential sweep into an sbatch array.
 
 The default is load-bearing in the other direction: every existing run, checkpoint and result in
@@ -13,15 +13,15 @@ import importlib
 
 from poke_env import LocalhostServerConfiguration
 
-import lategame.config
+import rotomai.config
 
 
 def _reload(monkeypatch, port: str | None):
     if port is None:
-        monkeypatch.delenv("LATEGAME_SHOWDOWN_PORT", raising=False)
+        monkeypatch.delenv("ROTOMAI_SHOWDOWN_PORT", raising=False)
     else:
-        monkeypatch.setenv("LATEGAME_SHOWDOWN_PORT", port)
-    return importlib.reload(lategame.config)
+        monkeypatch.setenv("ROTOMAI_SHOWDOWN_PORT", port)
+    return importlib.reload(rotomai.config)
 
 
 def test_default_is_identical_to_poke_env_localhost(monkeypatch):

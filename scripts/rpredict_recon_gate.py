@@ -19,8 +19,8 @@ import json
 import random
 from pathlib import Path
 
-from lategame.data.replays import iter_cached_replays
-from lategame.search.recon_check import run_recon_check
+from rotomai.data.replays import iter_cached_replays
+from rotomai.search.recon_check import run_recon_check
 
 
 def main(argv: list[str] | None = None) -> None:

@@ -12,7 +12,7 @@ holding the learned distribution soft so the argmax lags the distribution PPO op
 That is a real train/eval objective mismatch, but it is not free -- so qualify it before
 spending a 3-hour run on it.
 
-Two measurements on the SHIPPED v18 checkpoints (no training, no code change to lategame):
+Two measurements on the SHIPPED v18 checkpoints (no training, no code change to rotomai):
 
   A1 sharpness  -- mean entropy / max-prob of the masked policy over frozen live decision
                    states, for the warm-start, iter_01 and the v18 best iter. Reports the
@@ -50,7 +50,7 @@ from typing import Any
 import numpy as np
 import switch_mass_gate as smg
 
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from rotomai.features.encoder import OBS_DIM, OBS_VERSION
 
 # Pre-registered thresholds (docs/RESULTS.md, Build 19). H_ratio = mean entropy / mean
 # uniform-over-legal
@@ -64,7 +64,7 @@ def sharpness(model: Any, obs: np.ndarray, mask: np.ndarray, batch_size: int, de
     """Mean entropy / max-prob / n_legal of the masked policy over ``obs``."""
     import torch
 
-    from lategame.model.policy import masked_logits, policy_logits
+    from rotomai.model.policy import masked_logits, policy_logits
 
     model.to(device)
     ents: list[np.ndarray] = []
@@ -110,8 +110,8 @@ async def win_rates(
     concurrency: int,
 ) -> dict:
     """Win-rate of ``policy`` vs ``opponent`` under argmax and under sampling."""
-    from lategame.eval.arena import build_player, evaluate_built
-    from lategame.teambuilding.pool import TeamPool
+    from rotomai.eval.arena import build_player, evaluate_built
+    from rotomai.teambuilding.pool import TeamPool
 
     team = TeamPool.from_packed_file(team_pool) if team_pool else None
     rates: dict[str, float] = {}
@@ -180,7 +180,7 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=300, help="battles per arm for the greedy/sampled A/B")
     ap.add_argument("--opponent", default="heuristic")
     ap.add_argument("--format", default="gen9ou")
-    ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed")
+    ap.add_argument("--team-pool", default="rotomai/teambuilding/data/teams_gen9ou.packed")
     ap.add_argument("--loop-penalty", type=float, default=4.0)
     ap.add_argument("--concurrency", type=int, default=20)
     args = ap.parse_args()

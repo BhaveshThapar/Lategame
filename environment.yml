@@ -1,4 +1,4 @@
-name: lategame
+name: rotomai
 channels:
   - conda-forge
 dependencies:

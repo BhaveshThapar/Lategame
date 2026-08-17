@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software or its results, please cite it as below."
 type: software
-title: "Lategame"
+title: "RotomAI"
 abstract: >-
   A competitive Pokemon Showdown battle agent: behaviour cloning, offline RL,
   and PPO self-play across gen9randombattle, gen9ou, and gen9vgc, with every
@@ -13,8 +13,8 @@ authors:
 version: "1.0.0"
 date-released: "2026-08-16"
 license: MIT
-url: "https://github.com/BhaveshThapar/Lategame"
-repository-code: "https://github.com/BhaveshThapar/Lategame"
+url: "https://github.com/BhaveshThapar/RotomAI"
+repository-code: "https://github.com/BhaveshThapar/RotomAI"
 keywords:
   - reinforcement-learning
   - pokemon-showdown

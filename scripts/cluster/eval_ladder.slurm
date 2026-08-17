@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# R-EVAL: the agent-only eval ladder (lategame eval-ladder).
+# R-EVAL: the agent-only eval ladder (rotomai eval-ladder).
 #
 # Rates a FIELD of agents against each other rather than one agent against a fixed baseline. That
 # is the only condition under which GXE/Glicko-1 carry information a win rate did not -- against a
-# single pinned opponent they are a reparameterisation of it (lategame/eval/rating.py says so at
+# single pinned opponent they are a reparameterisation of it (rotomai/eval/rating.py says so at
 # length). This is what plan.md 12's "private/agent-only server or eval ladder" asks for.
 #
 # NOT a replacement for scripts/cluster/strength_gate.slurm. That remains the authoritative
@@ -21,7 +21,7 @@
 # server rather than failing, so they see each other's battles. The default below moves this job
 # clear of both bases a PPO build uses (8100-8102 and the 8200-8202 second array).
 #
-#SBATCH --job-name=lg-ladder
+#SBATCH --job-name=ra-ladder
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=08:00:00
@@ -30,7 +30,7 @@
 # NOTE: needs -p tron --qos=medium (the default QoS caps CPUs at 4).
 
 set -euo pipefail
-export LATEGAME_SHOWDOWN_PORT_BASE="${LATEGAME_SHOWDOWN_PORT_BASE:-8300}"
+export ROTOMAI_SHOWDOWN_PORT_BASE="${ROTOMAI_SHOWDOWN_PORT_BASE:-8300}"
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"
@@ -41,7 +41,7 @@ N="${N:-150}"
 FMT="${FMT:-gen9ou}"
 ANCHOR="${ANCHOR:-heuristic}"
 CONCURRENCY="${CONCURRENCY:-20}"
-TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
+TEAM_POOL="${TEAM_POOL:-rotomai/teambuilding/data/teams_gen9ou.packed}"
 
 # Cluster bootstrap over team matchups. Reachable from HERE and not only from the CLI, for the
 # reason Build 23 had to make target_kl reachable: a knob the cluster path cannot set is a knob
@@ -63,6 +63,6 @@ start_showdown
 # The CLI preflights the anchor and every checkpoint BEFORE playing a battle, so a bad field fails
 # in seconds rather than after an hour of games.
 echo "[job] eval ladder: ${ARGS[*]}"
-python -u -m lategame.cli eval-ladder "${ARGS[@]}"
+python -u -m rotomai.cli eval-ladder "${ARGS[@]}"
 
 echo "[job] eval ladder done -> $OUT"

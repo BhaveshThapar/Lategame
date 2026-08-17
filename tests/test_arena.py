@@ -3,7 +3,7 @@ on :8000; it is skipped automatically when the server is not running."""
 
 import pytest
 
-from lategame.eval.arena import build_player, evaluate
+from rotomai.eval.arena import build_player, evaluate
 from tests.conftest import requires_server
 
 
@@ -15,7 +15,7 @@ def test_build_player_rejects_unknown_agent():
 def test_build_player_forwards_loop_penalty_only_to_learned_agents(monkeypatch):
     """loop_penalty must reach bc/offrl/ppo (they carry a LoopGuard) but never a baseline
     like random (RandomPlayer has no such kwarg)."""
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     captured: dict[str, dict] = {}
 
@@ -64,7 +64,7 @@ class _FakePlayer:
 async def test_a_tie_scores_a_half_not_a_loss():
     """``cross_evaluate`` reports ``n_won / n_finished``, so a tie sits in the denominator without
     contributing to the numerator -- scored as a loss. 6W/2L/2T is 0.70, not 0.60."""
-    from lategame.eval.arena import evaluate_built
+    from rotomai.eval.arena import evaluate_built
 
     p1 = _FakePlayer(won=6, lost=2, tied=2)
     assert await evaluate_built(p1, _FakePlayer(2, 6, 2), n_battles=10) == pytest.approx(0.70)
@@ -73,14 +73,14 @@ async def test_a_tie_scores_a_half_not_a_loss():
 async def test_identical_to_the_old_win_rate_on_a_tie_free_record():
     """Every result this project has published is tie-free (singles ties are vanishingly rare on
     gen9ou), so the fix must not move a single one of them."""
-    from lategame.eval.arena import evaluate_built
+    from rotomai.eval.arena import evaluate_built
 
     p1 = _FakePlayer(won=7, lost=3, tied=0)
     assert await evaluate_built(p1, _FakePlayer(3, 7, 0), n_battles=10) == pytest.approx(7 / 10)
 
 
 async def test_a_pair_where_nothing_finished_scores_zero_rather_than_dividing_by_zero():
-    from lategame.eval.arena import evaluate_built
+    from rotomai.eval.arena import evaluate_built
 
     p1 = _FakePlayer(won=0, lost=0, tied=0)
     assert await evaluate_built(p1, _FakePlayer(0, 0, 0), n_battles=10) == 0.0
@@ -108,7 +108,7 @@ async def test_random_vs_random_completes_a_battle():
     ],
 )
 def test_doubles_formats_are_recognised(battle_format, doubles):
-    from lategame.config import is_doubles_format
+    from rotomai.config import is_doubles_format
 
     assert is_doubles_format(battle_format) is doubles
 
@@ -133,7 +133,7 @@ def test_poke_envs_own_baselines_are_allowed_on_doubles(monkeypatch):
     """`RandomPlayer`, `MaxBasePowerPlayer` and `SimpleHeuristicsPlayer` all branch on DoubleBattle
     in poke-env itself, so the VGC ceiling probe can be run with them before any doubles code of
     ours exists -- which is what makes the G4 decision cheap."""
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     for name in ("random", "maxbasepower", "simpleheuristics", "heuristic"):
         monkeypatch.setitem(arena.AGENTS, name, lambda **kw: object())
@@ -151,7 +151,7 @@ def test_a_teambuilt_format_is_refused_without_a_team(monkeypatch):
     and Gate C's ladder), each found only by watching a cluster job's log. `build_player` is the
     one choke point where it can be caught before a node is claimed.
     """
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
     for fmt in ("gen9ou", "gen9vgc2025regi"):
@@ -162,7 +162,7 @@ def test_a_teambuilt_format_is_refused_without_a_team(monkeypatch):
 
 
 def test_the_singles_agents_are_still_fine_on_singles(monkeypatch):
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     monkeypatch.setitem(arena.AGENTS, "heuristic", lambda **kw: object())
     build_player("heuristic", "gen9ou", team="T")
@@ -176,7 +176,7 @@ def test_the_vgc_format_constant_exists_in_the_vendored_simulator():
     import re
     from pathlib import Path
 
-    from lategame.config import VGC_FORMAT
+    from rotomai.config import VGC_FORMAT
 
     formats = Path("third_party/pokemon-showdown/config/formats.ts")
     if not formats.exists():
@@ -192,7 +192,7 @@ def test_the_vgc_format_constant_exists_in_the_vendored_simulator():
 # B6f: the doubles rollout agent, and the dispatch that keeps the singles guard intact.
 # --------------------------------------------------------------------------- #
 def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
-    from lategame.eval.arena import (
+    from rotomai.eval.arena import (
         _CHECKPOINT_AGENTS,
         _DOUBLES_SAFE_AGENTS,
         _LOOP_GUARD_AGENTS,
@@ -223,8 +223,8 @@ def test_the_doubles_rollout_agent_is_registered_and_doubles_safe():
 # as a doubles run in `arena._singles_only_agents` -- was still missing after that repair. So the
 # list is data now, and `test_no_dispatch_module_hardcodes_the_singles_learner` reads it.
 MUST_ASK_FOR_THE_AGENT = (
-    "lategame/train/ppo.py",
-    "lategame/train/selfplay.py",
+    "rotomai/train/ppo.py",
+    "rotomai/train/selfplay.py",
     "scripts/ppo_continue_gate.py",
     "scripts/rpredict_oppmodel_gate.py",
     "scripts/curriculum_gate.py",
@@ -251,8 +251,8 @@ def test_no_dispatch_module_hardcodes_the_singles_learner():
 
 def test_agent_dispatch_returns_a_usable_name_for_every_format():
     """The dispatch helpers `MUST_ASK_FOR_THE_AGENT`'s members are required to call."""
-    from lategame.config import is_doubles_format
-    from lategame.eval.arena import (
+    from rotomai.config import is_doubles_format
+    from rotomai.eval.arena import (
         AGENTS,
         _singles_only_agents,
         policy_agent,
@@ -273,7 +273,7 @@ def test_agent_dispatch_returns_a_usable_name_for_every_format():
 def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypatch):
     """The ceiling is meaningful only where the loop was measured, and `None` is exact identity,
     so a singles build must not even receive the kwarg."""
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     seen: dict[str, dict] = {}
 
@@ -295,7 +295,7 @@ def test_build_player_forwards_the_turn_cap_only_to_the_doubles_agents(monkeypat
 
 
 def test_the_cli_defaults_a_team_pool_per_format():
-    """`lategame evaluate --format gen9ou` was broken and reported a NUMBER, which is why nobody
+    """`rotomai evaluate --format gen9ou` was broken and reported a NUMBER, which is why nobody
     noticed: Showdown rejected every challenge with a team-required popup, no battle finished, and
     `evaluate_built` returned 0.0 for an empty denominator. `build_player`'s refusal turned that
     into an error; this turns it into a working command.
@@ -307,7 +307,7 @@ def test_the_cli_defaults_a_team_pool_per_format():
     from pathlib import Path
 
     spec = importlib.util.spec_from_file_location(
-        "lategame_cli", Path(__file__).resolve().parent.parent / "lategame" / "cli.py"
+        "rotomai_cli", Path(__file__).resolve().parent.parent / "rotomai" / "cli.py"
     )
     assert spec is not None and spec.loader is not None
     cli = importlib.util.module_from_spec(spec)
@@ -331,7 +331,7 @@ async def test_evaluate_forwards_a_checkpoint_per_side(monkeypatch):
     agent-specific environment variable, which cannot express two different ones at once -- so a
     published release was unusable from the CLI for exactly the comparison it exists to enable.
     """
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     seen: list[tuple[str, object]] = []
 
@@ -347,7 +347,7 @@ async def test_evaluate_forwards_a_checkpoint_per_side(monkeypatch):
 
     await arena.evaluate(
         "offrl", "offrl", 4, "gen9ou",
-        team_pool="lategame/teambuilding/data/teams_gen9ou.packed",
+        team_pool="rotomai/teambuilding/data/teams_gen9ou.packed",
         p1_checkpoint="a.pt", p2_checkpoint="b.pt",
     )
     assert seen == [("offrl", "a.pt"), ("offrl", "b.pt")]

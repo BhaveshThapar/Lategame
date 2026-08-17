@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lategame.features.doubles_action_space import GEN9_DOUBLES_SLOT_ACTIONS
+from rotomai.features.doubles_action_space import GEN9_DOUBLES_SLOT_ACTIONS
 
 pytest.importorskip("numpy")
 

@@ -18,7 +18,7 @@ from poke_env.battle import DoubleBattle, Pokemon
 from poke_env.environment.doubles_env import DoublesEnv
 from poke_env.player import DefaultBattleOrder, ForfeitBattleOrder
 
-from lategame.features.doubles_action_space import (
+from rotomai.features.doubles_action_space import (
     GEN9_DOUBLES_ACTION_SPACE_SIZE,
     GEN9_DOUBLES_SLOT_ACTIONS,
     action_mask,
@@ -38,7 +38,7 @@ def test_the_factored_head_is_two_by_107_not_eleven_thousand():
 
 def test_singles_action_space_is_untouched():
     """Every existing checkpoint depends on the singles codec; adding doubles must not move it."""
-    from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
+    from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
 
     assert GEN9_ACTION_SPACE_SIZE == 26
 
@@ -118,7 +118,7 @@ def _battle():
 def test_move_slots_follow_canonical_order_not_insertion_order():
     """Build 5's divergence, carried to doubles. Incineroar's moves were added knockoff-first;
     canonical order is alphabetical by move id, so slot 0 must be `fakeout`, not `knockoff`."""
-    from lategame.features.doubles_action_space import _canonical_slot_moves
+    from rotomai.features.doubles_action_space import _canonical_slot_moves
 
     b = _battle()
     assert [m.id for m in b.available_moves[0]][0] == "knockoff"  # insertion order
@@ -157,7 +157,7 @@ def test_default_and_forfeit_use_the_poke_env_sentinels():
 def test_a_move_action_reindexes_symmetrically():
     """Round-trip through the reindexer: our canonical index -> poke-env's -> back must be
     identity, or a label written at collection time decodes to a different move at eval time."""
-    from lategame.features.doubles_action_space import _MOVE_BASE, _reindex_move_action
+    from rotomai.features.doubles_action_space import _MOVE_BASE, _reindex_move_action
 
     b = _battle()
     for slot in (0, 1):
@@ -174,7 +174,7 @@ def test_a_half_default_becomes_a_pass_not_a_sentinel():
     meaning per slot, where "this slot does nothing" is action 0 (`pass`) in its own documented
     layout. 96% of collected VGC turns carry one such half (every partial replacement), and
     cross-entropy rejects them outright: `Target -2 is out of bounds`."""
-    from lategame.features.doubles_action_space import normalize_half_default
+    from rotomai.features.doubles_action_space import normalize_half_default
 
     assert list(normalize_half_default(np.array([12, -2]))) == [12, 0]
     assert list(normalize_half_default(np.array([-2, 5]))) == [0, 5]
@@ -272,7 +272,7 @@ def test_the_only_mask_legal_pair_that_cannot_execute_is_the_joint_switch_confli
 def test_action_to_order_behaviour_is_unchanged_by_the_split():
     """The non-strict public entry point must still never raise -- every BC/AWR/eval caller
     depends on a mis-predicting policy not hanging a battle."""
-    from lategame.features.doubles_action_space import action_to_order
+    from rotomai.features.doubles_action_space import action_to_order
 
     b = _battle()
     assert action_to_order(np.array([3, 4]), b) is not None  # decodes

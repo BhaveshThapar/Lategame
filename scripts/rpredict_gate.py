@@ -26,8 +26,8 @@ import json
 import os
 from pathlib import Path
 
-from lategame.config import DEFAULT_FORMAT
-from lategame.eval.arena import build_player, evaluate_built
+from rotomai.config import DEFAULT_FORMAT
+from rotomai.eval.arena import build_player, evaluate_built
 
 _CONCURRENCY = 10  # search choose_move blocks on the node RPC, so keep this modest
 
@@ -41,16 +41,16 @@ async def _winrate(p1: str, p2: str, n: int, ckpt: str, fmt: str) -> float:
 
 
 def _set_search_env(args: argparse.Namespace) -> None:
-    os.environ["LATEGAME_SEARCH_CHECKPOINT"] = args.init
-    os.environ["LATEGAME_SEARCH_DETERMINIZATIONS"] = str(args.determinizations)
-    os.environ["LATEGAME_SEARCH_OPP_AGG"] = args.opp_agg
-    os.environ["LATEGAME_SEARCH_OPP_CAP"] = str(args.opp_cap)
-    os.environ["LATEGAME_SEARCH_BLEND"] = str(args.blend)
-    os.environ["LATEGAME_SEARCH_SHAPED"] = str(args.shaped)
-    os.environ["LATEGAME_SEARCH_DEPTH"] = str(args.depth)
-    os.environ["LATEGAME_SEARCH_TOPK_MY"] = str(args.top_k_my)
-    os.environ["LATEGAME_SEARCH_OPP_CAP_DEEP"] = str(args.opp_cap_deep)
-    os.environ["LATEGAME_SEARCH_SEED"] = str(args.seed)
+    os.environ["ROTOMAI_SEARCH_CHECKPOINT"] = args.init
+    os.environ["ROTOMAI_SEARCH_DETERMINIZATIONS"] = str(args.determinizations)
+    os.environ["ROTOMAI_SEARCH_OPP_AGG"] = args.opp_agg
+    os.environ["ROTOMAI_SEARCH_OPP_CAP"] = str(args.opp_cap)
+    os.environ["ROTOMAI_SEARCH_BLEND"] = str(args.blend)
+    os.environ["ROTOMAI_SEARCH_SHAPED"] = str(args.shaped)
+    os.environ["ROTOMAI_SEARCH_DEPTH"] = str(args.depth)
+    os.environ["ROTOMAI_SEARCH_TOPK_MY"] = str(args.top_k_my)
+    os.environ["ROTOMAI_SEARCH_OPP_CAP_DEEP"] = str(args.opp_cap_deep)
+    os.environ["ROTOMAI_SEARCH_SEED"] = str(args.seed)
 
 
 async def run_gate(args: argparse.Namespace) -> dict:

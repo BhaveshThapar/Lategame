@@ -37,7 +37,7 @@
 # on another machine needs its three best_checkpoint files staged first. The preflight below names
 # exactly which, rather than failing an hour into battles.
 #
-#SBATCH --job-name=lg-strength
+#SBATCH --job-name=ra-strength
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=08:00:00

@@ -10,14 +10,14 @@ server-gated ``test_ppo_smoke``.
 import numpy as np
 import pytest
 
-from lategame.eval import arena
-from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-from lategame.features.encoder import OBS_DIM
+from rotomai.eval import arena
+from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
+from rotomai.features.encoder import OBS_DIM
 
 
 def test_compute_gae_single_episode_terminal_bootstrap():
     torch = pytest.importorskip("torch")
-    from lategame.train.ppo import compute_gae
+    from rotomai.train.ppo import compute_gae
 
     reward = torch.tensor([1.0, 1.0, 1.0])
     value = torch.zeros(3)
@@ -30,7 +30,7 @@ def test_compute_gae_single_episode_terminal_bootstrap():
 
 def test_compute_gae_resets_at_episode_boundary():
     torch = pytest.importorskip("torch")
-    from lategame.train.ppo import compute_gae
+    from rotomai.train.ppo import compute_gae
 
     reward = torch.tensor([1.0, 1.0, 1.0, 1.0])
     value = torch.zeros(4)
@@ -41,7 +41,7 @@ def test_compute_gae_resets_at_episode_boundary():
 
 def test_compute_gae_discounts_future_reward():
     torch = pytest.importorskip("torch")
-    from lategame.train.ppo import compute_gae
+    from rotomai.train.ppo import compute_gae
 
     reward = torch.tensor([0.0, 0.0, 1.0])
     value = torch.zeros(3)
@@ -52,7 +52,7 @@ def test_compute_gae_discounts_future_reward():
 
 def test_masked_distribution_ignores_illegal_actions():
     torch = pytest.importorskip("torch")
-    from lategame.model.policy import masked_logits
+    from rotomai.model.policy import masked_logits
 
     logits = torch.zeros(1, 4)
     mask = torch.tensor([[True, True, False, False]])
@@ -68,7 +68,7 @@ def test_hl_gauss_value_target_roundtrips_within_support():
     # property it relies on is a faithful round-trip in-support and saturation (within ~one
     # bin) at the clamped boundary -- not the degenerate far-out-of-support case.
     torch = pytest.importorskip("torch")
-    from lategame.model.actor_critic import hl_gauss_target, value_from_logits, value_support
+    from rotomai.model.actor_critic import hl_gauss_target, value_from_logits, value_support
 
     centers = value_support(-5.0, 5.0, 21)
     sigma = 0.75 * (10.0 / 20)
@@ -85,9 +85,9 @@ def test_hl_gauss_value_target_roundtrips_within_support():
 
 
 def _synthetic_buffer(torch, n=24, n_bins=21):
-    from lategame.model.actor_critic import ActorCritic, value_from_logits, value_support
-    from lategame.model.policy import masked_logits
-    from lategame.train.ppo import RolloutBuffer
+    from rotomai.model.actor_critic import ActorCritic, value_from_logits, value_support
+    from rotomai.model.policy import masked_logits
+    from rotomai.train.ppo import RolloutBuffer
 
     torch.manual_seed(0)
     model = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=n_bins)
@@ -111,7 +111,7 @@ def _synthetic_buffer(torch, n=24, n_bins=21):
 
 def test_ppo_update_runs_and_reports_finite_stats():
     torch = pytest.importorskip("torch")
-    from lategame.train.ppo import PPOConfig, compute_gae, ppo_update
+    from rotomai.train.ppo import PPOConfig, compute_gae, ppo_update
 
     model, buffer, centers = _synthetic_buffer(torch)
     config = PPOConfig(epochs=2, minibatch=8, target_kl=10.0)  # no early stop
@@ -138,9 +138,9 @@ def test_ppo_update_runs_and_reports_finite_stats():
 
 def test_save_checkpoint_roundtrip(tmp_path):
     torch = pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.model.factory import build_model
-    from lategame.train.ppo import _save_checkpoint
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.model.factory import build_model
+    from rotomai.train.ppo import _save_checkpoint
 
     model = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11)
     path = tmp_path / "ck.pt"
@@ -153,7 +153,7 @@ def test_save_checkpoint_roundtrip(tmp_path):
 
 def _tiny_entity_transformer(torch, n_bins=21):
     """Small EntityTransformer with the GREEN-checkpoint config (id_embed + dex priors)."""
-    from lategame.model.entity_transformer import EntityTransformer
+    from rotomai.model.entity_transformer import EntityTransformer
 
     return EntityTransformer(
         OBS_DIM,
@@ -172,9 +172,9 @@ def test_ppo_warm_starts_entity_transformer_checkpoint(tmp_path):
     # ``run_ppo`` builds straight from the checkpoint meta, so prove the ET warm-start path
     # (save -> build_model -> load_actor_critic_weights) round-trips before the multi-hour run.
     torch = pytest.importorskip("torch")
-    from lategame.model.actor_critic import load_actor_critic_weights
-    from lategame.model.factory import build_model
-    from lategame.train.ppo import _save_checkpoint
+    from rotomai.model.actor_critic import load_actor_critic_weights
+    from rotomai.model.factory import build_model
+    from rotomai.train.ppo import _save_checkpoint
 
     model = _tiny_entity_transformer(torch, n_bins=11)
     path = tmp_path / "et.pt"
@@ -196,9 +196,9 @@ def test_ppo_update_runs_on_entity_transformer():
     # The PPO surrogate + categorical value loss must run on the two-tower transformer, not
     # just the MLP -- this is the model the Lever 10 gate actually updates.
     torch = pytest.importorskip("torch")
-    from lategame.model.actor_critic import value_from_logits, value_support
-    from lategame.model.policy import masked_logits
-    from lategame.train.ppo import PPOConfig, RolloutBuffer, compute_gae, ppo_update
+    from rotomai.model.actor_critic import value_from_logits, value_support
+    from rotomai.model.policy import masked_logits
+    from rotomai.train.ppo import PPOConfig, RolloutBuffer, compute_gae, ppo_update
 
     torch.manual_seed(0)
     n, n_bins = 24, 21
@@ -233,7 +233,7 @@ def test_ppo_update_runs_on_entity_transformer():
 
 
 def test_arena_registers_ppo_agent():
-    from lategame.agents.ppo_agent import PPORecordingAgent
+    from rotomai.agents.ppo_agent import PPORecordingAgent
 
     assert arena.AGENTS["ppo"] is PPORecordingAgent
     assert "ppo" in arena._CHECKPOINT_AGENTS
@@ -266,7 +266,7 @@ def test_build_player_omits_max_concurrent_when_unset(monkeypatch):
 def test_ppo_config_has_ou_team_and_loop_fields():
     # Build 16: OU self-play needs a team pool + LoopGuard; both default to the RB no-op.
     pytest.importorskip("torch")
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     cfg = PPOConfig()
     assert cfg.team_pool is None
@@ -279,8 +279,8 @@ def test_run_ppo_rejects_format_mismatch(tmp_path):
     import asyncio
 
     pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.train.ppo import PPOConfig, _save_checkpoint, run_ppo
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.train.ppo import PPOConfig, _save_checkpoint, run_ppo
 
     path = tmp_path / "rb_init.pt"
     _save_checkpoint(ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11), str(path),
@@ -296,9 +296,9 @@ def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
     import asyncio
 
     pytest.importorskip("torch")
-    from lategame.data import rollout as rollout_mod
-    from lategame.data.collect import PlayerSpec
-    from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
+    from rotomai.data import rollout as rollout_mod
+    from rotomai.data.collect import PlayerSpec
+    from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
 
     calls: list[tuple[str, dict]] = []
 
@@ -345,7 +345,7 @@ def test_collect_rollout_forwards_team_and_loop_penalty(monkeypatch):
 # distribution sharpen onto its own argmax and closes that train/eval gap.
 # --------------------------------------------------------------------------- #
 def test_anneal_none_final_holds_the_value_constant():
-    from lategame.train.ppo import anneal
+    from rotomai.train.ppo import anneal
 
     # The Build 16-18 path: no schedule => every iteration runs at the start value.
     for k in (1, 7, 50):
@@ -353,7 +353,7 @@ def test_anneal_none_final_holds_the_value_constant():
 
 
 def test_anneal_hits_both_endpoints_and_the_midpoint():
-    from lategame.train.ppo import anneal
+    from rotomai.train.ppo import anneal
 
     assert anneal(0.01, 0.0, 1, 51) == pytest.approx(0.01)  # first iter = start
     assert anneal(0.01, 0.0, 51, 51) == pytest.approx(0.0)  # final iter = final
@@ -362,7 +362,7 @@ def test_anneal_hits_both_endpoints_and_the_midpoint():
 
 
 def test_anneal_is_monotone_and_clamps_out_of_range_iters():
-    from lategame.train.ppo import anneal
+    from rotomai.train.ppo import anneal
 
     values = [anneal(0.01, 0.0, k, 50) for k in range(1, 51)]
     assert all(a >= b for a, b in zip(values, values[1:], strict=False))
@@ -373,7 +373,7 @@ def test_anneal_is_monotone_and_clamps_out_of_range_iters():
 
 def test_ppo_update_reports_the_values_it_actually_ran_at():
     torch = pytest.importorskip("torch")
-    from lategame.train.ppo import PPOConfig, compute_gae, ppo_update
+    from rotomai.train.ppo import PPOConfig, compute_gae, ppo_update
 
     model, buffer, centers = _synthetic_buffer(torch)
     config = PPOConfig(epochs=1, minibatch=8, target_kl=10.0, ent_coef=0.004)
@@ -392,7 +392,7 @@ def test_ppo_update_reports_the_values_it_actually_ran_at():
 
 
 def test_ppo_config_schedule_defaults_to_no_schedule():
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     config = PPOConfig()
     assert config.ent_coef_final is None
@@ -409,7 +409,7 @@ def test_ppo_config_schedule_defaults_to_no_schedule():
 # those budgets therefore could not be attributed to update count.
 # --------------------------------------------------------------------------- #
 def test_anneal_horizon_defaults_to_iters_so_v17_v23_are_unchanged():
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     assert PPOConfig().anneal_iters is None
     assert PPOConfig(iters=80).anneal_horizon == 80
@@ -417,14 +417,14 @@ def test_anneal_horizon_defaults_to_iters_so_v17_v23_are_unchanged():
 
 
 def test_pinned_horizon_overrides_iters():
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     assert PPOConfig(iters=80, anneal_iters=50).anneal_horizon == 50
 
 
 def test_pinned_horizon_holds_both_schedules_at_their_finals_past_it():
     """The v24d arm: 80 iterations of updates on a schedule that finished at 50."""
-    from lategame.train.ppo import PPOConfig, anneal
+    from rotomai.train.ppo import PPOConfig, anneal
 
     cfg = PPOConfig(iters=80, anneal_iters=50, lr=2.5e-4, lr_final=5e-5,
                     ent_coef=0.01, ent_coef_final=0.0)
@@ -437,7 +437,7 @@ def test_pinned_horizon_holds_both_schedules_at_their_finals_past_it():
 
 def test_the_horizon_is_what_made_v22_and_v23b_differ_mid_run():
     """Reproduces the confound: same iteration, same schedule endpoints, different horizon."""
-    from lategame.train.ppo import anneal
+    from rotomai.train.ppo import anneal
 
     lr_at_40_short = anneal(2.5e-4, 5e-5, 40, 50)  # v22's budget
     lr_at_40_long = anneal(2.5e-4, 5e-5, 40, 80)  # v23b's budget

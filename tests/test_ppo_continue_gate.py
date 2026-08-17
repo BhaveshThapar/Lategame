@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("torch")  # the gate imports lategame.train.ppo, which imports torch
+pytest.importorskip("torch")  # the gate imports rotomai.train.ppo, which imports torch
 
 _GATE_PATH = Path(__file__).resolve().parent.parent / "scripts" / "ppo_continue_gate.py"
 _spec = importlib.util.spec_from_file_location("ppo_continue_gate", _GATE_PATH)
@@ -23,11 +23,11 @@ _spec.loader.exec_module(gate)
 def test_ppo_config_threads_ou_flags():
     cfg = gate._ppo_config(
         "checkpoints/offrl_gen9ou_v7_s0.pt", seed=1, iters=3, games_per_opp=4, eval_n=10,
-        device="cpu", fmt="gen9ou", team_pool="lategame/teambuilding/data/teams_gen9ou.packed",
+        device="cpu", fmt="gen9ou", team_pool="rotomai/teambuilding/data/teams_gen9ou.packed",
         loop_penalty=4.0, ckpt_prefix="ppo_ou_et_prior",
     )
     assert cfg.battle_format == "gen9ou"
-    assert cfg.team_pool == "lategame/teambuilding/data/teams_gen9ou.packed"
+    assert cfg.team_pool == "rotomai/teambuilding/data/teams_gen9ou.packed"
     assert cfg.loop_penalty == 4.0
     assert cfg.out_dir == "checkpoints/ppo_ou_et_prior_s1"  # prefix + seed, no clobber of RB runs
 

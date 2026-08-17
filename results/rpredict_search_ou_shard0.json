@@ -6,7 +6,7 @@
   "depth": 2,
   "seed": 0,
   "format": "gen9ou",
-  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9ou.packed",
   "loop_penalty": 4.0,
   "base_vs_heuristic": 0.812,
   "arms": {

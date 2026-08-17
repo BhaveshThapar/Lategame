@@ -36,10 +36,10 @@ from pathlib import Path
 
 from poke_env.teambuilder.teambuilder import Teambuilder
 
-from lategame.config import DEFAULT_FORMAT
-from lategame.eval.arena import build_player, evaluate_built, policy_agent
-from lategame.teambuilding.pool import TeamPool
-from lategame.train.ppo import PPOConfig, run_ppo
+from rotomai.config import DEFAULT_FORMAT
+from rotomai.eval.arena import build_player, evaluate_built, policy_agent
+from rotomai.teambuilding.pool import TeamPool
+from rotomai.train.ppo import PPOConfig, run_ppo
 
 _LADDER = ("random", "maxbasepower", "simpleheuristics", "heuristic")
 _EVAL_CONCURRENCY = 20  # the local server is the bottleneck; keep many battles in flight

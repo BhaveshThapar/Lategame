@@ -4,7 +4,7 @@ Uses a minimal fake battle exposing only what ``LoopGuard`` reads: ``force_switc
 ``battle_tag`` and ``gen`` (for the action-space size).
 """
 
-from lategame.agents.loop_guard import LoopGuard
+from rotomai.agents.loop_guard import LoopGuard
 
 
 class FakeBattle:
@@ -81,9 +81,9 @@ def test_forced_switch_is_ignored() -> None:
 # --------------------------------------------------------------------------- #
 import numpy as np  # noqa: E402
 
-from lategame.agents.loop_guard import DoublesLoopGuard  # noqa: E402
-from lategame.agents.turn_cap import TurnCap  # noqa: E402
-from lategame.features.doubles_action_space import N_SWITCHES, SWITCH_BASE  # noqa: E402
+from rotomai.agents.loop_guard import DoublesLoopGuard  # noqa: E402
+from rotomai.agents.turn_cap import TurnCap  # noqa: E402
+from rotomai.features.doubles_action_space import N_SWITCHES, SWITCH_BASE  # noqa: E402
 
 D_SWITCH, D_MOVE, D_PASS = SWITCH_BASE, SWITCH_BASE + N_SWITCHES + 3, 0
 

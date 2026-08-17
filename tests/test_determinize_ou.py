@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 from poke_env.battle import Pokemon
 
-from lategame.search.determinize import _is_random_battle, _mon_set_info, _usage_prior_for
+from rotomai.search.determinize import _is_random_battle, _mon_set_info, _usage_prior_for
 from tests.conftest import requires_showdown
 
 _PRIOR = _usage_prior_for("gen9ou")
@@ -84,7 +84,7 @@ def test_the_same_battle_and_seed_determinize_identically():
 def test_a_usage_filled_gen9ou_opponent_is_legal_and_can_act():
     """The end-to-end claim: a set drawn from the usage prior must survive the real simulator's
     team validation and produce a mon with moves to choose from."""
-    from lategame.search.forward import ForwardModel
+    from rotomai.search.forward import ForwardModel
 
     def side(species: str) -> dict:
         mon = Pokemon(9, species=species)

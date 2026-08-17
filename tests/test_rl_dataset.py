@@ -8,9 +8,9 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.data.rl_dataset import RLDataset, discounted_returns  # noqa: E402
-from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE  # noqa: E402
-from lategame.features.encoder import OBS_DIM, OBS_VERSION  # noqa: E402
+from rotomai.data.rl_dataset import RLDataset, discounted_returns  # noqa: E402
+from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE  # noqa: E402
+from rotomai.features.encoder import OBS_DIM, OBS_VERSION  # noqa: E402
 
 
 def test_discounted_returns_single_episode():

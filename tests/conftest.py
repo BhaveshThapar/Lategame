@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from lategame.data.resim import _DEFAULT_SHOWDOWN
+from rotomai.data.resim import _DEFAULT_SHOWDOWN
 
 HAS_NODE = shutil.which("node") is not None
 HAS_SIM = (Path(_DEFAULT_SHOWDOWN) / "dist").is_dir()
@@ -74,7 +74,7 @@ def write_ac_checkpoint(path, obs_dim, *, hidden_dim=32, n_bins=21, v_min=-5.0, 
     """
     import torch
 
-    from lategame.model.actor_critic import ActorCritic
+    from rotomai.model.actor_critic import ActorCritic
 
     model = ActorCritic(obs_dim, hidden_dim=hidden_dim, n_bins=n_bins)
     torch.save(
@@ -87,7 +87,7 @@ def write_ac_checkpoint(path, obs_dim, *, hidden_dim=32, n_bins=21, v_min=-5.0, 
             "n_bins": n_bins,
             "v_min": v_min,
             "v_max": v_max,
-            "obs_version": __import__("lategame.features.encoder", fromlist=["x"]).OBS_VERSION,
+            "obs_version": __import__("rotomai.features.encoder", fromlist=["x"]).OBS_VERSION,
             "battle_format": battle_format,
             "metrics": {},
         },

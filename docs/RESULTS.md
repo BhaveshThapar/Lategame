@@ -1,6 +1,6 @@
 # Build log & findings
 
-The complete experimental record for [Lategame](../README.md): every lever and every build in the
+The complete experimental record for [RotomAI](../README.md): every lever and every build in the
 order it ran, with the pre-registration it was judged against and the verdict it got. Roughly a
 third are negative results kept at full length, because a lever that did not work is usually the
 reason the next one was chosen.
@@ -77,7 +77,7 @@ build log moved.
 
 - **R-ENCODE identity-prior gate — built + run; priors reach parity, do not clear OFF (AMBER).**
   Acted on the indicated next lever from the scaling sweep. Built dex-feature **pre-initialized
-  embeddings** (`lategame/features/embed_prior.py` + committed `data/id_priors_gen9.npz`, stamped
+  embeddings** (`rotomai/features/embed_prior.py` + committed `data/id_priors_gen9.npz`, stamped
   with `vocab_version`): species warm-started from base stats + types, moves from
   power/accuracy/type/category/priority/pp — all from local poke-env `GenData` (no network; the
   named "Smogon usage / species2vec" alternatives were dropped — species2vec is meaningless on
@@ -186,7 +186,7 @@ build log moved.
     replays = 9,734 transitions: 0 mismatches** (core *and* the stricter full digest incl.
     boosts/pp/item/ability), 0 drive errors, match rate **1.0000** (≥0.99 ⇒ build search). A
     negative control confirms the check has teeth (a fork stepped with a *swapped* choice does
-    **not** match). `lategame/search/{fidelity_driver.js,fidelity.py}`,
+    **not** match). `rotomai/search/{fidelity_driver.js,fidelity.py}`,
     `scripts/rpredict_fidelity_gate.py`, `results/rpredict_fidelity.json`, `tests/test_fidelity.py`
     (server-free, env-gated like `test_resim`).
   - **Forward model + reconstruction mini-gate — built, PASS.** Persistent
@@ -409,11 +409,11 @@ build log moved.
 
 - **OU pivot — Build 1: R-TEAM + OU ceiling re-run — built + run; GREEN (the OU ceiling is genuinely
   higher).** The cheap gate the L15 pivot demanded *before* committing the full OU pipeline. **R-TEAM
-  built:** `lategame/teambuilding/pool.py` — `TeamPool` (a poke-env `Teambuilder` yielding a
+  built:** `rotomai/teambuilding/pool.py` — `TeamPool` (a poke-env `Teambuilder` yielding a
   seeded-random team per battle from a curated, pre-validated packed pool); `scripts/build_ou_teampool.py`
   — a Gate-A legality preflight that packs Showdown-paste teams via poke-env and validates each against
   the bundled Showdown `validate-team gen9ou` (kill-gate if < 8 pass). 12/12 curated teams legal →
-  `lategame/teambuilding/data/teams_gen9ou.packed`; the validator caught real illegalities while authoring (Zamazenta can't
+  `rotomai/teambuilding/data/teams_gen9ou.packed`; the validator caught real illegalities while authoring (Zamazenta can't
   learn Roost; Gouging Fire and Baxcalibur are Uber-banned in this build). `team=` threaded through
   `eval.arena.build_player` (backward-compatible; RB leaves it `None`); `format_ceiling_gate.py`
   parameterized (`--format`/`--team-pool`/`--out`) — the teambuilt path runs an **M1-only smoke** to a
@@ -519,7 +519,7 @@ build log moved.
 
 - **OU pivot — Build 4: usage-prior imputation — built + run; RED (train obs verified at eval-full
   density and the agent is still dead → the binding failure is NOT own-kit detail density; lever killed).**
-  - **Built.** `lategame/data/usage_prior.py` (mirrors `embed_prior`'s build/write/load split): distills a
+  - **Built.** `rotomai/data/usage_prior.py` (mirrors `embed_prior`'s build/write/load split): distills a
     monthly Smogon chaos-stats JSON (gen9ou-1500, 2026-06; fetched by `scripts/build_usage_prior.py`, raw
     cached under gitignored `replays/usage/`) into a committed per-species top-K artifact
     (`features/data/usage_gen9ou.json`, 181 KB, **402 species kept / 0 skipped / 0 out-of-vocab ids** —
@@ -785,7 +785,7 @@ build log moved.
     order; the actual carrier was a channel none of them touched. (2) Distance is a screen, not a verdict —
     only the causal swap (with a self-swap identity control and an ALL-swap positive control) separates
     "different" from "responsible." Suite **244 pass** (+23: drift-probe pure logic + obs-capture),
-    ruff + `mypy lategame` clean (the gate scripts carry the same 2 pre-existing "assign to a type"
+    ruff + `mypy rotomai` clean (the gate scripts carry the same 2 pre-existing "assign to a type"
     monkeypatch notes as Build 6); `results/drift_probe.json` + `results/behavior_probe8.json` committed
     (obs/decisions/transcripts gitignored).
 - **OU Pivot — Build 9: the pp-channel fix (two gates: drop pp / add first_turn) — built + run; BOTH gates
@@ -831,7 +831,7 @@ build log moved.
     does not neutralize the carrier; the policy keeps weighting the (present) OOD channel. The carrier itself
     must be made robust. (3) The offline causal counterfactual (ΔP from a targeted channel edit) diagnosed
     the live failure with zero extra training — reuse it before proposing the next fix. Suite **245 pass**
-    (+1: the first_turn encoder test), ruff + `mypy lategame` clean; `results/bc_gate9a.json` +
+    (+1: the first_turn encoder test), ruff + `mypy rotomai` clean; `results/bc_gate9a.json` +
     `results/first_turn_gate9b.json` + `results/behavior_probe9b.json` committed (obs/decisions/transcripts
     gitignored).
 
@@ -839,7 +839,7 @@ build log moved.
   the loop PERSISTS, and the diagnostic proves the fix is region-local (can't reach the loop).** Build 9's
   pincer left "robustify pp" as the only branch, with two pre-registered mechanisms (noise/dropout, or
   synthesize full-pp deep-game states); this build runs **synthesize**. New train-time augmentation
-  `lategame/train/augment.py::augment_pp_full` (+`TrainConfig.pp_aug_frac/pp_aug_turn_threshold`, CLI
+  `rotomai/train/augment.py::augment_pp_full` (+`TrainConfig.pp_aug_frac/pp_aug_turn_threshold`, CLI
   `--pp-aug-frac`, +8 unit tests): on a random `frac` of **attack-labeled** (`action ≥ team_size`),
   **deep-turn** (normalized turn ≥ threshold) rows, force the active mon's pp channels to full (present-guarded,
   offsets from `OBS_LAYOUT`), so "full pp deep in a game → attack" is in-distribution. Applied **train-time
@@ -870,7 +870,7 @@ build log moved.
     (noise/dropout) or that can synthesize the failure region itself. (2) Passing the BC gate proves the
     augmentation didn't break imitation, but says nothing about the loop — the live probe + the ΔP diagnostic
     are what adjudicate, and here they agree the mechanism is untouched. Suite **253 pass** (+8 augment
-    tests), ruff + `mypy lategame` clean; `results/bc_gate10.json` + `results/behavior_probe10.json` +
+    tests), ruff + `mypy rotomai` clean; `results/bc_gate10.json` + `results/behavior_probe10.json` +
     `results/pp_reliance_diag10.json` committed (obs/decisions/transcripts + checkpoints gitignored).
 
 - **OU Pivot — Build 11: robustify pp by GLOBAL regularization (noise + resample), decide by gates —
@@ -878,7 +878,7 @@ build log moved.
   attenuates (loop depth 108 → 29, ~4×) without fully breaking it.** Build 10 ruled out synthesize; this
   build runs the *other* pre-registered candidate — a **global** pp regularizer applied in **every** context
   (no attack/deep gate), so it can reach the loop corner region-local synthesis could not. Two flavors added
-  beside `augment_pp_full` in `lategame/train/augment.py`: **`augment_pp_noise`** (Gaussian jitter on pp,
+  beside `augment_pp_full` in `rotomai/train/augment.py`: **`augment_pp_noise`** (Gaussian jitter on pp,
   `[0,1]`-clamped; `--pp-noise-std`) and **`augment_pp_resample`** (a random `frac` of present pp cells
   resampled from the batch's own pp pool — an empirical draw from the shard's ~50%-full pp distribution,
   mirroring the proven neutralization counterfactual; `--pp-resample-frac`). +`TrainConfig.pp_noise_std/
@@ -990,13 +990,13 @@ build log moved.
     structural bounce-back, is cheap, and needs no retrain (RL loop-penalty is the heavier sibling).
     **Recommendation: (b) first** (the pp-invariant `return|switch` says the bounce-back is structural, not a
     feature the encoder can robustify away), with (a) the principled-but-costly imitation alternative. OU
-    ceiling re-probe + OU PPO stay gated OFF. Suite 271 pass, ruff + mypy(lategame) clean;
+    ceiling re-probe + OU PPO stay gated OFF. Suite 271 pass, ruff + mypy(rotomai) clean;
     `results/pingpong_probe.json` + `behavior_probe_v13.json` committed (obs/decisions/transcripts + checkpoints
     gitignored).
 
 - **OU Pivot — Build 14: decision-time anti-repetition (loop guard) — the absorbing switch loop is BROKEN
   (`max_switch_run` 58/26 → 2/2), with a milder interleaved ping-pong residual persisting (rate 0.30-0.37 > 0.25).**
-  - **Runs + small code, no `OBS_VERSION` bump / re-ingest / retrain.** New `lategame/agents/loop_guard.py`
+  - **Runs + small code, no `OBS_VERSION` bump / re-ingest / retrain.** New `rotomai/agents/loop_guard.py`
     (`LoopGuard`, torch-free) wired into `BCAgent`/`OfflineRLAgent.choose_move` between `masked_logits` and the
     argmax; a `--loop-penalty` flag on `behavior_probe` threads it through `_build_probe_player` for a clean A/B on
     identical machinery. `LoopGuard(0)` is exact identity. Chosen mechanism (per user): a **soft escalating logit
@@ -1020,7 +1020,7 @@ build log moved.
     interleaved oscillation** (switch→attack→switch→attack, 2-periodic across turns). It is much milder (win vs
     random 0.58), and the still-~0 heuristic win reflects the OU policy's **general weakness (FORMAT_BOUND, gated
     off)**, not the loop.
-  - **Verdict: loop BROKEN, committed as-is.** Suite **276 pass** (271 + 5 loop-guard), ruff + mypy(lategame)
+  - **Verdict: loop BROKEN, committed as-is.** Suite **276 pass** (271 + 5 loop-guard), ruff + mypy(rotomai)
     clean; `results/behavior_probe_v14_{off,on}.json` committed (obs/decisions/transcripts + checkpoints
     gitignored). **Open next:** the interleaved residual would need a persists-across-attacks penalty (risks
     over-penalizing legit pivots and won't lift heuristic win); the heuristic-win frontier is the separate
@@ -1053,7 +1053,7 @@ build log moved.
     plays roughly at "always max-base-power" level vs the heuristic.)
   - **Verdict: OU is MODEL_BOUND — the project posture flips.** OU has real, uncaptured headroom → **OU strength
     (PPO self-play / better BC data) is now the justified next build.** The interleaved ping-pong residual
-    deprioritizes (won't lift the heuristic win). Suite **281 pass** (276 + 5), ruff + mypy(lategame) clean;
+    deprioritizes (won't lift the heuristic win). Suite **281 pass** (276 + 5), ruff + mypy(rotomai) clean;
     `results/format_ceiling_gate_ou_v15.json` committed. **Open next:** OU strength push (Option C) — turn the
     heavier machinery on to close the 0.567 model gap; M2 (OU near-optimal search) / M3 (OU replays) remain
     deferred (the wide-band simpleheuristics evidence already rejects FORMAT_BOUND without them).
@@ -1096,7 +1096,7 @@ build log moved.
     is the **first method to move OU vs-heuristic with CI-clean significance** (0.057 → 0.133), with decisive
     self-improvement and no collapse ⇒ **the RB AMBER did NOT transfer** (it was a format artifact). But 0.133 is
     still far below the competent bot 0.643 — the gap is **dented (~10%), not closed**. `MODEL_BOUND` reconfirmed.
-    Suite **289 pass** (281 + 8), ruff + mypy(lategame) clean; `results/ppo_ou_gate_v16.json` +
+    Suite **289 pass** (281 + 8), ruff + mypy(rotomai) clean; `results/ppo_ou_gate_v16.json` +
     `results/format_ceiling_gate_ou_v16.json` + `checkpoints/offrl_gen9ou_v7_s0.pt` +
     `checkpoints/ppo_ou_et_prior_s{0,1,2}/`. **Open next (AMBER follow-ups):** the vs_random curve was still
     climbing at iter 10 and self-play ran on only a **12-team pool** — the prime ceiling suspect. Candidates:
@@ -1128,7 +1128,7 @@ build log moved.
   - **Verdict: stronger `AMBER` — the "still-climbing" outcome.** Iterations were the binding lever, not the pool:
     the same 12 teams and warm-start went from 0.133 → 0.303 vs heuristic purely on more training, and the curve is
     *still rising* at iter 25 (plateau not yet found). `MODEL_BOUND` reconfirmed; the gap is dented ~1/3 more but
-    not closed. Suite **289 pass** (no code change this build), ruff + mypy(lategame) clean;
+    not closed. Suite **289 pass** (no code change this build), ruff + mypy(rotomai) clean;
     `results/ppo_ou_gate_v17.json` + `results/format_ceiling_gate_ou_v17.json` + `checkpoints/ppo_ou_long_s{0,1,2}/`
     (gitignored). **Open next:** the plateau is *still* not reached (s1 best = final iter) → **extend iters again**
     is the cheapest, still-evidenced move (watch for the flatten); team-pool expansion (`build_ou_teampool.py`) and
@@ -1643,7 +1643,7 @@ build log moved.
     never forwarded one, so the whole lineage ran at the frozen `PPOConfig` default. `--target-kl` is
     now threaded through to the result JSON and guarded in `ARM_FIELDS`; `ppo_telemetry.py --kl-bar`
     stops the certificate from naming a bar the optimizer never enforced; and
-    `LATEGAME_SHOWDOWN_PORT_BASE` keeps two concurrent arrays off each other's Showdown servers —
+    `ROTOMAI_SHOWDOWN_PORT_BASE` keeps two concurrent arrays off each other's Showdown servers —
     without it both arms compute ports 8100-8102 and silently battle into each other's games.
   - **Cost:** ~9–11 h wall-clock with the arms concurrent; 6 seeds × 80 × 17.4 MiB = **8.4 GB** of
     new checkpoints (85 GB free). The two-arm strength gate is ~11 min.
@@ -2185,7 +2185,7 @@ build log moved.
     resume** in `ppo_continue_gate.py`, so a walltime kill loses a whole ~23 h arm.
     (b) **Port base.** `_job_common.sh` computes `8100 + TASK_ID`, so two concurrent `--array=0-2`
     arrays both claim 8100–8102, and colliding tasks **silently share one Showdown server** rather
-    than failing. `v26b` must be submitted with `LATEGAME_SHOWDOWN_PORT_BASE=8200`.
+    than failing. `v26b` must be submitted with `ROTOMAI_SHOWDOWN_PORT_BASE=8200`.
     **Disk:** ~29 GB needed (measured: `ppo_v25b_s0` is 2.8 GB / 160 iters ≈ 17.5 MB/iter) against
     **78 GB** free — not the 146 GB quoted above, which is stale.
   - **ATTEMPT 1 FAILED 4/6 ARMS (2026-08-06 → 08-08). Booked here rather than quietly re-run,
@@ -2325,9 +2325,9 @@ build log moved.
 
 - **M5 / G1 — LIVE PLAY, built and verified end-to-end (2026-08-10).** Every build through 26 plays
   a *fixed* baseline on a local server, where win rate is the sufficient statistic. G2 is stated in
-  GXE/Glicko-1 instead, and those are ladder metrics. `lategame/live/` is the missing half: three
+  GXE/Glicko-1 instead, and those are ladder metrics. `rotomai/live/` is the missing half: three
   modes (`challenge` / `accept` / `ladder`), a session supervisor, and Glicko-1/GXE telemetry,
-  driven by `lategame live`. Verified against a real local server — two players, real websocket,
+  driven by `rotomai live`. Verified against a real local server — two players, real websocket,
   real battle, the finalize sweep, GXE computed, results file written. **Three findings, each a
   case where the obvious implementation is silently wrong.**
   - **`ShowdownException` NEVER REACHES THE CALLER'S `await`.** poke-env dispatches each message in
@@ -2358,7 +2358,7 @@ build log moved.
     rare. `eval/ladder.py` below avoids `cross_evaluate` for exactly this reason.
   - **The ladder gate holds at all three levels.** No ack fails; a wrong phrase is rejected by
     `argparse` `choices` rather than silently falling back to a non-ladder mode; and the right
-    phrase without `LATEGAME_LIVE_ALLOW_LADDER=1` still refuses, with the policy note. Requiring
+    phrase without `ROTOMAI_LIVE_ALLOW_LADDER=1` still refuses, with the policy note. Requiring
     both channels is the point: a CLI flag cannot be inherited from a stale export, and an
     environment variable cannot be picked up from shell history.
   - **G2 was still uncomputed after this build, and that is a measurement fact, not a gap.** A live
@@ -2370,7 +2370,7 @@ build log moved.
 - **R-LADDER — the agent-only eval ladder: G2's headline metric, computed without touching the
   human ladder (2026-08-10).** §12's last line asks for evaluation "on a private/agent-only server
   or eval ladder wherever possible", and §16 Q5 is now answered: there is no unranked public
-  ladder, so that route is the only one. `lategame/eval/ladder.py` (`lategame eval-ladder`) plays a
+  ladder, so that route is the only one. `rotomai/eval/ladder.py` (`rotomai eval-ladder`) plays a
   round-robin over a heterogeneous field on the local server and fits every rating **jointly**.
   New file rather than an extension of `eval/rating.py` or `eval/arena.py`, both of which were on
   the frozen path of the running Build 26 jobs; it imports them and adds nothing to them.
@@ -2609,7 +2609,7 @@ build log moved.
     cheap probe there was *decisive*. On doubles the same probe is **not decisive**, because every
     agent cheap enough to run before building the pipeline is a singles policy applied per slot.
     Deciding G4 by measurement therefore costs more than the idiom promised: it needs either a
-    doubles M2 (extend `lategame/search/` to doubles — the forward model already serialises and
+    doubles M2 (extend `rotomai/search/` to doubles — the forward model already serialises and
     steps arbitrary battles) or a doubles-competent reference to put at the top of the gradient.
     Recording the cost honestly is better than reading a suggestive M1 as a verdict it cannot bear.
 
@@ -2950,7 +2950,7 @@ build log moved.
 
   - **CI WAS RED ON EVERY PUSH, INCLUDING THE PUSH THAT ADDED IT.** The workflow runs a bare
     `pytest -q`; four test modules do `from tests.conftest import ...`; `tests/` is not a package
-    and `[tool.setuptools.packages.find] include = ["lategame*"]` makes the editable install
+    and `[tool.setuptools.packages.find] include = ["rotomai*"]` makes the editable install
     finder-based, so nothing puts the repo root on `sys.path` for that invocation. The failure is
     at COLLECTION — `Interrupted: 4 errors during collection`, 0 tests run. The reported-green
     708/6 was measured through `python -m pytest`, the one form that hides it. `pythonpath = ["."]`
@@ -3005,7 +3005,7 @@ build log moved.
     the count was written, so it was stale on arrival rather than drifted. All ten were mechanical
     (4 redundant `# type: ignore`, an invariant `list[Parameter]`, a `sys.exit(main())` over a
     None-returning `main`, two monkeypatch assignments-to-a-type, and one `Sequence[Decision]` that
-    wanted a protocol). The fix is not `2 -> 10`: the bar is now `mypy lategame scripts` in both
+    wanted a protocol). The fix is not `2 -> 10`: the bar is now `mypy rotomai scripts` in both
     places and the count is deleted. Same reasoning as `113c07a` — a number nobody runs is a claim
     nobody can check.
 
@@ -3116,7 +3116,7 @@ build log moved.
     and ci.yml each called a 16th skip a regression, and leaving that would have made CI's own
     documentation contradict CI. Two other numbers in that block were wrong and are now measured:
     "0 skipped with the env active" was never true (the opt-in live smoke skips unless
-    `LATEGAME_LIVE_TEST=1`), and `node` merely being *installed* is not enough — it has to be **on
+    `ROTOMAI_LIVE_TEST=1`), and `node` merely being *installed* is not enough — it has to be **on
     PATH**, or six simulator tests self-skip with `dist/` built and the count reads 719/7 instead
     of 725/1. Measured: **710 pass / 16 skip** bare clone, **725 pass / 1 skip** with env + server.
 

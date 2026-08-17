@@ -10,12 +10,12 @@ import numpy as np
 import pytest
 import torch
 
-from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-from lategame.features.embed_prior import load_id_priors
-from lategame.features.encoder import OBS_DIM
-from lategame.model.entity_transformer import EntityTransformer
-from lategame.model.factory import MODEL_ENTITY_TRANSFORMER, build_model
-from lategame.train.offline_rl import OfflineRLConfig
+from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
+from rotomai.features.embed_prior import load_id_priors
+from rotomai.features.encoder import OBS_DIM
+from rotomai.model.entity_transformer import EntityTransformer
+from rotomai.model.factory import MODEL_ENTITY_TRANSFORMER, build_model
+from rotomai.train.offline_rl import OfflineRLConfig
 
 
 def _meta(config: OfflineRLConfig) -> dict:
@@ -68,7 +68,7 @@ def test_id_embed_off_drops_embeddings():
 
 def _write_rl_shard(path) -> None:
     """A minimal valid offline-RL shard (one episode) so train_offline_rl can run."""
-    from lategame.features.encoder import OBS_VERSION
+    from rotomai.features.encoder import OBS_VERSION
 
     k = 8
     np.savez_compressed(
@@ -87,9 +87,9 @@ def _write_rl_shard(path) -> None:
 
 def _write_bc_policy_checkpoint(path, hidden_dim=32) -> None:
     """A flat-MLP BC checkpoint stamped exactly as ``train_bc`` writes it (BC_POLICY)."""
-    from lategame.features.encoder import OBS_VERSION
-    from lategame.model.policy import BCPolicy
-    from lategame.train.bc import BC_POLICY
+    from rotomai.features.encoder import OBS_VERSION
+    from rotomai.model.policy import BCPolicy
+    from rotomai.train.bc import BC_POLICY
 
     model = BCPolicy(OBS_DIM, hidden_dim=hidden_dim)
     torch.save(
@@ -110,7 +110,7 @@ def _write_bc_policy_checkpoint(path, hidden_dim=32) -> None:
 def test_bc_policy_checkpoint_warm_starts_offrl(tmp_path):
     """Regression: a ``bc_policy``-stamped checkpoint must take the BC->AC warm-start
     path. It previously fell through to AC->AC and raised KeyError('n_bins')."""
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data = tmp_path / "rl.npz"
     bc = tmp_path / "bc.pt"
@@ -128,7 +128,7 @@ def test_bc_policy_checkpoint_warm_starts_offrl(tmp_path):
 
 def _write_transformer_ac_checkpoint(path, arch: dict, n_bins: int = 51) -> None:
     """An ``entity_transformer`` actor-critic checkpoint, stamped as offrl writes it."""
-    from lategame.features.encoder import OBS_VERSION
+    from rotomai.features.encoder import OBS_VERSION
 
     meta = {
         "model_type": MODEL_ENTITY_TRANSFORMER,
@@ -174,8 +174,8 @@ def test_ff_dim_sizes_the_feedforward():
 
 def _run_cli_train_rl(monkeypatch, argv: list[str]):
     """Parse a train-rl command line and capture the OfflineRLConfig it would train with."""
-    import lategame.train.offline_rl as offrl
-    from lategame.cli import _run_train_rl, build_parser
+    import rotomai.train.offline_rl as offrl
+    from rotomai.cli import _run_train_rl, build_parser
 
     captured = {}
 
@@ -223,7 +223,7 @@ def test_cli_unset_arch_flags_are_not_explicit(monkeypatch):
 def test_explicit_arch_conflicting_with_warm_start_raises(tmp_path):
     """The footgun: an AC->AC warm-start overwrites model_meta from the checkpoint, so
     --d-model 256 against a 128-wide checkpoint silently trained a 128-wide net."""
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data = tmp_path / "rl.npz"
     init = tmp_path / "init.pt"
@@ -251,8 +251,8 @@ def test_explicit_arch_conflicting_with_warm_start_raises(tmp_path):
 def test_warm_start_without_explicit_arch_adopts_checkpoint(tmp_path):
     """Regression for the self-play loop (selfplay.py:179): it passes bc_init=<AC ckpt>
     and no arch fields, relying on the checkpoint's arch winning. That must still work."""
-    from lategame.model.factory import model_metadata
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.model.factory import model_metadata
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data = tmp_path / "rl.npz"
     init = tmp_path / "init.pt"

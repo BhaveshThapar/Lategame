@@ -23,8 +23,8 @@ import math
 
 import pytest
 
-from lategame.eval import ladder as L
-from lategame.eval.ladder import (
+from rotomai.eval import ladder as L
+from rotomai.eval.ladder import (
     DEFAULT_FIELD,
     FieldEntry,
     LadderError,
@@ -35,7 +35,7 @@ from lategame.eval.ladder import (
     summarize_ladder,
     write_results,
 )
-from lategame.eval.rating import DEFAULT_RATING, MAX_RD, Rating, expected_score, g
+from rotomai.eval.rating import DEFAULT_RATING, MAX_RD, Rating, expected_score, g
 
 
 def _round_robin(true_ratings: dict[str, float], n: int) -> list[PairResult]:
@@ -280,7 +280,7 @@ def test_two_agent_fit_is_not_rate_win_rate():
     toward 1500. This module solves the score equation instead, which is unshrunk. They agree in
     sign and ordering and must not be expected to agree in value.
     """
-    from lategame.eval.rating import rate_win_rate
+    from rotomai.eval.rating import rate_win_rate
 
     single_period = rate_win_rate(0.75, 100)
     fit = rate_field([PairResult("a", "b", wins=75, losses=25, ties=0, games=100)], anchor="b")
@@ -458,7 +458,7 @@ def test_round_robin_scores_every_pair_from_the_counters(monkeypatch):
         built[name] = _FakePlayer(name, script[name])
         return built[name]
 
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     monkeypatch.setattr(arena, "build_player", _fake_build_player)
     monkeypatch.setattr(arena, "AGENTS", {"a": object, "b": object, "c": object})
@@ -476,7 +476,7 @@ def test_round_robin_scores_every_pair_from_the_counters(monkeypatch):
 
 
 def test_round_robin_refuses_an_unknown_agent(monkeypatch):
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     monkeypatch.setattr(arena, "AGENTS", {"heuristic": object})
     with pytest.raises(LadderError, match="unknown agent"):
@@ -498,7 +498,7 @@ def test_pairs_are_scored_by_difference_when_reset_is_refused(monkeypatch):
         player.refuse_reset = True  # every reset fails, so counters never zero
         return player
 
-    import lategame.eval.arena as arena
+    import rotomai.eval.arena as arena
 
     monkeypatch.setattr(arena, "build_player", _fake_build_player)
     monkeypatch.setattr(arena, "AGENTS", {"a": object, "b": object, "c": object})

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from lategame.data.ingest import _reconstruct_pov, ingest_replays
-from lategame.data.replays import _rating_of
-from lategame.data.reward import RewardWeights
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from rotomai.data.ingest import _reconstruct_pov, ingest_replays
+from rotomai.data.replays import _rating_of
+from rotomai.data.reward import RewardWeights
+from rotomai.features.encoder import OBS_DIM, OBS_VERSION
 
 # p1 (Alice) wins. p1 line: Thunderbolt; switch to (unseen) Charizard [first reveal
 # -> dropped]; switch back to Pikachu [pivot -> kept]; tera + Thunderbolt. p2 (Bob):
@@ -118,8 +118,8 @@ def test_ingest_dataset_shapes_rewards_and_dones() -> None:
 
 
 def test_schema_parity_loads_via_rl_dataset(tmp_path) -> None:
-    from lategame.data.collect import save_rl
-    from lategame.data.rl_dataset import RLDataset
+    from rotomai.data.collect import save_rl
+    from rotomai.data.rl_dataset import RLDataset
 
     replay = {"id": "t", "format": "gen9randombattle", "players": ["Alice", "Bob"], "log": LOG}
     rl, _, _ = ingest_replays([replay], weights=_WEIGHTS)
@@ -195,7 +195,7 @@ OU_LOG = "\n".join(
 
 
 def test_ou_preview_gives_full_rosters_in_encoded_obs() -> None:
-    from lategame.features.encoder import OBS_LAYOUT, embed_battle
+    from rotomai.features.encoder import OBS_LAYOUT, embed_battle
 
     battle, records, _, _ = _reconstruct_pov(OU_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
     # Own six are seeded into battle.team from preview (poke-env drops the ego preview).
@@ -315,7 +315,7 @@ COMPLETE_LOG = "\n".join(
 
 def _own_active_detail(obs: np.ndarray) -> tuple[bool, bool, int]:
     """(item-known, ability-known, active-move-count) read from the encoder ID channels."""
-    from lategame.features.encoder import OBS_LAYOUT
+    from rotomai.features.encoder import OBS_LAYOUT
 
     pdim = OBS_LAYOUT.pokemon_dim
     ms, md = OBS_LAYOUT.moves_start, OBS_LAYOUT.move_dim
@@ -329,7 +329,7 @@ def _own_active_detail(obs: np.ndarray) -> tuple[bool, bool, int]:
 
 
 def test_prescan_recovers_full_kit_including_consumed_item() -> None:
-    from lategame.data.ingest import _prescan_kits, _team_key
+    from rotomai.data.ingest import _prescan_kits, _team_key
 
     kits = _prescan_kits(COMPLETE_LOG.split("\n"), "Alice", "t", 9, _WEIGHTS)
     kit = kits[_team_key("p1a: Kingambit")]
@@ -340,9 +340,9 @@ def test_prescan_recovers_full_kit_including_consumed_item() -> None:
 
 
 def test_two_pass_completes_active_kit_at_early_decision() -> None:
-    from lategame.data.ingest import _prescan_kits
-    from lategame.features import vocab
-    from lategame.features.encoder import OBS_LAYOUT
+    from rotomai.data.ingest import _prescan_kits
+    from rotomai.features import vocab
+    from rotomai.features.encoder import OBS_LAYOUT
 
     lines = COMPLETE_LOG.split("\n")
     _, off, _, _ = _reconstruct_pov(lines, "Alice", "t", 9, _WEIGHTS, kits=None)
@@ -361,7 +361,7 @@ def test_two_pass_completes_active_kit_at_early_decision() -> None:
 
 
 def test_two_pass_keeps_consumed_item_unknown_after_knockoff() -> None:
-    from lategame.data.ingest import _prescan_kits
+    from rotomai.data.ingest import _prescan_kits
 
     lines = COMPLETE_LOG.split("\n")
     kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
@@ -373,7 +373,7 @@ def test_two_pass_keeps_consumed_item_unknown_after_knockoff() -> None:
 
 
 def test_backfilled_move_claims_its_canonical_slot() -> None:
-    from lategame.data.ingest import _prescan_kits
+    from rotomai.data.ingest import _prescan_kits
 
     # Swap the reveal order: Sucker Punch turn 1, Kowtow Cleave turn 2. Two-pass backfill
     # gives the turn-1 decision the full {kowtowcleave, suckerpunch} set, and kowtowcleave
@@ -398,7 +398,7 @@ def _fake_prior():
     Kingambit's prior item is deliberately NOT its true Air Balloon, to prove revealed
     truth always beats the prior. Move lists carry exactly the mass needed to fill to 4.
     """
-    from lategame.data.usage_prior import SpeciesUsage, UsagePrior
+    from rotomai.data.usage_prior import SpeciesUsage, UsagePrior
 
     return UsagePrior(
         version="test",
@@ -433,9 +433,9 @@ def _fake_prior():
 
 
 def test_impute_fills_unrevealed_kit_to_full() -> None:
-    from lategame.data.ingest import _impute_kits, _prescan_kits, _team_key
-    from lategame.features import vocab
-    from lategame.features.encoder import OBS_LAYOUT
+    from rotomai.data.ingest import _impute_kits, _prescan_kits, _team_key
+    from rotomai.features import vocab
+    from rotomai.features.encoder import OBS_LAYOUT
 
     lines = COMPLETE_LOG.split("\n")
     kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
@@ -460,8 +460,8 @@ def test_impute_fills_unrevealed_kit_to_full() -> None:
 
 
 def test_impute_deterministic_across_runs_and_timesteps() -> None:
-    from lategame.data.ingest import _impute_kits, _prescan_kits
-    from lategame.data.usage_prior import load_usage_prior
+    from rotomai.data.ingest import _impute_kits, _prescan_kits
+    from rotomai.data.usage_prior import load_usage_prior
 
     prior = load_usage_prior("gen9ou")  # the committed artifact -- also exercises its ids
     assert prior is not None
@@ -479,7 +479,7 @@ def test_impute_deterministic_across_runs_and_timesteps() -> None:
 
 
 def test_impute_never_overwrites_consumed_item() -> None:
-    from lategame.data.ingest import _impute_kits, _prescan_kits
+    from rotomai.data.ingest import _impute_kits, _prescan_kits
 
     lines = COMPLETE_LOG.split("\n")
     kits = _prescan_kits(lines, "Alice", "t", 9, _WEIGHTS)
@@ -491,8 +491,8 @@ def test_impute_never_overwrites_consumed_item() -> None:
 
 
 def test_impute_missing_species_counts_and_falls_back() -> None:
-    from lategame.data.ingest import _impute_kits, _prescan_kits, _team_key
-    from lategame.data.usage_prior import UsagePrior
+    from rotomai.data.ingest import _impute_kits, _prescan_kits, _team_key
+    from rotomai.data.usage_prior import UsagePrior
 
     prior = _fake_prior()
     gholdengo_only = UsagePrior(

@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lategame.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PolicyError
-from lategame.live.session import LiveConfig, _accept_list, chunk_count, run_session
+from rotomai.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PolicyError
+from rotomai.live.session import LiveConfig, _accept_list, chunk_count, run_session
 
 
 class FakePlayer:
@@ -23,7 +23,7 @@ class FakePlayer:
         self.battles = {}
         self._opp_rating = opp_rating
         self.n_finished_battles = 0
-        self.username = "lategamebot"
+        self.username = "rotomaibot"
         self.plays: list[tuple] = []  # (mode, k, opponent) -- play calls only
         self.stopped = False
         self._hang = hang
@@ -174,7 +174,7 @@ async def test_results_file_is_rewritten_after_every_battle(tmp_path):
 
 async def test_a_wedged_connection_trips_the_watchdog_and_restarts(tmp_path, monkeypatch):
     """poke-env neither raises nor reconnects, so this must be caught by timeout."""
-    monkeypatch.setattr("lategame.live.session._WATCHDOG_PERIOD", 0.05)
+    monkeypatch.setattr("rotomai.live.session._WATCHDOG_PERIOD", 0.05)
     built = []
 
     def factory(cfg):
@@ -194,7 +194,7 @@ async def test_a_wedged_connection_trips_the_watchdog_and_restarts(tmp_path, mon
 
 
 async def test_restarts_are_bounded(tmp_path, monkeypatch):
-    monkeypatch.setattr("lategame.live.session._WATCHDOG_PERIOD", 0.05)
+    monkeypatch.setattr("rotomai.live.session._WATCHDOG_PERIOD", 0.05)
     built = []
 
     def factory(cfg):
@@ -212,7 +212,7 @@ async def test_restarts_are_bounded(tmp_path, monkeypatch):
 
 async def test_a_failed_login_is_fatal_and_never_retried(tmp_path):
     """Hammering a bad password is how a live account gets locked."""
-    from lategame.live.player import LoginError
+    from rotomai.live.player import LoginError
 
     built = []
 
@@ -243,7 +243,7 @@ async def test_stop_event_drains_cleanly(tmp_path):
 
 
 async def test_credentials_never_reach_the_results_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("LATEGAME_PS_PASSWORD", "hunter2-do-not-leak")
+    monkeypatch.setenv("ROTOMAI_PS_PASSWORD", "hunter2-do-not-leak")
     await run_session(_cfg(tmp_path, mode="accept", n=1), lambda c: FakePlayer())
     raw = (tmp_path / "live.json").read_bytes()
     assert b"hunter2-do-not-leak" not in raw

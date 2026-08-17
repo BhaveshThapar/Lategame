@@ -25,8 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lategame.model.factory import MODEL_ENTITY_TRANSFORMER
-from lategame.train.bc import TrainConfig, train_bc
+from rotomai.model.factory import MODEL_ENTITY_TRANSFORMER
+from rotomai.train.bc import TrainConfig, train_bc
 
 # 4196 is the original R-ENCODE gate's sample count -> kept as an anchor for continuity.
 _RUNGS = (1000, 2000, 4196, 8000, 16000, 32000, 64000, 128000)

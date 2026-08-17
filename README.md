@@ -1,4 +1,4 @@
-# Lategame
+# RotomAI
 
 A competitive Pokémon Showdown battle agent, trained and evaluated end to end against a pinned local
 simulator. Behaviour cloning → offline RL → PPO self-play, across three formats — `gen9randombattle`,
@@ -6,23 +6,23 @@ simulator. Behaviour cloning → offline RL → PPO self-play, across three form
 and the negative results kept.
 
 [**Quickstart**](#quickstart) · [**Results**](#results) · [**Build log**](docs/RESULTS.md) ·
-[**Design doc**](plan.md) · [**Releases**](https://github.com/BhaveshThapar/Lategame/releases)
+[**Design doc**](plan.md) · [**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
 
 ---
 
 ## Quickstart
 
 ```bash
-conda env create -f environment.yml && conda activate lategame
+conda env create -f environment.yml && conda activate rotomai
 bash scripts/setup_server.sh          # vendored Showdown at a pinned rev, builds dist/
 bash scripts/run_server.sh &          # ws://localhost:8000
 
-python -m lategame.cli evaluate --p1 heuristic --p2 random --n 20 --format gen9ou
+python -m rotomai.cli evaluate --p1 heuristic --p2 random --n 20 --format gen9ou
 ```
 
 The rule-based baseline against `random` on a local server, printing a win rate. **No weights, no
 GPU, no network** — team pools for the teambuilt formats are committed and defaulted per format.
-`lategame --help` lists the rest; [Run](#run) covers training and evaluation, [Develop](#develop)
+`rotomai --help` lists the rest; [Run](#run) covers training and evaluation, [Develop](#develop)
 the test / lint / type bar.
 
 To play the *trained* agents, fetch the release weights — see
@@ -34,7 +34,7 @@ To play the *trained* agents, fetch the release weights — see
 
 | goal | status | headline |
 |---|---|---|
-| **G1** live play | built + verified | `lategame/live/`, behind an explicit opt-in |
+| **G1** live play | built + verified | `rotomai/live/`, behind an explicit opt-in |
 | **G2** strong-human on one format | **met, both halves** | gen9ou **0.7513** vs the heuristic; agent-only ladder **Glicko 1776.3 / GXE 0.7434** |
 | **G3** continual improvement | **booked** | five-dose self-play curve, monotone on both reads (80 → 320 updates) |
 | **G4** ≥3 formats through one core | **met** | `gen9randombattle`, `gen9ou`, `gen9vgc2025regi` end to end |
@@ -62,7 +62,7 @@ in [plan.md](plan.md).
 # 1. Python env (Python 3.11, isolated) — environment.yml runs `pip install -e ".[dev,ml]"`,
 #    torch included: train / grad_noise_diag / the bc agent all die at the first `import torch`
 conda env create -f environment.yml
-conda activate lategame
+conda activate rotomai
 
 # 2. On a CPU-only box, install the CPU torch wheel FIRST to avoid pulling ~2.5 GB of CUDA:
 #    pip install "torch>=2.2" --index-url https://download.pytorch.org/whl/cpu
@@ -92,13 +92,13 @@ node scripts/gen_inputlog_fixture.js third_party/pokemon-showdown
 bash scripts/run_server.sh
 
 # Evaluate agents head-to-head (the heuristic is the baseline to beat)
-python -m lategame.cli evaluate --p1 heuristic --p2 random --n 100
-python -m lategame.cli evaluate --p1 offrl --p2 heuristic --n 100
+python -m rotomai.cli evaluate --p1 heuristic --p2 random --n 100
+python -m rotomai.cli evaluate --p1 offrl --p2 heuristic --n 100
 ```
 
 Agent names: `random`, `maxbasepower`, `simpleheuristics`, `heuristic` (baselines);
 `bc`, `offrl`, `ppo` (learned — load their default checkpoint); `search` (R-PREDICT
-depth-limited lookahead on the GREEN checkpoint — config via `LATEGAME_SEARCH_*` env vars).
+depth-limited lookahead on the GREEN checkpoint — config via `ROTOMAI_SEARCH_*` env vars).
 
 **Score a PPO checkpoint through `offrl`, never through `ppo`.** `PPORecordingAgent` is the
 training rollout agent and forces `sample=True`; the same `v25b` terminal checkpoint measures
@@ -113,21 +113,21 @@ checkpoints greedily through `offrl`, which is the deployed policy. `eval-ladder
 # information a win rate did not. Round-robin + one joint Bradley-Terry fit on the Glicko scale,
 # with `heuristic` pinned at 1500 to fix the gauge. NOT a replacement for seed_strength_gate.py,
 # and NOT comparable to a Showdown GXE (which is measured against humans).
-python -m lategame.cli eval-ladder --format gen9ou \
-    --team-pool lategame/teambuilding/data/teams_gen9ou.packed \
+python -m rotomai.cli eval-ladder --format gen9ou \
+    --team-pool rotomai/teambuilding/data/teams_gen9ou.packed \
     --n 150 --out results/eval_ladder_gen9ou.json
 
 # M5 deploy / G1 — live server. Default mode is `accept` (opt-in opponents only). Credentials come
-# from $LATEGAME_PS_USERNAME / $LATEGAME_PS_PASSWORD and never reach --out.
-python -m lategame.cli live --agent ppo --mode accept --n 5 --format gen9ou
-python -m lategame.cli live --mode challenge --opponent <user> --n 3   # opt-in opponent
-python -m lategame.cli live --server ws://localhost:8000/showdown/websocket --allow-guest --n 1
+# from $ROTOMAI_PS_USERNAME / $ROTOMAI_PS_PASSWORD and never reach --out.
+python -m rotomai.cli live --agent ppo --mode accept --n 5 --format gen9ou
+python -m rotomai.cli live --mode challenge --opponent <user> --n 3   # opt-in opponent
+python -m rotomai.cli live --server ws://localhost:8000/showdown/websocket --allow-guest --n 1
 
 # `--mode ladder` is the PUBLIC RANKED ladder, which plan.md NG3 puts out of scope. There is no
 # unranked ladder: `/search` on the public server IS the rated one. It needs BOTH opt-in channels,
 # so neither a stale export nor a recalled command can start ranked play on its own:
-#   export LATEGAME_LIVE_ALLOW_LADDER=1
-#   python -m lategame.cli live --mode ladder --ladder-ack i-have-read-plan-md-section-15 \
+#   export ROTOMAI_LIVE_ALLOW_LADDER=1
+#   python -m rotomai.cli live --mode ladder --ladder-ack i-have-read-plan-md-section-15 \
 #       --use-live-ratings --n 50
 # --use-live-ratings rates each opponent at its OBSERVED rating instead of pinning the field;
 # without it the session's GXE is a reparameterisation of its own score rate. Read plan.md 15 first.
@@ -137,12 +137,12 @@ python -m lategame.cli live --server ws://localhost:8000/showdown/websocket --al
 
 ```bash
 # M2/M3 — collect self-play trajectories, train BC then offline RL
-python -m lategame.cli collect-rl --n 50
-python -m lategame.cli train-rl   --data data/gen9rb_rl.npz
+python -m rotomai.cli collect-rl --n 50
+python -m rotomai.cli train-rl   --data data/gen9rb_rl.npz
 
 # M4/M5 — self-play league / on-policy PPO improvement loops
-python -m lategame.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
-python -m lategame.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
+python -m rotomai.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
+python -m rotomai.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
 
 # Lever experiment gates (win-rate vs the heuristic; write results/*.json)
 python scripts/offrl_scale_gate.py     --out results/offrl_scale_gate.json   # Lever 9: AWR @ 82k (GREEN)
@@ -198,26 +198,26 @@ sbatch -p tron --qos=medium scripts/cluster/build26_analysis.slurm
 # R-EVAL — the agent-only eval ladder. On the cluster, scripts/cluster/eval_ladder.slurm.
 #   MUST set a port base clear of any in-flight PPO build: _job_common.sh computes 8100 + TASK_ID,
 #   a non-array job takes TASK_ID=0 -> 8100, and colliding jobs SILENTLY SHARE one Showdown server.
-#   The slurm wrapper defaults LATEGAME_SHOWDOWN_PORT_BASE=8300 for exactly this reason.
+#   The slurm wrapper defaults ROTOMAI_SHOWDOWN_PORT_BASE=8300 for exactly this reason.
 OUT=results/eval_ladder_gen9ou.json sbatch -p tron --qos=medium scripts/cluster/eval_ladder.slurm
 
 # M6 — human replays: fetch, then reconstruct each player's POV either from the public
 # spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
-python -m lategame.cli fetch-replays  --min-rating 1200 --limit 200
-python -m lategame.cli ingest-replays --out data/ingest_gen9rb_rl.npz   # v1 (public-log POV)
-python -m lategame.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (needs node + dist/)
+python -m rotomai.cli fetch-replays  --min-rating 1200 --limit 200
+python -m rotomai.cli ingest-replays --out data/ingest_gen9rb_rl.npz   # v1 (public-log POV)
+python -m rotomai.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (needs node + dist/)
 ```
 
 ### Using the released weights
 
 **The weights are on the release.** Three checkpoints, 23 MiB, one playable policy per teambuilt
 format:
-[v1.0.0](https://github.com/BhaveshThapar/Lategame/releases/tag/v1.0.0).
+[v1.0.0](https://github.com/BhaveshThapar/RotomAI/releases/tag/v1.0.0).
 **Restore the paths as you download** — the manifest keys on them, and the gen9ou asset is attached
 under the bare name `iter_320.pt`, which does not say which arm it came from:
 
 ```bash
-B=https://github.com/BhaveshThapar/Lategame/releases/download/v1.0.0
+B=https://github.com/BhaveshThapar/RotomAI/releases/download/v1.0.0
 mkdir -p checkpoints/ppo_v26b_s0
 curl -sL -o checkpoints/ppo_v26b_s0/iter_320.pt  $B/iter_320.pt          # gen9ou, 17.4 MiB
 curl -sL -o checkpoints/doubles_offrl_vgc_v2.pt  $B/doubles_offrl_vgc_v2.pt
@@ -225,7 +225,7 @@ curl -sL -o checkpoints/doubles_bc_vgc_v2.pt     $B/doubles_bc_vgc_v2.pt
 
 python scripts/release_assets.py --verify        # want: 3/3 release assets present and verified
 
-python -m lategame.cli evaluate --p1 offrl --p1-checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
+python -m rotomai.cli evaluate --p1 offrl --p1-checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
   --p2 heuristic --n 100 --format gen9ou         # the gen9ou ladder top vs the fixed baseline
 ```
 
@@ -246,7 +246,7 @@ than reporting them as a failed download.
 
 ```bash
 pytest            # 783 tests. With the env active (node ON PATH) + a local server up: 782 pass,
-                  #   1 skip -- the opt-in live-client smoke, which LATEGAME_LIVE_TEST=1 enables
+                  #   1 skip -- the opt-in live-client smoke, which ROTOMAI_LIVE_TEST=1 enables
                   #   for 783/0. `node` on PATH is load-bearing: without it six simulator tests
                   #   self-skip even with dist/ built.
                   #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
@@ -254,7 +254,7 @@ pytest            # 783 tests. With the env active (node ON PATH) + a local serv
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form.
 ruff check .
-mypy lategame scripts   # both trees; CI runs the same two arguments
+mypy rotomai scripts   # both trees; CI runs the same two arguments
 ```
 
 **Reading the CI result without `gh`.** There is no `gh` on the dev host, which is a large part of
@@ -263,11 +263,11 @@ REST API is unauthenticated:
 
 ```bash
 # last 5 runs: which branch, which commit, red or green
-curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs?per_page=5" \
+curl -s "https://api.github.com/repos/BhaveshThapar/RotomAI/actions/runs?per_page=5" \
   | python -m json.tool | grep -E '"(run_number|head_branch|head_sha|conclusion)"'
 
 # per-step conclusions for one run (is it `pytest -q` that failed, or `mypy`?)
-curl -s "https://api.github.com/repos/BhaveshThapar/Lategame/actions/runs/<RUN_ID>/jobs" \
+curl -s "https://api.github.com/repos/BhaveshThapar/RotomAI/actions/runs/<RUN_ID>/jobs" \
   | python -m json.tool | grep -E '"(name|conclusion)"'
 ```
 
@@ -281,20 +281,20 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 
 | Path | Role |
 |---|---|
-| `lategame/config.py` | Local server config + format constants |
-| `lategame/engine/damage.py` | Expected-damage / move-value estimator |
-| `lategame/features/` | `embed_battle` 720-d encoder (`OBS_LAYOUT`) + action-space codec |
-| `lategame/model/` | MLP actor-critic + entity transformer + build factory |
-| `lategame/agents/` | `heuristic`, `bc`, `offrl`, `ppo` agents |
-| `lategame/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2) |
-| `lategame/train/` | BC, offline RL, self-play, PPO training loops |
-| `lategame/search/` | R-PREDICT: forward model, determinization, expectimax, opponent model |
-| `lategame/teambuilding/` | R-TEAM: validator-checked packed team pools for teambuilt formats |
-| `lategame/eval/arena.py` | run N battles vs one fixed baseline, report win rates |
-| `lategame/eval/rating.py` | R-EVAL: Glicko-1 + GXE (degenerate against a fixed baseline — read the docstring) |
-| `lategame/eval/ladder.py` | agent-only eval ladder: round-robin + joint rating fit (the varied field G2 needs) |
-| `lategame/live/` | M5 deploy / G1: live-server client, policy gate, session supervisor, telemetry |
-| `lategame/cli.py` | all subcommands (eval / collect / train / data / live) |
+| `rotomai/config.py` | Local server config + format constants |
+| `rotomai/engine/damage.py` | Expected-damage / move-value estimator |
+| `rotomai/features/` | `embed_battle` 720-d encoder (`OBS_LAYOUT`) + action-space codec |
+| `rotomai/model/` | MLP actor-critic + entity transformer + build factory |
+| `rotomai/agents/` | `heuristic`, `bc`, `offrl`, `ppo` agents |
+| `rotomai/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2) |
+| `rotomai/train/` | BC, offline RL, self-play, PPO training loops |
+| `rotomai/search/` | R-PREDICT: forward model, determinization, expectimax, opponent model |
+| `rotomai/teambuilding/` | R-TEAM: validator-checked packed team pools for teambuilt formats |
+| `rotomai/eval/arena.py` | run N battles vs one fixed baseline, report win rates |
+| `rotomai/eval/rating.py` | R-EVAL: Glicko-1 + GXE (degenerate against a fixed baseline — read the docstring) |
+| `rotomai/eval/ladder.py` | agent-only eval ladder: round-robin + joint rating fit (the varied field G2 needs) |
+| `rotomai/live/` | M5 deploy / G1: live-server client, policy gate, session supervisor, telemetry |
+| `rotomai/cli.py` | all subcommands (eval / collect / train / data / live) |
 | `scripts/` | local Showdown server + simulator setup/run, and every experiment gate |
 
 ---
@@ -305,8 +305,8 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 gitignored, so every published number was produced from files that exist only on the machine that
 ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 236
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
-team pools (`lategame/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
-(`lategame/features/data/`), and the pinned simulator rev.
+team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
+(`rotomai/features/data/`), and the pinned simulator rev.
 
 **Which record backs which headline.** These name result files rather than checkpoint paths, because
 a gate can be re-pinned and a result file cannot:

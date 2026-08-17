@@ -2,7 +2,7 @@
   "init": "checkpoints/doubles_offrl_vgc_v2.pt",
   "arm": "ppo_et_prior",
   "format": "gen9vgc2025regi",
-  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9vgc.packed",
   "loop_penalty": 0.0,
   "ckpt_prefix": "ppo_b6f",
   "ent_coef": 0.01,

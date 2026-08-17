@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from lategame.features.encoder import OBS_DIM
+from rotomai.features.encoder import OBS_DIM
 from tests.conftest import requires_server, write_ac_checkpoint
 
 pytestmark = requires_server
@@ -18,7 +18,7 @@ pytestmark = requires_server
 
 async def test_ppo_one_iteration_end_to_end(tmp_path):
     pytest.importorskip("torch")
-    from lategame.train.ppo import PPOConfig, run_ppo
+    from rotomai.train.ppo import PPOConfig, run_ppo
 
     init = tmp_path / "iter0.pt"
     write_ac_checkpoint(init, OBS_DIM)

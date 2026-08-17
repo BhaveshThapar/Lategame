@@ -5,8 +5,8 @@ path would (websocket, login, the finished-battle callback, the finalize sweep, 
 with zero account and zero policy exposure. That is also exactly the "private eval server" plan.md
 section 15 prefers.
 
-Opt-in via LATEGAME_LIVE_TEST=1, because it needs a running `pokemon-showdown --no-security` on
-LATEGAME_SHOWDOWN_PORT (default 8000) and takes a few seconds.
+Opt-in via ROTOMAI_LIVE_TEST=1, because it needs a running `pokemon-showdown --no-security` on
+ROTOMAI_SHOWDOWN_PORT (default 8000) and takes a few seconds.
 """
 
 import json
@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from lategame.config import SHOWDOWN_PORT
+from rotomai.config import SHOWDOWN_PORT
 from tests.conftest import server_up
 
 _WS = f"ws://localhost:{SHOWDOWN_PORT}/showdown/websocket"
@@ -23,8 +23,8 @@ _WS = f"ws://localhost:{SHOWDOWN_PORT}/showdown/websocket"
 
 
 requires_live = pytest.mark.skipif(
-    not os.environ.get("LATEGAME_LIVE_TEST") or not server_up(port=SHOWDOWN_PORT),
-    reason="opt-in: set LATEGAME_LIVE_TEST=1 with a local Showdown server running",
+    not os.environ.get("ROTOMAI_LIVE_TEST") or not server_up(port=SHOWDOWN_PORT),
+    reason="opt-in: set ROTOMAI_LIVE_TEST=1 with a local Showdown server running",
 )
 
 
@@ -33,9 +33,9 @@ async def test_two_local_players_complete_a_live_session(tmp_path):
     """A real challenge/accept pair, driven entirely through run_session."""
     import asyncio
 
-    from lategame.live.player import build_live_player
-    from lategame.live.server import live_account, live_server
-    from lategame.live.session import LiveConfig, run_session
+    from rotomai.live.player import build_live_player
+    from rotomai.live.server import live_account, live_server
+    from rotomai.live.session import LiveConfig, run_session
 
     server = live_server(_WS)
     out = tmp_path / "live.json"
@@ -66,7 +66,7 @@ async def test_two_local_players_complete_a_live_session(tmp_path):
     assert outcome.records[0].result in {"win", "loss", "tie"}
 
     written = json.loads(out.read_text())
-    assert written["schema"] == "lategame.live.telemetry/1"
+    assert written["schema"] == "rotomai.live.telemetry/1"
     assert written["policy"]["ranked"] is False  # challenge mode is never ranked
     assert written["gxe"] is not None and 0.0 <= written["gxe"] <= 1.0
     # Unrated local play never emits a |raw| rating line; None everywhere is the correct outcome.

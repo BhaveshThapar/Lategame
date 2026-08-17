@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time cluster setup: conda (bootstrapped if absent) + the lategame env + a built Showdown.
+# One-time cluster setup: conda (bootstrapped if absent) + the rotomai env + a built Showdown.
 #
 # MEASURED on UMIACS Nexus (not guessed): `module avail`, `which conda`, and every common install
 # path (~/miniconda3, ~/anaconda3, /opt/conda, ...) all come up EMPTY. There is no conda anywhere
@@ -67,13 +67,13 @@ source "$CONDA_BASE/etc/profile.d/conda.sh"
 echo "  $(conda --version)"
 
 echo "== conda env =="
-if conda env list | grep -q '^lategame '; then
-  echo "  'lategame' exists; updating from environment.yml"
-  conda env update -n lategame -f environment.yml --prune
+if conda env list | grep -q '^rotomai '; then
+  echo "  'rotomai' exists; updating from environment.yml"
+  conda env update -n rotomai -f environment.yml --prune
 else
   conda env create -f environment.yml
 fi
-conda activate lategame
+conda activate rotomai
 echo "  active env node: $(node --version)"
 
 echo "== showdown =="
@@ -87,26 +87,26 @@ fi
 echo "== smoke test: does a server come up on a NON-default port? =="
 # This is the whole point of the port override -- if it fails here, the sbatch array will silently
 # have every task fighting over :8000.
-export LATEGAME_SHOWDOWN_PORT=8199
-bash scripts/run_server.sh "$LATEGAME_SHOWDOWN_PORT" > /tmp/lg_setup_showdown.log 2>&1 &
+export ROTOMAI_SHOWDOWN_PORT=8199
+bash scripts/run_server.sh "$ROTOMAI_SHOWDOWN_PORT" > /tmp/ra_setup_showdown.log 2>&1 &
 SRV=$!
 trap 'kill $SRV 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do
   if python -c "
 import socket,sys
 s=socket.socket(); s.settimeout(1)
-sys.exit(0 if s.connect_ex(('127.0.0.1', $LATEGAME_SHOWDOWN_PORT)) == 0 else 1)" 2>/dev/null; then
-    echo "  OK -- Showdown answered on :$LATEGAME_SHOWDOWN_PORT"
+sys.exit(0 if s.connect_ex(('127.0.0.1', $ROTOMAI_SHOWDOWN_PORT)) == 0 else 1)" 2>/dev/null; then
+    echo "  OK -- Showdown answered on :$ROTOMAI_SHOWDOWN_PORT"
     python -c "
-from lategame.config import LOCAL_SERVER
+from rotomai.config import LOCAL_SERVER
 assert ':8199/' in LOCAL_SERVER.websocket_url, LOCAL_SERVER
-print('  OK -- lategame.config points at', LOCAL_SERVER.websocket_url)"
+print('  OK -- rotomai.config points at', LOCAL_SERVER.websocket_url)"
     echo
     echo "setup complete. next:  sbatch scripts/cluster/stage_a.slurm"
     exit 0
   fi
   sleep 2
 done
-echo "FAILED: Showdown never opened :$LATEGAME_SHOWDOWN_PORT" >&2
-tail -20 /tmp/lg_setup_showdown.log >&2
+echo "FAILED: Showdown never opened :$ROTOMAI_SHOWDOWN_PORT" >&2
+tail -20 /tmp/ra_setup_showdown.log >&2
 exit 1

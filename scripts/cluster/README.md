@@ -26,7 +26,7 @@ by hand** — but estimate in **task-hours ÷ 4**, not "the arms run concurrentl
 
 poke-env's `LocalhostServerConfiguration` **hardcodes `ws://localhost:8000`**. Two jobs on one host
 would therefore share a single Showdown server and silently see each other's battles — a data
-corruption that no gate here would catch. `lategame/config.py` now reads **`LATEGAME_SHOWDOWN_PORT`**
+corruption that no gate here would catch. `rotomai/config.py` now reads **`ROTOMAI_SHOWDOWN_PORT`**
 (default 8000, byte-identical to poke-env's config — see `tests/test_config.py`), and each job starts
 its own server on its own port.
 
@@ -39,12 +39,12 @@ bash scripts/cluster/setup_umiacs.sh
 **Measured on UMIACS Nexus login nodes: there is no conda anywhere** — no module (`module avail`
 comes up empty), no system install at any common path. So this script does not try to find one; it
 bootstraps a private Miniforge3 under `$REPO_DIR/.miniforge3` (no root needed, gitignored) and
-creates the `lategame` env from `environment.yml` inside it. `node` is more forgiving: `module load
+creates the `rotomai` env from `environment.yml` inside it. `node` is more forgiving: `module load
 nodejs` alone already satisfies Showdown's own `>=16` requirement (measured: v16.20.2); the conda
 env's newer `nodejs` (environment.yml wants `>=18`) simply takes over on PATH once activated, and
 nothing depends on which one wins.
 
-Idempotent — reruns reuse an existing `.miniforge3` or `lategame` env rather than recreating them.
+Idempotent — reruns reuse an existing `.miniforge3` or `rotomai` env rather than recreating them.
 
 `_job_common.sh`'s `activate_env()` finds this same bootstrap at job time: `sbatch` does **not**
 inherit an interactive shell's `conda activate`, so every job script sources it before doing
@@ -102,10 +102,10 @@ Everything in `plan.md` §13.1 still applies, in particular:
   once so the writer and the reader cannot drift apart.)
 - Job logs land under `logs/`, never the repo root: `logs/ppo/<build>/` for run stdout,
   `logs/slurm/` for `sbatch --output`, `logs/showdown/<bucket>/` for the per-job server, where
-  `<bucket>` is `$BUILD` if set and otherwise the job name minus `lg-`. **`logs/slurm/` must exist
+  `<bucket>` is `$BUILD` if set and otherwise the job name minus `ra-`. **`logs/slurm/` must exist
   before you submit** — sbatch does not create its `--output` directory and the job dies at launch if
   it is missing, which is why `logs/slurm/.gitkeep` is tracked. When running two gates concurrently,
-  set `LATEGAME_SHOWDOWN_PORT_BASE` on the second: `strength_gate.slurm` is not an array job, so both
+  set `ROTOMAI_SHOWDOWN_PORT_BASE` on the second: `strength_gate.slurm` is not an array job, so both
   otherwise compute port 8100 and silently share a server if they land on one node.
 - Pool seeds with `scripts/merge_gate_seeds.py`. A dropped seed silently halves the strength gate's
   power — it still prints a verdict.

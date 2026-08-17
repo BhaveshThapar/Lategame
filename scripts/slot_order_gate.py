@@ -53,12 +53,12 @@ from typing import Any
 import numpy as np
 from poke_env import to_id_str
 
-from lategame.data import ingest
-from lategame.data.ingest import _gen_from_log, _impute_kits, _prescan_kits, _reconstruct_pov
-from lategame.data.replays import cached_replay_paths
-from lategame.data.reward import RewardWeights
-from lategame.data.usage_prior import load_usage_prior
-from lategame.teambuilding.pool import DEFAULT_OU_POOL
+from rotomai.data import ingest
+from rotomai.data.ingest import _gen_from_log, _impute_kits, _prescan_kits, _reconstruct_pov
+from rotomai.data.replays import cached_replay_paths
+from rotomai.data.reward import RewardWeights
+from rotomai.data.usage_prior import load_usage_prior
+from rotomai.teambuilding.pool import DEFAULT_OU_POOL
 
 _RESULTS = Path("results/slot_order_gate.json")
 
@@ -217,8 +217,8 @@ def _measure_live_pool(pool_path: str | Path) -> dict[str, float]:
 
 async def _run_b2_random(args: argparse.Namespace) -> None:
     """Per-seed offrl-vs-random win rates on the eval teampool (v4-record JSON shape)."""
-    from lategame.eval.arena import build_player, evaluate_built
-    from lategame.teambuilding.pool import TeamPool
+    from rotomai.eval.arena import build_player, evaluate_built
+    from rotomai.teambuilding.pool import TeamPool
 
     teams = TeamPool.from_packed_file(args.team_pool).teams
     seeds = itertools.count()

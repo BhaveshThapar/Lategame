@@ -16,7 +16,7 @@ import random
 import pytest
 import torch
 
-from lategame.train.ppo import (
+from rotomai.train.ppo import (
     _RESUME_FILE,
     _load_resume_state,
     _save_resume_state,
@@ -91,7 +91,7 @@ def test_refuses_when_the_run_is_already_complete(tmp_path):
 
 
 def test_resume_defaults_off_so_build_25_is_unchanged():
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     assert PPOConfig().resume is False
 
@@ -102,7 +102,7 @@ async def test_resume_refuses_an_unpinned_anneal_horizon(tmp_path):
     Left unguarded, chunk 1 would anneal over 160 and chunk 2 over 320 -- the arm quietly stops
     being one experiment. This is the confound Build 24 added ``anneal_iters`` to remove.
     """
-    from lategame.train.ppo import PPOConfig, run_ppo
+    from rotomai.train.ppo import PPOConfig, run_ppo
 
     init = tmp_path / "init.pt"
     init.write_bytes(b"stub")
@@ -113,7 +113,7 @@ async def test_resume_refuses_an_unpinned_anneal_horizon(tmp_path):
 
 async def test_pinned_anneal_horizon_is_stable_across_chunks():
     """The property the guard buys: same horizon whatever ``iters`` a chunk was given."""
-    from lategame.train.ppo import PPOConfig
+    from rotomai.train.ppo import PPOConfig
 
     chunk1 = PPOConfig(iters=160, anneal_iters=80, resume=True)
     chunk2 = PPOConfig(iters=320, anneal_iters=80, resume=True)

@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from lategame.eval.rating import (
+from rotomai.eval.rating import (
     DEFAULT_RATING,
     MAX_RD,
     REFERENCE,

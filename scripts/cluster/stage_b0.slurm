@@ -17,7 +17,7 @@
 # sample-budget logic; B_simple is the ratio tr(Sigma)/|G|^2 and EXPLODES when |G|^2 -> 0. "Collect
 # more samples" is exactly wrong against a vanished gradient.
 #
-#SBATCH --job-name=lg-b22-stageB0
+#SBATCH --job-name=ra-b22-stageB0
 #SBATCH --array=0-2
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
@@ -92,8 +92,8 @@ import sys
 
 import torch
 
-from lategame.data.rl_dataset import RLDataset
-from lategame.train.offline_rl import _support_from_returns
+from rotomai.data.rl_dataset import RLDataset
+from rotomai.train.offline_rl import _support_from_returns
 
 shard_path, ref_path = sys.argv[1], sys.argv[2]
 ref = torch.load(ref_path, map_location="cpu", weights_only=False)
@@ -148,7 +148,7 @@ echo "[job] preflight OK -- arch d_model=$ARCH_D_MODEL n_layers=$ARCH_N_LAYERS" 
 # No Showdown needed -- this reads an npz off disk.
 # ---------------------------------------------------------------------------
 echo "[job] === training wide @ ${EPOCHS} epochs -> $CKPT ==="
-python -u -m lategame.cli train-rl \
+python -u -m rotomai.cli train-rl \
   --data           "$SHARD" \
   --out            "$CKPT" \
   --bc-init        '' \

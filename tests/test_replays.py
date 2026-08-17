@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from lategame.data.replays import (
+from rotomai.data.replays import (
     cached_replay_paths,
     fetch_replay,
     iter_cached_replays,

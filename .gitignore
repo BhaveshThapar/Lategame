@@ -18,7 +18,7 @@ dist/
 .pytest_cache/
 
 # Data / artifacts (later milestones). Anchored to the repo root: an unanchored
-# `data/` also matches the `lategame/data/` source package and silently un-tracks it.
+# `data/` also matches the `rotomai/data/` source package and silently un-tracks it.
 /replays/
 /data/
 /checkpoints/

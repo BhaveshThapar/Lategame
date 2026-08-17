@@ -28,8 +28,8 @@ import json
 import random
 from pathlib import Path
 
-from lategame.data.replays import cached_replay_paths
-from lategame.search.fidelity import run_fidelity_files
+from rotomai.data.replays import cached_replay_paths
+from rotomai.search.fidelity import run_fidelity_files
 
 _PASS_THRESHOLD = 0.99
 

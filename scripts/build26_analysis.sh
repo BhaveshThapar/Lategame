@@ -12,7 +12,7 @@
 # a contrast must clear BOTH p < alpha AND diff - bias > 0.
 #
 # NEEDS A SHOWDOWN SERVER. The strength gates below play real battles, so this must run somewhere
-# with one listening on $LATEGAME_SHOWDOWN_PORT -- and at the pre-registered N that is ~3 h of
+# with one listening on $ROTOMAI_SHOWDOWN_PORT -- and at the pre-registered N that is ~3 h of
 # battles, which does not belong on a login node. Use the wrapper, which starts its own server on a
 # port clear of any in-flight PPO build:
 #   sbatch -p tron --qos=medium scripts/cluster/build26_analysis.slurm

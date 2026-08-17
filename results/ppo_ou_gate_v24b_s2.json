@@ -2,7 +2,7 @@
   "init": "checkpoints/offrl_gen9ou_wide_s0.pt",
   "arm": "ppo_et_prior",
   "format": "gen9ou",
-  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9ou.packed",
   "loop_penalty": 4.0,
   "ckpt_prefix": "ppo_v24b",
   "ent_coef": 0.01,

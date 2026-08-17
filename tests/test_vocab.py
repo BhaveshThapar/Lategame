@@ -11,7 +11,7 @@ import json
 
 from poke_env.battle import Move, Pokemon
 
-from lategame.features import vocab
+from rotomai.features import vocab
 
 
 def test_load_vocab_version_matches_content_hash() -> None:

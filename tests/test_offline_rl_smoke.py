@@ -8,10 +8,10 @@ Skipped automatically when the server is not running.
 
 import pytest
 
-from lategame.data.collect import collect_trajectories, save_rl
-from lategame.data.rl_dataset import RLDataset
-from lategame.eval.arena import evaluate
-from lategame.features.encoder import OBS_DIM
+from rotomai.data.collect import collect_trajectories, save_rl
+from rotomai.data.rl_dataset import RLDataset
+from rotomai.eval.arena import evaluate
+from rotomai.features.encoder import OBS_DIM
 from tests.conftest import requires_server
 
 pytestmark = requires_server
@@ -20,8 +20,8 @@ pytestmark = requires_server
 def _write_bc_checkpoint(path, hidden_dim=32):
     import torch
 
-    from lategame.features.encoder import OBS_VERSION
-    from lategame.model.policy import BCPolicy
+    from rotomai.features.encoder import OBS_VERSION
+    from rotomai.model.policy import BCPolicy
 
     model = BCPolicy(OBS_DIM, hidden_dim=hidden_dim)
     torch.save(
@@ -40,8 +40,8 @@ def _write_bc_checkpoint(path, hidden_dim=32):
 
 async def test_offline_rl_pipeline_end_to_end(tmp_path, monkeypatch):
     pytest.importorskip("torch")
-    from lategame.agents.offline_rl_agent import CHECKPOINT_ENV_VAR
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.agents.offline_rl_agent import CHECKPOINT_ENV_VAR
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     # 1. Collect a tiny full-trajectory dataset (wins AND losses, shaped rewards).
     dataset = await collect_trajectories(["random", "maxbasepower"], n_per_pair=2)

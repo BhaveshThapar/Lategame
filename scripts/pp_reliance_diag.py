@@ -35,7 +35,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import switch_mass_gate as smg  # noqa: E402
 
-from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION  # noqa: E402
+from rotomai.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION  # noqa: E402
 
 _MOVE_PP_IDX = 4
 _MOVE_PRESENT_IDX = 0

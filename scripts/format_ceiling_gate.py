@@ -304,7 +304,7 @@ def compute_verdict(m1: dict[str, Any], m2: dict[str, Any], m3: dict[str, Any]) 
 # --------------------------------------------------------------------------- #
 def _species_strength_table() -> np.ndarray:
     """Per-species scalar strength = sum of the 6 z-scored base-stat columns (row 0 = UNK = 0)."""
-    from lategame.features.embed_prior import _PRIORS_PATH
+    from rotomai.features.embed_prior import _PRIORS_PATH
 
     species_feat = np.load(_PRIORS_PATH)["species"]  # (V+1, 6 stats + |types|)
     return species_feat[:, :6].sum(axis=1)
@@ -446,7 +446,7 @@ def run_m3(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
     if not files:
         raise SystemExit(
             f"no replays under '{replay_glob or _REPLAY_GLOB}'. Fetch them first:\n"
-            f"  python -c \"from lategame.data.replays import fetch_replays; \"\n"
+            f"  python -c \"from rotomai.data.replays import fetch_replays; \"\n"
             f"  \"fetch_replays(battle_format=FMT, cache_dir=..., require_rating=False)\""
         )
     with_inputlog = sum(1 for f in files if json.load(open(f)).get("inputlog"))
@@ -461,8 +461,8 @@ def run_m3(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
 
 def _run_m3_resim(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
     """The original RB path: node re-sim of the inputlog to recover level-adjusted real stats."""
-    from lategame.data.resim import _parse_inputlog_meta, _reconstruct_pov_resim, run_driver
-    from lategame.data.reward import RewardWeights
+    from rotomai.data.resim import _parse_inputlog_meta, _reconstruct_pov_resim, run_driver
+    from rotomai.data.reward import RewardWeights
 
     bst_z = _species_strength_table()  # raw base-stat z-sum (ignores RB level-balancing)
     vocab_index = _species_index_fn()
@@ -542,7 +542,7 @@ def _run_m3_resim(limit: int, replay_glob: str | None = None) -> dict[str, Any]:
 
 
 def _species_index_fn():  # noqa: ANN202 -- returns a closure over the loaded vocab
-    from lategame.features.vocab import load_vocab
+    from rotomai.features.vocab import load_vocab
 
     table = load_vocab().tables["species"]
     return lambda species: table.get(species, 0)
@@ -571,11 +571,11 @@ async def run_m1(
     ``bc_ckpt`` appends a loop-fixed ``bc_v11`` arm (the shipped OU winner); ``loop_penalty``
     (Build 14) is applied to every learned arm so the agents are scored *with* the LoopGuard the
     live probe uses."""
-    from lategame.eval.arena import build_player, evaluate_built, policy_agent
+    from rotomai.eval.arena import build_player, evaluate_built, policy_agent
 
     teams: list[str] | None = None
     if "randombattle" not in battle_format:
-        from lategame.teambuilding.pool import TeamPool
+        from rotomai.teambuilding.pool import TeamPool
 
         teams = TeamPool.from_packed_file(team_pool).teams
 
@@ -584,7 +584,7 @@ async def run_m1(
     def _pool() -> object | None:  # fresh pool per player so p1/p2 draw independently
         if teams is None:
             return None
-        from lategame.teambuilding.pool import TeamPool
+        from rotomai.teambuilding.pool import TeamPool
 
         return TeamPool(teams, seed=next(seeds))
 
@@ -744,7 +744,7 @@ def load_m2(path: Path | None = None) -> dict[str, Any]:
     if not src.exists():
         raise SystemExit(
             f"no M2 record at '{src}'. Produce one first:\n"
-            f"  LATEGAME_SEARCH_SHAPED_ONLY=1 python scripts/rpredict_oppmodel_gate.py "
+            f"  ROTOMAI_SEARCH_SHAPED_ONLY=1 python scripts/rpredict_oppmodel_gate.py "
             f"--gate b --arms whitebox --depth 2 --format FMT --out {src}"
         )
     data = json.loads(src.read_text())
@@ -804,7 +804,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stage", choices=["m1", "m3", "decide", "all"], default="all")
     ap.add_argument("--format", dest="battle_format", default="gen9randombattle")
-    ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed",
+    ap.add_argument("--team-pool", default="rotomai/teambuilding/data/teams_gen9ou.packed",
                     help="packed team pool for teambuilt formats (R-TEAM)")
     ap.add_argument("--out", default=None, help="results JSON (default derived from --format)")
     ap.add_argument("--n", type=int, default=300, help="battles per M1 matchup")
@@ -839,7 +839,7 @@ def main() -> None:
         # could ever reach the three-leg verdict `compute_verdict` implements -- only `assess_ou`,
         # which reads M1 alone and cannot return FORMAT_BOUND at all. That was honest while the
         # other two legs did not exist for any teambuilt format. They exist now: the M2 producer
-        # takes --format and runs on doubles under LATEGAME_SEARCH_SHAPED_ONLY=1, and M3 reads team
+        # takes --format and runs on doubles under ROTOMAI_SEARCH_SHAPED_ONLY=1, and M3 reads team
         # preview lines rather than an inputlog. So the M1-only assessment still runs and is still
         # recorded, and the run falls through to whichever other legs are actually available.
         print(f"[M1] bot-skill-gradient sweep on {fmt} (teambuilt)...")

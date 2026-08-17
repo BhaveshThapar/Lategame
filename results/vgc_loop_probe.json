@@ -8,7 +8,7 @@
     "heuristic"
   ],
   "n_per_pair": 10,
-  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9vgc.packed",
   "arms": {
     "uncapped": {
       "max_battle_turns": null,

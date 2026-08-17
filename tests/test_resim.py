@@ -14,13 +14,13 @@ import json
 
 import numpy as np
 
-from lategame.data.resim import (
+from rotomai.data.resim import (
     _parse_inputlog_meta,
     _reconstruct_pov_resim,
     resim_replays,
 )
-from lategame.data.reward import RewardWeights
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
+from rotomai.data.reward import RewardWeights
+from rotomai.features.encoder import OBS_DIM, OBS_VERSION
 from tests.conftest import GEN9_INPUTLOG, requires_showdown
 
 _WEIGHTS = RewardWeights()
@@ -126,7 +126,7 @@ def test_masks_keep_taken_action_legal() -> None:
 def test_resim_dataset_shapes_rewards_and_dones() -> None:
     replay = {"id": "t", "inputlog": ">player p1 {\"name\":\"Alice\"}"}  # unused obs source
     # Drive the aggregation directly off the hand-built POV (no node needed).
-    from lategame.data.ingest import _ShardBuilder
+    from rotomai.data.ingest import _ShardBuilder
 
     builder = _ShardBuilder()
     battle, records, values, _ = _reconstruct_pov_resim(_EVENTS, "Alice", "t-p1", 9, _WEIGHTS)
@@ -172,9 +172,9 @@ def test_resim_end_to_end_through_driver() -> None:
 
 
 def test_save_schema_parity(tmp_path) -> None:
-    from lategame.data.collect import save_rl
-    from lategame.data.ingest import _ShardBuilder
-    from lategame.data.rl_dataset import RLDataset
+    from rotomai.data.collect import save_rl
+    from rotomai.data.ingest import _ShardBuilder
+    from rotomai.data.rl_dataset import RLDataset
 
     builder = _ShardBuilder()
     battle, records, values, _ = _reconstruct_pov_resim(_EVENTS, "Alice", "t-p1", 9, _WEIGHTS)

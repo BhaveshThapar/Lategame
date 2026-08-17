@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from lategame.data.usage_prior import (
+from rotomai.data.usage_prior import (
     SpeciesUsage,
     UsagePrior,
     build_usage_prior,
@@ -20,7 +20,7 @@ from lategame.data.usage_prior import (
     sample_kit,
     write_usage_prior,
 )
-from lategame.features.vocab import vocab_version
+from rotomai.features.vocab import vocab_version
 
 # Two real species (ids present in the committed vocab), one bogus species, one bogus
 # move id, one bogus item id, a "" empty move slot, and a "nothing" item -- every

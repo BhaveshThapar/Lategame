@@ -11,17 +11,17 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.features.encoder import (  # noqa: E402
+from rotomai.features.encoder import (  # noqa: E402
     MOVE_ID_FIELDS,
     OBS_DIM,
     OBS_LAYOUT,
     OBS_VERSION,
     POKEMON_ID_FIELDS,
 )
-from lategame.features.vocab import vocab_sizes  # noqa: E402
-from lategame.model.actor_critic import ActorCritic  # noqa: E402
-from lategame.model.entity_transformer import EntityTransformer  # noqa: E402
-from lategame.model.factory import (  # noqa: E402
+from rotomai.features.vocab import vocab_sizes  # noqa: E402
+from rotomai.model.actor_critic import ActorCritic  # noqa: E402
+from rotomai.model.entity_transformer import EntityTransformer  # noqa: E402
+from rotomai.model.factory import (  # noqa: E402
     MODEL_ENTITY_TRANSFORMER,
     build_model,
     model_metadata,
@@ -114,7 +114,7 @@ def test_metadata_roundtrip_reproduces_outputs():
     # model_metadata(m) + input_dim is enough for build_model to rebuild m exactly,
     # and load_actor_critic_weights (arch-agnostic) restores identical outputs --
     # this is the AC->AC self-play warm-start contract for the transformer.
-    from lategame.model.actor_critic import load_actor_critic_weights
+    from rotomai.model.actor_critic import load_actor_critic_weights
 
     src = _tiny_transformer(n_bins=21).eval()
     meta = {**model_metadata(src), "input_dim": OBS_DIM}
@@ -157,7 +157,7 @@ def test_id_embed_flag_round_trips_through_metadata():
 
 
 def test_id_embed_init_prior_warm_starts_species_and_moves():
-    from lategame.features.embed_prior import load_id_priors
+    from rotomai.features.embed_prior import load_id_priors
 
     model = _tiny_transformer(id_embed=True)
     assert model.id_embed_init == "random"
@@ -194,8 +194,8 @@ def test_id_embed_init_round_trips_and_load_state_dict_overwrites_prior():
 
 
 def _make_rl_npz(path, n=64, episode_len=16):
-    from lategame.data.collect import TrajectoryDataset, save_rl
-    from lategame.data.reward import RewardWeights
+    from rotomai.data.collect import TrajectoryDataset, save_rl
+    from rotomai.data.reward import RewardWeights
 
     rng = np.random.default_rng(0)
     obs = _valid_obs(n, rng)
@@ -212,7 +212,7 @@ def _make_rl_npz(path, n=64, episode_len=16):
 
 
 def test_train_offline_rl_transformer_end_to_end(tmp_path):
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data_path = tmp_path / "rl.npz"
     _make_rl_npz(data_path)
@@ -246,7 +246,7 @@ def test_train_offline_rl_transformer_selfplay_continuation(tmp_path):
     # AC->AC warm-start: a second train run pointed at the transformer checkpoint
     # must rebuild the transformer (from the init arch) even with the default
     # config model_type, and re-save it as a transformer.
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data_path = tmp_path / "rl.npz"
     _make_rl_npz(data_path)
@@ -278,8 +278,8 @@ def test_train_offline_rl_transformer_selfplay_continuation(tmp_path):
 def test_train_bc_dispatches_entity_transformer(tmp_path):
     # BC is no longer hardcoded to the flat MLP: model_type routes through the factory,
     # and the checkpoint stamps model_type/arch so the bc agent rebuilds the transformer.
-    from lategame.data.collect import Dataset, save
-    from lategame.train.bc import TrainConfig, train_bc
+    from rotomai.data.collect import Dataset, save
+    from rotomai.train.bc import TrainConfig, train_bc
 
     rng = np.random.default_rng(1)
     obs = _valid_obs(64, rng)
@@ -307,8 +307,8 @@ def test_train_bc_dispatches_entity_transformer(tmp_path):
 
 
 def test_train_bc_prior_init_stamps_and_rebuilds(tmp_path):
-    from lategame.data.collect import Dataset, save
-    from lategame.train.bc import TrainConfig, train_bc
+    from rotomai.data.collect import Dataset, save
+    from rotomai.train.bc import TrainConfig, train_bc
 
     rng = np.random.default_rng(2)
     obs = _valid_obs(64, rng)
@@ -334,7 +334,7 @@ def test_train_bc_prior_init_stamps_and_rebuilds(tmp_path):
 
 
 def test_bc_warm_start_into_transformer_rejected(tmp_path):
-    from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+    from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
     data_path = tmp_path / "rl.npz"
     _make_rl_npz(data_path)

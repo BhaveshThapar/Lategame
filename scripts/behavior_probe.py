@@ -48,8 +48,8 @@ import numpy as np
 from poke_env import to_id_str
 from poke_env.player import Player, RandomPlayer
 
-from lategame.config import LOCAL_SERVER, OU_FORMAT, local_account
-from lategame.teambuilding.pool import DEFAULT_OU_POOL, TeamPool
+from rotomai.config import LOCAL_SERVER, OU_FORMAT, local_account
+from rotomai.teambuilding.pool import DEFAULT_OU_POOL, TeamPool
 
 _RESULTS = Path("results/behavior_probe.json")
 _DECISIONS_OUT = Path("results/behavior_probe_decisions.jsonl")
@@ -467,9 +467,9 @@ def _probe_agents(probe: _BehaviorProbe) -> Iterator[None]:
     """
     import torch
 
-    from lategame.agents import bc_agent, offline_rl_agent
-    from lategame.features import action_space
-    from lategame.model import policy
+    from rotomai.agents import bc_agent, offline_rl_agent
+    from rotomai.features import action_space
+    from rotomai.model import policy
 
     orig_masked = policy.masked_logits
     orig_decode = bc_agent.action_to_order
@@ -549,9 +549,9 @@ def _build_probe_player(
 ) -> Player:
     # arena.build_player forwards neither log_level (needed to see the level-25
     # rejection messages) nor save_replays, so the probe builds players itself.
-    from lategame.agents.bc_agent import BCAgent
-    from lategame.agents.heuristic_agent import HeuristicAgent
-    from lategame.agents.offline_rl_agent import OfflineRLAgent
+    from rotomai.agents.bc_agent import BCAgent
+    from rotomai.agents.heuristic_agent import HeuristicAgent
+    from rotomai.agents.offline_rl_agent import OfflineRLAgent
 
     classes: dict[str, type[Player]] = {
         "bc": BCAgent,

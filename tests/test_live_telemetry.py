@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lategame.eval.rating import rate_win_rate
-from lategame.live.telemetry import (
+from rotomai.eval.rating import rate_win_rate
+from rotomai.live.telemetry import (
     SCHEMA,
     BattleRecord,
     LiveLog,
@@ -199,4 +199,4 @@ def test_the_password_can_never_reach_the_results_file(tmp_path):
                   summarize([_rec("win")]), [_rec("win")])
     raw = out.read_bytes()
     assert secret.encode() not in raw
-    assert b"LATEGAME_PS_PASSWORD" not in raw
+    assert b"ROTOMAI_PS_PASSWORD" not in raw

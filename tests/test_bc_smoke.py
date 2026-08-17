@@ -8,11 +8,11 @@ the server is not running.
 
 import pytest
 
-from lategame.data.collect import collect
-from lategame.data.collect import save as save_dataset
-from lategame.data.dataset import BCDataset
-from lategame.eval.arena import evaluate
-from lategame.features.encoder import OBS_DIM
+from rotomai.data.collect import collect
+from rotomai.data.collect import save as save_dataset
+from rotomai.data.dataset import BCDataset
+from rotomai.eval.arena import evaluate
+from rotomai.features.encoder import OBS_DIM
 from tests.conftest import requires_server
 
 pytestmark = requires_server
@@ -20,8 +20,8 @@ pytestmark = requires_server
 
 async def test_bc_pipeline_end_to_end(tmp_path, monkeypatch):
     pytest.importorskip("torch")
-    from lategame.agents.bc_agent import CHECKPOINT_ENV_VAR
-    from lategame.train.bc import TrainConfig, train_bc
+    from rotomai.agents.bc_agent import CHECKPOINT_ENV_VAR
+    from rotomai.train.bc import TrainConfig, train_bc
 
     # 1. Collect a tiny reward-filtered self-play dataset.
     dataset = await collect(["random", "maxbasepower"], n_per_pair=2)

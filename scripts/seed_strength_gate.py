@@ -55,8 +55,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from format_ceiling_gate import wilson_ci
 
-from lategame.eval.arena import build_player, evaluate_built, policy_agent
-from lategame.teambuilding.pool import TeamPool
+from rotomai.eval.arena import build_player, evaluate_built, policy_agent
+from rotomai.teambuilding.pool import TeamPool
 
 
 def two_proportion_z(w1: int, n1: int, w2: int, n2: int) -> dict[str, float]:
@@ -267,7 +267,7 @@ def main() -> None:
     )
     ap.add_argument("--n", type=int, default=300, help="battles per checkpoint")
     ap.add_argument("--format", default="gen9ou")
-    ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed")
+    ap.add_argument("--team-pool", default="rotomai/teambuilding/data/teams_gen9ou.packed")
     ap.add_argument("--loop-penalty", type=float, default=4.0)
     ap.add_argument("--concurrency", type=int, default=20)
     ap.add_argument("--out", default="results/seed_strength_gate.json")
