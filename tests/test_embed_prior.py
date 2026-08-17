@@ -6,8 +6,8 @@ the build path needs GenData and is a maintenance tool, so it is not on the test
 
 import numpy as np
 
-from lategame.features.embed_prior import PRIOR_FIELDS, load_id_priors
-from lategame.features.vocab import vocab_sizes
+from rotomai.features.embed_prior import PRIOR_FIELDS, load_id_priors
+from rotomai.features.vocab import vocab_sizes
 
 
 def test_shapes_dtype_and_padding_row():

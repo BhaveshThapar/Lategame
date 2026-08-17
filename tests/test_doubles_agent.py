@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lategame.agents.doubles_agent import resolve_switch_conflict
+from rotomai.agents.doubles_agent import resolve_switch_conflict
 
 
 def _logits(slot1_ranking: list[int], n: int = 107) -> np.ndarray:

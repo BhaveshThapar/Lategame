@@ -78,7 +78,7 @@ def _state_estimation() -> dict[str, Any]:
     return {
         "capability": "state estimation",
         "requirement": "R-STATE / R-PRIORS (plan.md 7)",
-        "gate": "lategame/search/recon_check.py",
+        "gate": "rotomai/search/recon_check.py",
         "reproduce": [
             "python scripts/rpredict_recon_gate.py",
             "python scripts/rpredict_recon_live_gate.py --format gen9ou",
@@ -143,7 +143,7 @@ def _planning() -> dict[str, Any]:
     return {
         "capability": "win-condition planning",
         "requirement": "R-PLAN (plan.md 7)",
-        "gate": "lategame/search/expectimax.py via scripts/rpredict_oppmodel_gate.py --gate b",
+        "gate": "rotomai/search/expectimax.py via scripts/rpredict_oppmodel_gate.py --gate b",
         "reproduce": [
             "N_PER_SHARD=250 sbatch --array=0-9 scripts/cluster/search_gate.slurm",
             "python scripts/merge_search_shards.py "
@@ -187,7 +187,7 @@ def _damage_math() -> dict[str, Any]:
     return {
         "capability": "precise damage math",
         "requirement": "R-CALC (plan.md 7)",
-        "gate": "lategame/search/fidelity.py + lategame/engine/damage.py",
+        "gate": "rotomai/search/fidelity.py + rotomai/engine/damage.py",
         "reproduce": ["python scripts/rpredict_fidelity_gate.py --limit 300"],
         "records": [{
             "record": "rpredict_fidelity.json",

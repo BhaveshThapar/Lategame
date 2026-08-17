@@ -68,8 +68,8 @@ from typing import Any
 
 import numpy as np
 
-from lategame.data import ingest
-from lategame.data.ingest import (
+from rotomai.data import ingest
+from rotomai.data.ingest import (
     _UNKNOWN_ITEM,
     _episode_rewards,
     _gen_from_log,
@@ -77,10 +77,10 @@ from lategame.data.ingest import (
     _prescan_kits,
     _reconstruct_pov,
 )
-from lategame.data.replays import cached_replay_paths, fetch_replays
-from lategame.data.reward import RewardWeights
-from lategame.data.usage_prior import UsagePrior, load_usage_prior
-from lategame.features.encoder import OBS_LAYOUT
+from rotomai.data.replays import cached_replay_paths, fetch_replays
+from rotomai.data.reward import RewardWeights
+from rotomai.data.usage_prior import UsagePrior, load_usage_prior
+from rotomai.features.encoder import OBS_LAYOUT
 
 _RESULTS = Path("results/ou_ingest_gate.json")
 _PDIM = OBS_LAYOUT.pokemon_dim  # each of the first 12 obs blocks is one Pokemon

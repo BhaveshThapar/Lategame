@@ -7,15 +7,15 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.features.encoder import OBS_DIM  # noqa: E402
-from lategame.model.actor_critic import (  # noqa: E402
+from rotomai.features.encoder import OBS_DIM  # noqa: E402
+from rotomai.model.actor_critic import (  # noqa: E402
     ActorCritic,
     hl_gauss_target,
     load_bc_weights,
     value_from_logits,
     value_support,
 )
-from lategame.model.policy import BCPolicy  # noqa: E402
+from rotomai.model.policy import BCPolicy  # noqa: E402
 
 
 def test_forward_shapes():

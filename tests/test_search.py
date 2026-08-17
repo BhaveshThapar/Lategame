@@ -8,9 +8,9 @@ since the vendored simulator (``third_party/``) is not committed. The full live 
 
 from __future__ import annotations
 
-from lategame.data.resim import _reconstruct_pov_resim
-from lategame.data.reward import RewardWeights
-from lategame.search.determinize import battle_to_spec, pokeenv_digest
+from rotomai.data.resim import _reconstruct_pov_resim
+from rotomai.data.reward import RewardWeights
+from rotomai.search.determinize import battle_to_spec, pokeenv_digest
 from tests.conftest import requires_showdown
 from tests.test_resim import _EVENTS
 
@@ -33,7 +33,7 @@ def test_determinize_spec_and_digest_shapes() -> None:
 
 @requires_showdown
 def test_forward_reconstruct_and_step() -> None:
-    from lategame.search.forward import ForwardModel
+    from rotomai.search.forward import ForwardModel
 
     spec = {
         "seed": 7,
@@ -115,7 +115,7 @@ def _res(**kw):  # noqa: ANN002, ANN201
 
 
 def test_node_value_depth2_backup_and_opponent_aggregation() -> None:
-    from lategame.search.expectimax import SearchConfig, _node_value
+    from rotomai.search.expectimax import SearchConfig, _node_value
 
     # Two of our actions, two opponent moves; every step ends the game (no node needed).
     #   A: vs x -> we win (+1), vs y -> we lose (-1)
@@ -146,7 +146,7 @@ def test_node_value_depth2_backup_and_opponent_aggregation() -> None:
 
 
 def test_node_value_prunes_our_actions_to_top_k_my() -> None:
-    from lategame.search.expectimax import SearchConfig, _node_value
+    from rotomai.search.expectimax import SearchConfig, _node_value
 
     class _Node:  # _to_order finds no match -> every prior -20 -> stable keep-first-k
         available_moves: list = []
@@ -169,7 +169,7 @@ def test_node_value_prunes_our_actions_to_top_k_my() -> None:
 
 
 def test_node_value_terminal_and_no_move_leaf() -> None:
-    from lategame.search.expectimax import SearchConfig, _node_value
+    from rotomai.search.expectimax import SearchConfig, _node_value
 
     cfg = SearchConfig(depth=2, shaped_coef=0.0)
     fm = _FakeFM({})
@@ -195,7 +195,7 @@ def test_an_omitted_format_still_reconstructs_as_random_battles() -> None:
     so a spec that omits it -- which is every caller before 2026-08 -- must still reconstruct
     exactly as before, right down to the driver sampling the RB pool to fill the hidden opponent.
     """
-    from lategame.search.forward import ForwardModel
+    from rotomai.search.forward import ForwardModel
 
     bare = {
         "seed": 7,
@@ -222,7 +222,7 @@ def test_a_teambuilt_format_never_invents_species() -> None:
     """On gen9ou the opponent's six are known from team preview, so there is nothing to sample --
     and there is no random-set generator to sample legally with. `fill` must be ignored rather
     than quietly producing a team the format would reject."""
-    from lategame.search.forward import ForwardModel
+    from rotomai.search.forward import ForwardModel
 
     spec = {
         "seed": 3,

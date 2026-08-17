@@ -10,7 +10,7 @@ vendored simulator (``third_party/``) is not committed.
 
 from __future__ import annotations
 
-from lategame.search.fidelity import run_fidelity
+from rotomai.search.fidelity import run_fidelity
 from tests.conftest import GEN9_INPUTLOG, requires_showdown
 
 

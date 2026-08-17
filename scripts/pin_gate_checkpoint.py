@@ -39,7 +39,7 @@ from typing import Any
 def checkpoint_for(out_dir: str, init: str, iteration: int) -> str:
     """Mirror of `ppo_continue_gate._best_checkpoint` -- iteration 0 is the warm start itself.
 
-    Not imported from there: that module pulls in torch through `lategame.train.ppo`, and this is
+    Not imported from there: that module pulls in torch through `rotomai.train.ppo`, and this is
     a pure JSON rewrite. `pin` cross-checks the format against the record it is rewriting, so a
     drift in the naming convention fails loudly instead of producing a path to nothing.
     """

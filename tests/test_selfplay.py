@@ -11,13 +11,13 @@ import random
 import numpy as np
 import pytest
 
-from lategame.data import collect
-from lategame.data.collect import PlayerSpec, TrajectoryDataset, concat_rl_shards, save_rl
-from lategame.data.reward import RewardWeights
-from lategame.eval import arena
-from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-from lategame.features.encoder import OBS_DIM
-from lategame.train.selfplay import _sample_league
+from rotomai.data import collect
+from rotomai.data.collect import PlayerSpec, TrajectoryDataset, concat_rl_shards, save_rl
+from rotomai.data.reward import RewardWeights
+from rotomai.eval import arena
+from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
+from rotomai.features.encoder import OBS_DIM
+from rotomai.train.selfplay import _sample_league
 
 
 def test_sample_league_uniform_subset():
@@ -75,7 +75,7 @@ def test_recording_player_forwards_checkpoint_kwargs(monkeypatch):
 
 def test_selfplay_config_has_the_teambuilt_and_cap_fields():
     """Both default to None, so every RB/OU arm ever run is bit-identical."""
-    from lategame.train.selfplay import SelfPlayConfig
+    from rotomai.train.selfplay import SelfPlayConfig
 
     cfg = SelfPlayConfig()
     assert cfg.team_pool is None
@@ -88,9 +88,9 @@ def test_run_selfplay_rejects_format_mismatch(tmp_path):
     import asyncio
 
     pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.train.ppo import _save_checkpoint
-    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.train.ppo import _save_checkpoint
+    from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
     path = tmp_path / "rb_init.pt"
     _save_checkpoint(
@@ -108,9 +108,9 @@ def test_run_selfplay_rejects_an_encoder_mismatched_warm_start(tmp_path):
     import asyncio
 
     pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.train.ppo import _save_checkpoint
-    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.train.ppo import _save_checkpoint
+    from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
     path = tmp_path / "fake_vgc_init.pt"
     _save_checkpoint(
@@ -135,9 +135,9 @@ def test_run_selfplay_rejects_a_warm_start_with_no_value_support(tmp_path):
     import torch
 
     pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.train.ppo import _save_checkpoint
-    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.train.ppo import _save_checkpoint
+    from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
     path = tmp_path / "bc_shaped_init.pt"
     _save_checkpoint(
@@ -162,7 +162,7 @@ def test_selfplay_eval_points_build_the_agent_the_format_wants(monkeypatch):
     """
     import asyncio
 
-    from lategame.train import selfplay as sp
+    from rotomai.train import selfplay as sp
 
     async def fake_eval(a, b, n):
         return 0.5
@@ -207,7 +207,7 @@ def test_collect_selfplay_gives_each_side_its_own_team_draw(monkeypatch):
     """
     import asyncio
 
-    from lategame.teambuilding.pool import DEFAULT_VGC_POOL
+    from rotomai.teambuilding.pool import DEFAULT_VGC_POOL
 
     captured: list[dict] = []
 
@@ -307,7 +307,7 @@ def test_concat_rl_shards_preserves_episodes(tmp_path):
 
 def test_concat_rl_shards_returns_reset_across_seam(tmp_path):
     pytest.importorskip("torch")
-    from lategame.data.rl_dataset import RLDataset
+    from rotomai.data.rl_dataset import RLDataset
 
     s1, s2 = tmp_path / "a.npz", tmp_path / "b.npz"
     save_rl(_tiny_traj(2), s1)
@@ -320,7 +320,7 @@ def test_concat_rl_shards_returns_reset_across_seam(tmp_path):
 
 def test_load_actor_critic_weights_roundtrip():
     torch = pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic, load_actor_critic_weights
+    from rotomai.model.actor_critic import ActorCritic, load_actor_critic_weights
 
     src = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11)
     dst = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11)
@@ -331,7 +331,7 @@ def test_load_actor_critic_weights_roundtrip():
 
 def test_load_actor_critic_weights_shape_mismatch_raises():
     pytest.importorskip("torch")
-    from lategame.model.actor_critic import ActorCritic, load_actor_critic_weights
+    from rotomai.model.actor_critic import ActorCritic, load_actor_critic_weights
 
     src = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=11)
     dst = ActorCritic(OBS_DIM, hidden_dim=16, n_bins=21)  # value head shape differs

@@ -21,7 +21,7 @@ gap was the price of sampling, not slack in the argmax). This probe exists to av
 that: it asks whether the update direction is actually noise-dominated at the current budget.
 
 Three measurements on rollouts collected from a SHIPPED v19 checkpoint (no training, no change to
-lategame/):
+rotomai/):
 
   B1 cross-rollout cosine -- cos(g_i, g_j) between gradients from INDEPENDENT rollouts at the
                    run's real budget, plus a scaling curve at smaller batch sizes. Near 0 at the
@@ -97,19 +97,19 @@ from typing import Any
 import torch
 from torch import nn
 
-from lategame.data.collect import PlayerSpec
-from lategame.data.rollout import RolloutBuffer, collect_rollout
-from lategame.features.encoder import OBS_DIM, OBS_VERSION
-from lategame.model.actor_critic import (
+from rotomai.data.collect import PlayerSpec
+from rotomai.data.rollout import RolloutBuffer, collect_rollout
+from rotomai.features.encoder import OBS_DIM, OBS_VERSION
+from rotomai.model.actor_critic import (
     hl_gauss_target,
     load_actor_critic_weights,
     value_support,
 )
-from lategame.model.factory import build_model
-from lategame.teambuilding.pool import TeamPool
-from lategame.train.offline_rl import _value_ce
-from lategame.train.ppo import PPOConfig, _policy_stats, compute_gae
-from lategame.train.selfplay import _sample_league
+from rotomai.model.factory import build_model
+from rotomai.teambuilding.pool import TeamPool
+from rotomai.train.offline_rl import _value_ce
+from rotomai.train.ppo import PPOConfig, _policy_stats, compute_gae
+from rotomai.train.selfplay import _sample_league
 
 # Pre-registered thresholds (docs/RESULTS.md, Build 20), read on the POLICY-term split-half cosine.
 NOISY_COS = 0.30  # below this, the update direction is noise-dominated at this batch size
@@ -524,7 +524,7 @@ def main() -> None:
     )
     ap.add_argument("--ent-coef", type=float, default=PPOConfig.ent_coef)
     ap.add_argument("--format", default="gen9ou")
-    ap.add_argument("--team-pool", default="lategame/teambuilding/data/teams_gen9ou.packed")
+    ap.add_argument("--team-pool", default="rotomai/teambuilding/data/teams_gen9ou.packed")
     ap.add_argument("--loop-penalty", type=float, default=4.0)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()

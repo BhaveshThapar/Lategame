@@ -5,7 +5,7 @@
   "battles": 40,
   "agent": "heuristic",
   "opponent": "heuristic",
-  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9vgc.packed",
   "pass_rate": 0.99,
   "snapshots": 698,
   "errored": 0,

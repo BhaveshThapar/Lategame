@@ -61,7 +61,7 @@ def _heuristic_choice_on_pov(opp_battle: Any) -> str | None:
     from poke_env import to_id_str
     from poke_env.battle import Move
 
-    from lategame.agents.heuristic_agent import heuristic_pick
+    from rotomai.agents.heuristic_agent import heuristic_pick
 
     pick = heuristic_pick(
         opp_battle.active_pokemon,
@@ -78,12 +78,12 @@ def _heuristic_choice_on_pov(opp_battle: Any) -> str | None:
 def run_gate_a(args: argparse.Namespace) -> dict[str, Any]:
     from poke_env import to_id_str
 
-    from lategame.data.replays import iter_cached_replays
-    from lategame.data.resim import _parse_inputlog_meta, run_driver
-    from lategame.search.determinize import battle_to_spec
-    from lategame.search.forward import ForwardModel
-    from lategame.search.opponent_model import WhiteBoxHeuristicOpponent, build_opp_pov
-    from lategame.search.recon_check import _decision_snapshots
+    from rotomai.data.replays import iter_cached_replays
+    from rotomai.data.resim import _parse_inputlog_meta, run_driver
+    from rotomai.search.determinize import battle_to_spec
+    from rotomai.search.forward import ForwardModel
+    from rotomai.search.opponent_model import WhiteBoxHeuristicOpponent, build_opp_pov
+    from rotomai.search.recon_check import _decision_snapshots
 
     replays = list(iter_cached_replays(args.cache_dir))
     if not replays:
@@ -173,7 +173,7 @@ def run_gate_a(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _digest(battle: Any) -> dict[str, Any]:
-    from lategame.search.determinize import pokeenv_digest
+    from rotomai.search.determinize import pokeenv_digest
 
     return pokeenv_digest(battle)
 
@@ -190,16 +190,16 @@ _CONCURRENCY = 6
 
 
 def _set_search_env(args: argparse.Namespace, opp_model: str) -> None:
-    os.environ["LATEGAME_SEARCH_CHECKPOINT"] = args.init
-    os.environ["LATEGAME_SEARCH_OPP_MODEL"] = opp_model
-    os.environ["LATEGAME_SEARCH_OPP_AGG"] = "model"
-    os.environ["LATEGAME_SEARCH_DEPTH"] = str(args.depth)
-    os.environ["LATEGAME_SEARCH_DETERMINIZATIONS"] = str(args.determinizations)
-    os.environ["LATEGAME_SEARCH_OPP_CAP"] = str(args.opp_cap)
-    os.environ["LATEGAME_SEARCH_OPP_CAP_DEEP"] = str(args.opp_cap_deep)
-    os.environ["LATEGAME_SEARCH_TOPK_MY"] = str(args.top_k_my)
-    os.environ["LATEGAME_SEARCH_SHAPED"] = str(args.shaped)
-    os.environ["LATEGAME_SEARCH_SEED"] = str(args.seed)
+    os.environ["ROTOMAI_SEARCH_CHECKPOINT"] = args.init
+    os.environ["ROTOMAI_SEARCH_OPP_MODEL"] = opp_model
+    os.environ["ROTOMAI_SEARCH_OPP_AGG"] = "model"
+    os.environ["ROTOMAI_SEARCH_DEPTH"] = str(args.depth)
+    os.environ["ROTOMAI_SEARCH_DETERMINIZATIONS"] = str(args.determinizations)
+    os.environ["ROTOMAI_SEARCH_OPP_CAP"] = str(args.opp_cap)
+    os.environ["ROTOMAI_SEARCH_OPP_CAP_DEEP"] = str(args.opp_cap_deep)
+    os.environ["ROTOMAI_SEARCH_TOPK_MY"] = str(args.top_k_my)
+    os.environ["ROTOMAI_SEARCH_SHAPED"] = str(args.shaped)
+    os.environ["ROTOMAI_SEARCH_SEED"] = str(args.seed)
 
 
 async def _winrate(
@@ -213,8 +213,8 @@ async def _winrate(
     loop_penalty: float = 0.0,
     pool_seed: int = 0,
 ) -> float:
-    from lategame.config import is_doubles_format
-    from lategame.eval.arena import (
+    from rotomai.config import is_doubles_format
+    from rotomai.eval.arena import (
         _CHECKPOINT_AGENTS,
         _DOUBLES_LOOP_GUARD_AGENTS,
         _LOOP_GUARD_AGENTS,
@@ -227,7 +227,7 @@ async def _winrate(
         # matchup varies and the mirror stays fair in expectation, as the ceiling gate does.
         if not team_pool:
             return None
-        from lategame.teambuilding.pool import TeamPool
+        from rotomai.teambuilding.pool import TeamPool
 
         return TeamPool.from_packed_file(team_pool, seed=2 * pool_seed + seed)
 
@@ -251,8 +251,8 @@ async def _winrate(
 
 
 async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
-    from lategame.config import DEFAULT_FORMAT
-    from lategame.eval.arena import policy_agent
+    from rotomai.config import DEFAULT_FORMAT
+    from rotomai.eval.arena import policy_agent
 
     if not Path(args.init).exists():
         raise SystemExit(f"checkpoint '{args.init}' not found.")
@@ -261,7 +261,7 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
 
     # ASK which learner the format wants. This gate is the M2 leg of the format-ceiling probe, and
     # `--format gen9vgc2025regi` was already a documented use of it (`arena._singles_only_agents`
-    # unlocks `search` on doubles under LATEGAME_SEARCH_SHAPED_ONLY=1 for exactly this run) -- but
+    # unlocks `search` on doubles under ROTOMAI_SEARCH_SHAPED_ONLY=1 for exactly this run) -- but
     # the base arm hardcoded `offrl`, which `build_player` refuses on a doubles format. So M2 on
     # doubles could not run at all: the same defect as `train.selfplay`'s, in the next module.
     base = policy_agent(fmt)
@@ -314,7 +314,7 @@ async def run_gate_b(args: argparse.Namespace) -> dict[str, Any]:
         # produce it on its own. A reader comparing this record to the RB one needs to know which
         # they are looking at, and until now the flag lived only in the environment.
         "search_leaf": (
-            "shaped_only" if os.environ.get("LATEGAME_SEARCH_SHAPED_ONLY") == "1"
+            "shaped_only" if os.environ.get("ROTOMAI_SEARCH_SHAPED_ONLY") == "1"
             else "policy_value"
         ),
         "base_vs_heuristic": round(base_vs_heur, 4),

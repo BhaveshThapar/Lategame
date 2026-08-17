@@ -27,8 +27,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lategame.model.factory import MODEL_ENTITY_TRANSFORMER
-from lategame.train.bc import TrainConfig, train_bc
+from rotomai.model.factory import MODEL_ENTITY_TRANSFORMER
+from rotomai.train.bc import TrainConfig, train_bc
 
 # Focused on the emergence -> ceiling region from the scaling sweep (full grid x 3 arms is
 # costly); the ceiling rung is always included via the shard total.

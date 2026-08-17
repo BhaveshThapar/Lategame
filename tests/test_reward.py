@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lategame.data.reward import RewardWeights, state_value
+from rotomai.data.reward import RewardWeights, state_value
 
 W = RewardWeights()
 
@@ -90,7 +90,7 @@ def test_the_digest_value_mirrors_state_value():
     deepcopy + delta replay against ~1 ms for the RPC that already produced the digest."""
     from poke_env.battle import Pokemon, Status
 
-    from lategame.data.reward import RewardWeights, digest_state_value, state_value
+    from rotomai.data.reward import RewardWeights, digest_state_value, state_value
 
     class _B:
         def __init__(self, ours, theirs, won=None):
@@ -129,7 +129,7 @@ def test_the_digest_value_mirrors_state_value():
 def test_the_digest_value_credits_unrevealed_mons_the_same_way():
     """`state_value` credits the mons it has not seen at full HP; dropping that on the digest side
     would make a leaf drift as the opponent's team is revealed, which is a moving target."""
-    from lategame.data.reward import RewardWeights, digest_state_value
+    from rotomai.data.reward import RewardWeights, digest_state_value
 
     w = RewardWeights()
     full = {f"m{i}": {"hp": 1.0, "status": "", "fainted": False} for i in range(6)}

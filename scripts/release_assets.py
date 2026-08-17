@@ -100,7 +100,7 @@ def build_manifest() -> dict[str, Any]:
         })
     runnable = [a for a in assets if a["runnable"]]
     return {
-        "schema": "lategame.release_assets/1",
+        "schema": "rotomai.release_assets/1",
         "note": (
             "Derived from check_artifacts.HEADLINE, not hand-kept, so it cannot drift from the "
             "claims it backs. `runnable` marks the minimum set needed to PLAY a format; the rest "

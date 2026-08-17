@@ -8,8 +8,8 @@ assembly + padding + the fixed-size assertion.
 import numpy as np
 from poke_env.battle import PokemonType, Status
 
-from lategame.features import encoder
-from lategame.features.encoder import (
+from rotomai.features import encoder
+from rotomai.features.encoder import (
     _MOVE_DIM,
     _POKEMON_DIM,
     OBS_DIM,
@@ -88,7 +88,7 @@ def test_encode_pokemon_sets_type_and_hp():
 
 
 def test_encode_pokemon_appends_identity_ids():
-    from lategame.features import vocab
+    from rotomai.features import vocab
 
     v = vocab.load_vocab()
     mon = FakePokemon(
@@ -127,8 +127,8 @@ def test_obs_version_v5_marks_first_turn_feature():
 def test_embed_battle_move_blocks_canonical_and_insertion_invariant():
     from poke_env.battle import Move
 
-    from lategame.features import vocab
-    from lategame.features.encoder import OBS_LAYOUT
+    from rotomai.features import vocab
+    from rotomai.features.encoder import OBS_LAYOUT
 
     def build(insertion_order):
         battle = FakeBattle()

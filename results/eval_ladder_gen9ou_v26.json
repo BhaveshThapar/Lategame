@@ -1,7 +1,7 @@
 {
-  "schema": "lategame.eval.ladder/1",
+  "schema": "rotomai.eval.ladder/1",
   "field_spec": "random,maxbasepower,simpleheuristics,heuristic,offrl@checkpoints/ppo_v23b_s0/iter_80.pt,offrl@checkpoints/ppo_v25a_s0/iter_120.pt,offrl@checkpoints/ppo_v25b_s0/iter_160.pt,offrl@checkpoints/ppo_v26a_s0/iter_240.pt,offrl@checkpoints/ppo_v26b_s0/iter_320.pt",
-  "team_pool": "lategame/teambuilding/data/teams_gen9ou.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9ou.packed",
   "concurrency": 20,
   "sample": false,
   "loop_penalty": 4.0,

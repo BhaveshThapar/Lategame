@@ -56,7 +56,7 @@ from typing import Any
 
 import numpy as np
 
-from lategame.features.encoder import OBS_LAYOUT
+from rotomai.features.encoder import OBS_LAYOUT
 
 # Reuse the Build-7 gate's validated machinery (obs decode, policy load, scoring, the frozen
 # loop-species constants, the numpy masked-softmax reference). It lives next to this script,
@@ -451,7 +451,7 @@ def main() -> None:  # noqa: C901 - a linear gate assembly
     live_turn = live_npz["turn"]
     live_tag = live_npz["battle_tag"]
 
-    from lategame.features.vocab import load_vocab
+    from rotomai.features.vocab import load_vocab
 
     table = load_vocab().tables["species"]
     species_ids, missing = smg.species_to_ids(list(LOOP_SPECIES), table)
@@ -731,7 +731,7 @@ def _harness_check(model: Any, tbl: dict[str, np.ndarray], device: str) -> float
         return 0.0
     import torch
 
-    from lategame.model.policy import policy_logits
+    from rotomai.model.policy import policy_logits
 
     obs = tbl["base_obs"][:512]
     mask = tbl["base_mask"][:512]

@@ -2,14 +2,14 @@
 # One PPO seed per array task, each with its own Showdown server.
 #
 # On the laptop the three seeds ran SEQUENTIALLY (4.6 h) because they shared one server on the
-# hardcoded port 8000. With LATEGAME_SHOWDOWN_PORT they are embarrassingly parallel: wall-clock
+# hardcoded port 8000. With ROTOMAI_SHOWDOWN_PORT they are embarrassingly parallel: wall-clock
 # collapses to a single seed's runtime.
 #
 #   sbatch --array=0-2 scripts/cluster/ppo_seed.slurm
 #
 # ITERS and TARGET_KL default to the v17-v22 values, so an unset submit reproduces those builds
 # exactly. Build 23 raises both (ITERS=80 TARGET_KL=0.06) and runs TWO arms concurrently -- the
-# second needs LATEGAME_SHOWDOWN_PORT_BASE=8200 or the arms share Showdown servers (_job_common.sh).
+# second needs ROTOMAI_SHOWDOWN_PORT_BASE=8200 or the arms share Showdown servers (_job_common.sh).
 #
 # Build 24 adds ANNEAL_ITERS, because ITERS silently doubles as the lr/ent anneal horizon: at
 # iteration 40, v22 (ITERS=50) sat at lr 9.08e-05 / ent 0.0020 while v23b (ITERS=80) sat at
@@ -29,7 +29,7 @@
 # will happily pool 300 instead of 900 and print a verdict that has lost the power it was
 # designed to buy.
 #
-#SBATCH --job-name=lg-ppo
+#SBATCH --job-name=ra-ppo
 #SBATCH --cpus-per-task=8
 # 64G is a HARD CEILING, not a choice: `sacctmgr show qos medium` sets MaxTRES=cpu=8,mem=64G PER
 # JOB, so `--mem` above 64G is rejected at submit time ("Memory required by task is not available")
@@ -114,7 +114,7 @@ fi
 # identity, which is what every OU build ran.
 TAG="${TAG:-ou}"
 FMT="${FMT:-gen9ou}"
-TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
+TEAM_POOL="${TEAM_POOL:-rotomai/teambuilding/data/teams_gen9ou.packed}"
 LOOP_PENALTY="${LOOP_PENALTY:-4.0}"
 GAMES_PER_OPP="${GAMES_PER_OPP:-48}"
 EVAL_N="${EVAL_N:-100}"

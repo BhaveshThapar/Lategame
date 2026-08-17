@@ -17,7 +17,7 @@
 # PORT BASE: 8600, clear of PPO (8100-8202), eval_ladder (8300), build26_analysis (8400) and the
 # interactive 8500. Two concurrent arrays MUST use different bases -- see _job_common.sh.
 #
-#SBATCH --job-name=lg-search
+#SBATCH --job-name=ra-search
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=12:00:00
@@ -25,7 +25,7 @@
 # NOTE: no --gres=gpu -- inference is CPU-cheap; the node forward model is the bottleneck.
 
 set -euo pipefail
-export LATEGAME_SHOWDOWN_PORT_BASE="${LATEGAME_SHOWDOWN_PORT_BASE:-8600}"
+export ROTOMAI_SHOWDOWN_PORT_BASE="${ROTOMAI_SHOWDOWN_PORT_BASE:-8600}"
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"
@@ -36,18 +36,18 @@ N_PER_SHARD="${N_PER_SHARD:-250}"
 SANITY_N="${SANITY_N:-40}"
 FMT="${FMT:-gen9ou}"
 INIT="${INIT:-checkpoints/ppo_v26b_s0/iter_300.pt}"
-TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
+TEAM_POOL="${TEAM_POOL:-rotomai/teambuilding/data/teams_gen9ou.packed}"
 
 # DOUBLES: this same job is the M2 leg of the VGC ceiling probe, and two settings are not optional.
 #
 #   FMT=gen9vgc2025regi INIT=checkpoints/doubles_offrl_vgc_v2.pt \
-#   TEAM_POOL=lategame/teambuilding/data/teams_gen9vgc.packed \
+#   TEAM_POOL=rotomai/teambuilding/data/teams_gen9vgc.packed \
 #   N_PER_SHARD=30 SANITY_N=10 OUT_PREFIX=results/rpredict_search_vgc \
-#   LATEGAME_SHOWDOWN_PORT_BASE=8700 sbatch -p tron --qos=medium --array=0-9 \
+#   ROTOMAI_SHOWDOWN_PORT_BASE=8700 sbatch -p tron --qos=medium --array=0-9 \
 #     scripts/cluster/search_gate.slurm
 #
 # 1. `search` is in `_SINGLES_ONLY_AGENTS` and `build_player` refuses it on a doubles format --
-#    UNLESS LATEGAME_SEARCH_SHAPED_ONLY=1, where the leaf is `data.reward.state_value` (reads the
+#    UNLESS ROTOMAI_SEARCH_SHAPED_ONLY=1, where the leaf is `data.reward.state_value` (reads the
 #    battle object, no singles encoder), the driver enumerates JOINT orders, and the fallback is
 #    the doubles-capable heuristic rule. Set here rather than left to the caller's environment,
 #    because forgetting it is a hard refusal at build time and an hour of queue wasted.
@@ -56,7 +56,7 @@ TEAM_POOL="${TEAM_POOL:-lategame/teambuilding/data/teams_gen9ou.packed}"
 #    six switches -- not a weaker guard, a differently-wrong one.
 case "$FMT" in
   *vgc*|*doubles*)
-    export LATEGAME_SEARCH_SHAPED_ONLY=1
+    export ROTOMAI_SEARCH_SHAPED_ONLY=1
     LOOP_PENALTY="${LOOP_PENALTY:-0}"
     echo "[job] doubles format $FMT: shaped-only search leaf, loop_penalty $LOOP_PENALTY"
     ;;

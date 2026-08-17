@@ -2,7 +2,7 @@
 
 Fetches one month's chaos-stats JSON from smogon.com (cached raw under gitignored
 ``replays/usage/``), distills it to per-species top-K item/ability/move usage lists via
-``data.usage_prior``, and freezes the small artifact into ``lategame/features/data/``.
+``data.usage_prior``, and freezes the small artifact into ``rotomai/features/data/``.
 A species count collapse means silent id-normalization drift, so this is a loud kill-gate:
 it exits non-zero if too few species survive distillation.
 
@@ -18,9 +18,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from lategame.data.usage_prior import _usage_path, write_usage_prior
+from rotomai.data.usage_prior import _usage_path, write_usage_prior
 
-_UA = "lategame-research/0.1 (offline RL replay study)"
+_UA = "rotomai-research/0.1 (offline RL replay study)"
 _TIMEOUT = 60.0
 _MIN_SPECIES = 350  # gen9ou-1500 carries ~403; far fewer means normalization drift
 

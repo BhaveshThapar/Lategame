@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lategame.teambuilding.pool import pack_showdown_team
+from rotomai.teambuilding.pool import pack_showdown_team
 
 _SHOWDOWN = Path("third_party/pokemon-showdown/pokemon-showdown")
 _DELIM = "==="
@@ -55,8 +55,8 @@ def _validate(packed: str, battle_format: str) -> tuple[bool, str]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--format", dest="battle_format", default="gen9ou")
-    ap.add_argument("--src", default="lategame/teambuilding/data/teams_gen9ou_src.txt")
-    ap.add_argument("--out", default="lategame/teambuilding/data/teams_gen9ou.packed")
+    ap.add_argument("--src", default="rotomai/teambuilding/data/teams_gen9ou_src.txt")
+    ap.add_argument("--out", default="rotomai/teambuilding/data/teams_gen9ou.packed")
     ap.add_argument("--min", type=int, default=8, help="fail if fewer than this many pass")
     args = ap.parse_args()
 

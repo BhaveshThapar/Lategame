@@ -42,12 +42,12 @@ from pathlib import Path
 
 import numpy as np
 
-from lategame.config import DEFAULT_FORMAT
-from lategame.data.collect import PlayerSpec, collect_selfplay
-from lategame.data.reward import RewardWeights
-from lategame.data.rl_dataset import discounted_returns
-from lategame.eval.arena import build_player, evaluate_built, policy_agent
-from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+from rotomai.config import DEFAULT_FORMAT
+from rotomai.data.collect import PlayerSpec, collect_selfplay
+from rotomai.data.reward import RewardWeights
+from rotomai.data.rl_dataset import discounted_returns
+from rotomai.eval.arena import build_player, evaluate_built, policy_agent
+from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
 _LADDER = ("random", "maxbasepower", "simpleheuristics", "heuristic")
 _EVAL_CONCURRENCY = 20  # the local server is the bottleneck; keep many battles in flight
@@ -293,7 +293,7 @@ async def _ladder(
     def _team(seed: int) -> object | None:
         if not team_pool:
             return None
-        from lategame.teambuilding.pool import TeamPool
+        from rotomai.teambuilding.pool import TeamPool
 
         return TeamPool.from_packed_file(team_pool, seed=seed)
 
@@ -442,7 +442,7 @@ def main(argv: list[str] | None = None) -> None:
     if "randombattle" not in args.battle_format and not args.team_pool:
         raise SystemExit(
             f"--team-pool is required on the teambuilt format {args.battle_format!r}; "
-            f"try lategame/teambuilding/data/teams_gen9vgc.packed"
+            f"try rotomai/teambuilding/data/teams_gen9vgc.packed"
         )
 
     asyncio.run(run_gate(args))

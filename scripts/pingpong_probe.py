@@ -162,7 +162,7 @@ def score_action_prob(
     """Per-row masked-softmax probability at ``action_idx`` under the agents' masked softmax."""
     import torch
 
-    from lategame.model.policy import masked_logits, policy_logits
+    from rotomai.model.policy import masked_logits, policy_logits
 
     model.to(device)
     out: list[np.ndarray] = []
@@ -186,7 +186,7 @@ def _gather_harness(
         return 0.0
     import torch
 
-    from lategame.model.policy import policy_logits
+    from rotomai.model.policy import policy_logits
 
     o, m, a = obs[:512], mask[:512], action_idx[:512]
     model.to(device)

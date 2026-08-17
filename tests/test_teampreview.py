@@ -9,12 +9,12 @@ import pytest
 from poke_env.battle import Move, Pokemon
 from poke_env.player import MaxBasePowerPlayer, RandomPlayer, SimpleHeuristicsPlayer
 
-from lategame.agents.teampreview import (
+from rotomai.agents.teampreview import (
     TeamPreviewMixin,
     choose_preview,
     score_our_team,
 )
-from lategame.eval import arena
+from rotomai.eval import arena
 
 GEN = 9
 
@@ -172,7 +172,7 @@ def test_singles_formats_are_untouched():
 def test_preview_can_be_turned_off_for_the_contrast_measurement(monkeypatch):
     """Every VGC number on the record predates this selector. Re-measuring the contrast needs both
     halves runnable from one build, so the off switch is a measurement instrument, not a legacy."""
-    monkeypatch.setenv("LATEGAME_TEAM_PREVIEW", "0")
+    monkeypatch.setenv("ROTOMAI_TEAM_PREVIEW", "0")
     assert not arena.team_preview_enabled()
     cls = arena._with_team_preview(arena.AGENTS["doubles"], "gen9vgc2025regi")
     assert cls is arena.AGENTS["doubles"]

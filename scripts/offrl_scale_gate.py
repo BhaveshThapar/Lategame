@@ -35,10 +35,10 @@ import statistics
 import time
 from pathlib import Path
 
-from lategame.config import DEFAULT_FORMAT
-from lategame.eval.arena import build_player, evaluate_built
-from lategame.model.factory import MODEL_ACTOR_CRITIC, MODEL_ENTITY_TRANSFORMER
-from lategame.train.offline_rl import OfflineRLConfig, train_offline_rl
+from rotomai.config import DEFAULT_FORMAT
+from rotomai.eval.arena import build_player, evaluate_built
+from rotomai.model.factory import MODEL_ACTOR_CRITIC, MODEL_ENTITY_TRANSFORMER
+from rotomai.train.offline_rl import OfflineRLConfig, train_offline_rl
 
 _CKPT_DIR = Path("checkpoints")
 _EVAL_CONCURRENCY = 20  # the local server is the bottleneck; keep many battles in flight
@@ -91,7 +91,7 @@ async def run_gate(
     fmt: str,
 ) -> dict:
     if "mlp" in arms and not Path(bc_init).exists():
-        raise SystemExit(f"BC warm-start '{bc_init}' not found; train it first (lategame train).")
+        raise SystemExit(f"BC warm-start '{bc_init}' not found; train it first (rotomai train).")
     print(f"shard {data} | arms {arms} | seeds {seeds} | epochs {epochs} | eval_n {eval_n}")
 
     records: list[dict] = []

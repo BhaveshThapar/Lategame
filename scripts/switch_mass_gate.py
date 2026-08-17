@@ -60,13 +60,13 @@ from typing import Any
 
 import numpy as np
 
-from lategame.features.encoder import OBS_LAYOUT
+from rotomai.features.encoder import OBS_LAYOUT
 
 _RESULTS = Path("results/switch_mass_gate.json")
 _DECISIONS_DEFAULT = Path("results/behavior_probe_decisions.jsonl")
 _REPLAY_DIR_DEFAULT = Path("replays/gen9ou")
 _PRIORS_PATH = Path(__file__).resolve().parent.parent / (
-    "lategame/features/data/id_priors_gen9.npz"
+    "rotomai/features/data/id_priors_gen9.npz"
 )
 
 # Loop-state extraction from the Build-6 decision stream (pre-registered).
@@ -509,7 +509,7 @@ def load_policy(path: str, obs_version: str, obs_dim: int) -> Any:
     """Load a v5 checkpoint the way BCAgent does, guarded against the SHARD's stamps."""
     import torch
 
-    from lategame.model.factory import build_model
+    from rotomai.model.factory import build_model
 
     ckpt = torch.load(path, map_location="cpu", weights_only=False)
     if ckpt.get("obs_version") != obs_version or int(ckpt.get("input_dim", -1)) != obs_dim:
@@ -528,7 +528,7 @@ def random_init_model(reference_ckpt: str, seed: int = 0) -> Any:
     """Same architecture as the reference checkpoint, freshly initialized (C-random)."""
     import torch
 
-    from lategame.model.factory import build_model
+    from rotomai.model.factory import build_model
 
     ckpt = torch.load(reference_ckpt, map_location="cpu", weights_only=False)
     torch.manual_seed(seed)
@@ -543,7 +543,7 @@ def score_shard(
     """Per-row (switch mass, top-1-is-switch) under the masked softmax the agents use."""
     import torch
 
-    from lategame.model.policy import masked_logits, policy_logits
+    from rotomai.model.policy import masked_logits, policy_logits
 
     model.to(device)
     masses: list[np.ndarray] = []
@@ -671,7 +671,7 @@ def main() -> None:
     loop_species, loop_pairs, loop_source, n_decision_rows = _loop_states(Path(args.decisions))
     print(f"loop states from {loop_source}: species={loop_species} pairs={len(loop_pairs)}")
 
-    from lategame.features.vocab import load_vocab
+    from rotomai.features.vocab import load_vocab
 
     table = load_vocab().tables["species"]
     species_ids, missing = species_to_ids(loop_species, table)

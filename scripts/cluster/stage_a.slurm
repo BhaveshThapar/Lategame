@@ -11,7 +11,7 @@
 # The narrow arm is the CONTROL. Read the WITHIN-architecture trend: absolute |G|^2 is not
 # comparable across widths (gradient norms scale with parameterization); cos and B_simple are.
 #
-#SBATCH --job-name=lg-b22-stageA
+#SBATCH --job-name=ra-b22-stageA
 #SBATCH --array=0-1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G

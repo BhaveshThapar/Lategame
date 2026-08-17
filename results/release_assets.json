@@ -1,5 +1,5 @@
 {
-  "schema": "lategame.release_assets/1",
+  "schema": "rotomai.release_assets/1",
   "note": "Derived from check_artifacts.HEADLINE, not hand-kept, so it cannot drift from the claims it backs. `runnable` marks the minimum set needed to PLAY a format; the rest is provenance for a curve.",
   "verify": "python scripts/release_assets.py --verify",
   "n_assets": 18,

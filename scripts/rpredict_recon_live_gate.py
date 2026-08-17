@@ -15,7 +15,7 @@ details are guesses by construction and are not scored.
 Gate A runs first and why a low match rate is a finding rather than a nuisance.
 
     bash scripts/run_server.sh 8500
-    LATEGAME_SHOWDOWN_PORT=8500 python scripts/rpredict_recon_live_gate.py \
+    ROTOMAI_SHOWDOWN_PORT=8500 python scripts/rpredict_recon_live_gate.py \
         --format gen9ou --n 20 --out results/rpredict_recon_ou.json
 """
 
@@ -30,8 +30,8 @@ from typing import Any
 from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder
 
-from lategame.config import is_doubles_format
-from lategame.search.recon_check import ReconStats, check_live_snapshot
+from rotomai.config import is_doubles_format
+from rotomai.search.recon_check import ReconStats, check_live_snapshot
 
 #: Match rate at or above which the reconstruction is trusted enough to search on. The RB gate
 #: measured 0.99995; this is deliberately looser because a teambuilt opponent's set is SAMPLED,
@@ -70,8 +70,8 @@ def _snapshotting_agent(base_cls: type, stats: ReconStats, model: Any, cap: int)
 
 
 async def _run(args: argparse.Namespace, stats: ReconStats, model: Any) -> None:
-    from lategame.eval.arena import AGENTS, build_player
-    from lategame.teambuilding.pool import TeamPool
+    from rotomai.eval.arena import AGENTS, build_player
+    from rotomai.teambuilding.pool import TeamPool
 
     team = None
     if args.team_pool:
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"{args.battle_format} is teambuilt -- pass --team-pool")
     out = args.out or f"results/rpredict_recon_{args.battle_format}.json"
 
-    from lategame.search.forward import ForwardModel
+    from rotomai.search.forward import ForwardModel
 
     stats = ReconStats()
     model = ForwardModel(showdown_dir=args.showdown_dir, node=args.node)

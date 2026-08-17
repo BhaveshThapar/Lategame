@@ -1,6 +1,6 @@
 # PRD — Competitive Pokémon Showdown ML Battle Agent
 
-**Working name:** Lategame (placeholder)
+**Working name:** RotomAI (placeholder)
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
@@ -40,7 +40,7 @@ The opportunity is to combine the **offline-bootstrap-then-self-play** recipe (M
 - **G2.** Reach **strong-human performance** in the first target format, measured by matchmaking-bias-robust metrics (GXE / Glicko-1), competitive with the foul-play heuristic and Metamon baselines.
   - **AMENDED 2026-08-10: the target format is `gen9ou`, not Gen 9 Random Battles, and the change was forced by measurement rather than preference.** Lever 15 measured the *achievable* ceiling on gen9-RB directly (see §13.1): the strongest competent bot reaches **0.523** vs the heuristic with its CI spanning 0.50, near-optimal depth-2 search with a white-box opponent model reaches **0.500**, and team strength does not predict the winner (AUC 0.495) — RB is balanced by design, and a good heuristic already sits at the achievable skill ceiling. Verdict **FORMAT_BOUND**: G2 is unreachable in gen9-RB *no matter the model*, so pursuing it there was not a difficulty problem but an impossibility one. On `gen9ou` the same measurement shows real headroom — `simpleheuristics` **0.633** [0.577, 0.686], heuristic mirror **0.487** — and the band is wider (0.610 vs RB's 0.516).
   - **Status against the two halves of G2.** The *fixed-baseline* half is met: §12's "> 50% vs the heuristic" bar is cleared on `gen9ou`, with `v25b`'s selection-free terminal read at **0.6807** [0.6682, 0.6930], above `simpleheuristics`' 0.633.
-  - **The *ladder* half is now COMPUTED (2026-08-10), on an agent-only eval ladder rather than the human ladder.** GXE and Glicko-1 need a varied opponent field, which no amount of further training can supply — but §12's own last line prefers "a private/agent-only server or eval ladder", and §16 Q5 is answered: there is *no* unranked public ladder, so that route is the only policy-clean one. `lategame/eval/ladder.py` fits a whole field jointly (Bradley-Terry on the Glicko scale, `heuristic` pinned at 1500). Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9, GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000) — see §13.1. Two caveats travel with it: the RD is a **lower bound** (battles cluster by team matchup, so the effective sample is under `n`), and this is an **agent-only** field, so the number is *not* comparable to a Showdown GXE measured against humans. The human-ladder reading remains out of scope under NG3; `lategame/live/` (**G1**) is built and gated for it should that ever change.
+  - **The *ladder* half is now COMPUTED (2026-08-10), on an agent-only eval ladder rather than the human ladder.** GXE and Glicko-1 need a varied opponent field, which no amount of further training can supply — but §12's own last line prefers "a private/agent-only server or eval ladder", and §16 Q5 is answered: there is *no* unranked public ladder, so that route is the only policy-clean one. `rotomai/eval/ladder.py` fits a whole field jointly (Bradley-Terry on the Glicko scale, `heuristic` pinned at 1500). Over 8 agents × 28 pairs × 300 battles on `gen9ou`, **`v25b` reaches Glicko 1696.9 ± 14.9, GXE 0.6809**, above `simpleheuristics` (1579.2 / 0.5756) and the `heuristic` anchor (1500 / 0.5000) — see §13.1. Two caveats travel with it: the RD is a **lower bound** (battles cluster by team matchup, so the effective sample is under `n`), and this is an **agent-only** field, so the number is *not* comparable to a Showdown GXE measured against humans. The human-ladder reading remains out of scope under NG3; `rotomai/live/` (**G1**) is built and gated for it should that ever change.
 - **G3.** Demonstrate **continual improvement**: model strength measurably increases as self-play volume and replay data grow.
   - **MET (booked 2026-08-11), and the evidence was already on the record before it was claimed.** §12's continual-improvement row asks for "metric vs self-play/data volume → monotonic improvement". Builds 24–26 are exactly that curve and nobody had written it up as one. Five doses of PPO self-play at a pinned schedule (`anneal_iters` 80, `target_kl` 0.06, from the converged offline init), 3 seeds each, pooled **n = 9000/arm** against the fixed heuristic, chained through the shared `v25b` anchor because absolute rates move between runs (the anchor re-calibrated **+0.0157**, inside the ±0.027 cross-run band) and only within-run differences are trustworthy:
 
@@ -374,7 +374,7 @@ now cite `docs/RESULTS.md`; citations to §3.1, §7, §12, §15, NG3 and M0–M7
 3. ~~**Team generation:** how far to push beyond curated pools toward learned teambuilding for OU/VGC?~~
    **ANSWERED BY DESCOPING (2026-08-16): not at all in v1, and NG6 said so from the start.** The
    question outlived its own non-goal. What v1 ships is the curated-pool half: validator-checked
-   packed pools for both teambuilt formats (`lategame/teambuilding/data/`) drawn per side with
+   packed pools for both teambuilt formats (`rotomai/teambuilding/data/`) drawn per side with
    distinct seeds. The one piece of team-level *decision-making* that did land is bring-6-pick-4
    team preview, and it is a fixed rule rather than a learned policy — the codec has no slot for
    preview and the model no head for it (§13.1, 2026-08-16). Measured worth: up to +0.060 on a
@@ -396,9 +396,9 @@ now cite `docs/RESULTS.md`; citations to §3.1, §7, §12, §15, NG3 and M0–M7
    out not to exist.** The question presupposes that "anonymized non-ranked live play" is available
    on the public server. It is not: `/search <format>` on the public sim **is** the rated ladder,
    and Showdown offers no unranked equivalent, so live public play cannot be made policy-safe —
-   only policy-*explicit*. `lategame/live/policy.py` is that finding turned into a gate (two
+   only policy-*explicit*. `rotomai/live/policy.py` is that finding turned into a gate (two
    independent opt-in channels; see NG3 and §15), and `--server` is the supported private-eval
-   path. The clean-evaluation half of the question is answered by `lategame/eval/ladder.py`: an
+   path. The clean-evaluation half of the question is answered by `rotomai/eval/ladder.py`: an
    **agent-only eval ladder** on the local server, which is what §12's "private/agent-only server
    or eval ladder" asks for and the only varied field reachable without touching the human ladder.
 6. **Reward shaping specifics:** which intermediate signals densify learning without distorting the win objective? **(THE ONLY QUESTION STILL OPEN.)** `data/reward.py`'s `RewardWeights` is what every arm ran with and it was never ablated — no build varied it, so nothing on the record separates "these weights help" from "these weights are what we happened to use". It is open rather than descoped because it is cheap to answer on `gen9ou`, the one format with proven headroom.

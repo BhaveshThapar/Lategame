@@ -17,7 +17,7 @@ from poke_env.battle import Move, Pokemon, Status
 from poke_env.battle.double_battle import DoubleBattle
 from poke_env.player import DefaultBattleOrder, DoubleBattleOrder, PassBattleOrder
 
-from lategame.agents.heuristic_agent import HeuristicAgent, best_target, doubles_pick
+from rotomai.agents.heuristic_agent import HeuristicAgent, best_target, doubles_pick
 
 
 class _FakeDoubleBattle(DoubleBattle):
@@ -176,7 +176,7 @@ def test_a_fainted_foe_is_not_targeted():
 
 def test_singles_is_untouched():
     """Every published number came through the singles path; it must not move."""
-    from lategame.agents.heuristic_agent import heuristic_pick
+    from rotomai.agents.heuristic_agent import heuristic_pick
 
     pick = heuristic_pick(
         Pokemon(9, species="garchomp"),
@@ -302,10 +302,10 @@ def test_the_search_fallback_uses_the_doubles_rule_not_the_singles_one():
     detached message task, where it is logged and swallowed. The agent then never answers and the
     server plays a default move on the timer, which reads as a very weak arm rather than a broken
     one. This is the one path `_SINGLES_ONLY_AGENTS` deliberately lets through to doubles
-    (LATEGAME_SEARCH_SHAPED_ONLY=1, the VGC M2 ceiling probe), and `arena._singles_only_agents`
+    (ROTOMAI_SEARCH_SHAPED_ONLY=1, the VGC M2 ceiling probe), and `arena._singles_only_agents`
     claimed in its own docstring that the fallback was doubles-capable while it was not.
     """
-    from lategame.agents.search_agent import SearchAgent
+    from rotomai.agents.search_agent import SearchAgent
 
     battle = _FakeDoubleBattle(
         active=[Pokemon(9, species="garchomp"), Pokemon(9, species="rillaboom")],
@@ -331,7 +331,7 @@ def test_the_doubles_join_is_one_function_shared_by_both_agents():
     the singles version survived in `search_agent` after the doubles path was built."""
     import inspect
 
-    from lategame.agents import heuristic_agent, search_agent
+    from rotomai.agents import heuristic_agent, search_agent
 
     assert "doubles_order" in inspect.getsource(search_agent.SearchAgent.choose_move)
     assert "doubles_order" in inspect.getsource(heuristic_agent.HeuristicAgent._choose_doubles_move)

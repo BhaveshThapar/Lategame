@@ -11,11 +11,11 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.data.collect import Dataset, save  # noqa: E402
-from lategame.data.dataset import BCDataset  # noqa: E402
-from lategame.features.encoder import OBS_DIM  # noqa: E402
-from lategame.model.factory import MODEL_ENTITY_TRANSFORMER  # noqa: E402
-from lategame.train.bc import TrainConfig, _subset, train_bc  # noqa: E402
+from rotomai.data.collect import Dataset, save  # noqa: E402
+from rotomai.data.dataset import BCDataset  # noqa: E402
+from rotomai.features.encoder import OBS_DIM  # noqa: E402
+from rotomai.model.factory import MODEL_ENTITY_TRANSFORMER  # noqa: E402
+from rotomai.train.bc import TrainConfig, _subset, train_bc  # noqa: E402
 
 
 def _bc_npz(path, n=200):

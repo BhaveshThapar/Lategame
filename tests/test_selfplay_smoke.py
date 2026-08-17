@@ -16,7 +16,7 @@ import json
 
 import pytest
 
-from lategame.features.encoder import OBS_DIM
+from rotomai.features.encoder import OBS_DIM
 from tests.conftest import requires_server, write_ac_checkpoint
 
 pytestmark = requires_server
@@ -24,7 +24,7 @@ pytestmark = requires_server
 
 async def test_selfplay_one_iteration_end_to_end(tmp_path):
     pytest.importorskip("torch")
-    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+    from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
     init = tmp_path / "iter0.pt"
     write_ac_checkpoint(init, OBS_DIM)
@@ -68,12 +68,12 @@ async def test_selfplay_one_iteration_end_to_end_on_vgc(tmp_path):
     measurement, and G4's exit criterion says the same thing about its own 0.667.
     """
     pytest.importorskip("torch")
-    from lategame.config import VGC_FORMAT
-    from lategame.features.doubles_encoder import OBS_DIM_DOUBLES, OBS_VERSION_DOUBLES
-    from lategame.model.actor_critic import ActorCritic
-    from lategame.teambuilding.pool import DEFAULT_VGC_POOL
-    from lategame.train.ppo import _save_checkpoint
-    from lategame.train.selfplay import SelfPlayConfig, run_selfplay
+    from rotomai.config import VGC_FORMAT
+    from rotomai.features.doubles_encoder import OBS_DIM_DOUBLES, OBS_VERSION_DOUBLES
+    from rotomai.model.actor_critic import ActorCritic
+    from rotomai.teambuilding.pool import DEFAULT_VGC_POOL
+    from rotomai.train.ppo import _save_checkpoint
+    from rotomai.train.selfplay import SelfPlayConfig, run_selfplay
 
     n_bins = 21
     init = tmp_path / "vgc_iter0.pt"

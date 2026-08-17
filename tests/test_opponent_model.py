@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from poke_env.battle import Move, Pokemon
 
-from lategame.agents.heuristic_agent import heuristic_pick, matchup
-from lategame.search.expectimax import SearchConfig, _combine, _node_value, _opp_weights
-from lategame.search.opponent_model import (
+from rotomai.agents.heuristic_agent import heuristic_pick, matchup
+from rotomai.search.expectimax import SearchConfig, _combine, _node_value, _opp_weights
+from rotomai.search.opponent_model import (
     LearnedOpponent,
     WhiteBoxHeuristicOpponent,
     _match_choice,
@@ -224,7 +224,7 @@ def test_learned_uniform_when_no_opp_pov() -> None:
 
 
 def test_learned_softmax_over_actions(monkeypatch) -> None:  # noqa: ANN001
-    import lategame.search.opponent_model as om
+    import rotomai.search.opponent_model as om
 
     choices = _move_choices("a", "b")
     # map choice -> action int by slot, and score action 0 far above action 1.

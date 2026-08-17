@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # M4 self-play as a BUILD: run the loop and leave a citable record behind.
 #
-# There was no cluster job for self-play at all. `lategame selfplay` writes only
+# There was no cluster job for self-play at all. `rotomai selfplay` writes only
 # <out_dir>/curve.json -- nothing under results/ -- so every M4 run before this one left an
 # artifact the artifact checker cannot see and a later build cannot cite. The one bridge from the
 # loop to results/ is scripts/curriculum_gate.py, which is what this job runs.
@@ -12,20 +12,20 @@
 #
 #   # capability record (one seed, short) -- the FORMAT_BOUND branch
 #   ARM=m4_vgc_cap FMT=gen9vgc2025regi INIT=checkpoints/doubles_offrl_vgc_v2.pt \
-#   TEAM_POOL=lategame/teambuilding/data/teams_gen9vgc.packed \
+#   TEAM_POOL=rotomai/teambuilding/data/teams_gen9vgc.packed \
 #   ITERS=2 GAMES_PER_OPP=24 EVAL_N=60 SEEDS=0 \
 #   sbatch -p tron --qos=medium scripts/cluster/selfplay_gate.slurm
 #
 #   # strength arm (three seeds) -- the AMBIGUOUS / MODEL_BOUND branch
 #   ARM=m4_vgc FMT=gen9vgc2025regi INIT=checkpoints/doubles_offrl_vgc_v2.pt \
-#   TEAM_POOL=lategame/teambuilding/data/teams_gen9vgc.packed \
+#   TEAM_POOL=rotomai/teambuilding/data/teams_gen9vgc.packed \
 #   SEEDS=0,1,2 sbatch -p tron --qos=medium scripts/cluster/selfplay_gate.slurm
 #
 # PORT BASE: 8800, clear of PPO (8100-8202), eval_ladder (8300), build26_analysis (8400), the
 # interactive 8500, search (8600) and the VGC search array (8700). Two concurrent arrays MUST use
 # different bases -- see _job_common.sh.
 #
-#SBATCH --job-name=lg-selfplay
+#SBATCH --job-name=ra-selfplay
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=12:00:00
@@ -33,7 +33,7 @@
 # NOTE: no --gres=gpu -- the fine-tune is small and the server is the bottleneck, as for ppo_seed.
 
 set -euo pipefail
-export LATEGAME_SHOWDOWN_PORT_BASE="${LATEGAME_SHOWDOWN_PORT_BASE:-8800}"
+export ROTOMAI_SHOWDOWN_PORT_BASE="${ROTOMAI_SHOWDOWN_PORT_BASE:-8800}"
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"

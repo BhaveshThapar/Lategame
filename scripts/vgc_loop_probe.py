@@ -33,7 +33,7 @@ ceiling (`agents.turn_cap`) is what terminates it.
     bash scripts/run_server.sh                       # local Showdown on :8000
     python scripts/vgc_loop_probe.py \
         --format gen9vgc2025regi \
-        --team-pool lategame/teambuilding/data/teams_gen9vgc.packed \
+        --team-pool rotomai/teambuilding/data/teams_gen9vgc.packed \
         --n 12 --out results/vgc_loop_probe.json
 
 PRE-REGISTERED GATE. Both clauses, and both are reported whether or not they bind:
@@ -58,8 +58,8 @@ from typing import Any
 
 import numpy as np
 
-from lategame.config import VGC_FORMAT
-from lategame.teambuilding.pool import DEFAULT_VGC_POOL
+from rotomai.config import VGC_FORMAT
+from rotomai.teambuilding.pool import DEFAULT_VGC_POOL
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
 
@@ -177,7 +177,7 @@ async def run_probe(
     arms: list[dict[str, Any]],
     out: str,
 ) -> dict[str, Any]:
-    from lategame.data.collect import collect_trajectories
+    from rotomai.data.collect import collect_trajectories
 
     measured: dict[str, dict[str, Any]] = {}
     for arm in arms:

@@ -3,7 +3,7 @@
   "arm": "m4_vgc_cap",
   "opponent": "heuristic",
   "format": "gen9vgc2025regi",
-  "team_pool": "lategame/teambuilding/data/teams_gen9vgc.packed",
+  "team_pool": "rotomai/teambuilding/data/teams_gen9vgc.packed",
   "max_battle_turns": 60,
   "preflight": {
     "n_episodes": 160,

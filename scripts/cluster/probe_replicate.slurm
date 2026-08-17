@@ -11,13 +11,13 @@
 # is mandatory), --policy == --init to probe the warm start itself.
 #
 #   CKPT=checkpoints/offrl_gen9ou_wide_e10_s0.pt TAG=b22_stageB0_e10 PROBE_SEED=1 \
-#     LATEGAME_SHOWDOWN_PORT=8200 sbatch -p tron --qos=medium scripts/cluster/probe_replicate.slurm
+#     ROTOMAI_SHOWDOWN_PORT=8200 sbatch -p tron --qos=medium scripts/cluster/probe_replicate.slurm
 #
 # PORT: this job has no array index, so _job_common.sh would default it to 8100 -- which COLLIDES
 # with a concurrent `--array=0-2` job's task 0. Two jobs sharing one Showdown silently battle into
-# each other's games. Always pin LATEGAME_SHOWDOWN_PORT clear of any running array.
+# each other's games. Always pin ROTOMAI_SHOWDOWN_PORT clear of any running array.
 #
-#SBATCH --job-name=lg-probe-rep
+#SBATCH --job-name=ra-probe-rep
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=04:00:00
@@ -37,7 +37,7 @@ OUT="results/grad_noise_diag_${TAG}_seed${PROBE_SEED}.json"
 [[ -f "$CKPT" ]] || { echo "[job] FATAL: checkpoint not found at $CKPT" >&2; exit 1; }
 [[ -e "$OUT" ]] && { echo "[job] FATAL: $OUT exists; refusing to overwrite a probe result" >&2; exit 1; }
 
-echo "[job] re-probing $CKPT at --seed $PROBE_SEED on port $LATEGAME_SHOWDOWN_PORT -> $OUT"
+echo "[job] re-probing $CKPT at --seed $PROBE_SEED on port $ROTOMAI_SHOWDOWN_PORT -> $OUT"
 start_showdown
 
 python -u scripts/grad_noise_diag.py \

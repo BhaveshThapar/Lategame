@@ -14,14 +14,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from lategame.features.doubles_encoder import (
+from rotomai.features.doubles_encoder import (
     N_ACTIVE,
     OBS_DIM_DOUBLES,
     OBS_LAYOUT_DOUBLES,
     OBS_VERSION_DOUBLES,
     embed_doubles_battle,
 )
-from lategame.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION
+from rotomai.features.encoder import OBS_DIM, OBS_LAYOUT, OBS_VERSION
 
 
 def test_the_singles_layout_is_frozen():

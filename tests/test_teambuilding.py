@@ -6,7 +6,7 @@ pin its sampling contract (in-pool, seeded-deterministic, varied) and the paste-
 
 import pytest
 
-from lategame.teambuilding.pool import TeamPool, pack_showdown_team
+from rotomai.teambuilding.pool import TeamPool, pack_showdown_team
 
 _PASTE = """\
 Great Tusk @ Leftovers

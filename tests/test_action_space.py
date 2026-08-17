@@ -15,8 +15,8 @@ import logging
 from poke_env.battle import Battle, Move, Pokemon
 from poke_env.player import SingleBattleOrder
 
-from lategame.features import vocab
-from lategame.features.action_space import (
+from rotomai.features import vocab
+from rotomai.features.action_space import (
     GEN9_ACTION_SPACE_SIZE,
     action_mask,
     action_space_size,
@@ -25,7 +25,7 @@ from lategame.features.action_space import (
     label_action,
     order_to_action,
 )
-from lategame.features.encoder import OBS_LAYOUT, embed_battle
+from rotomai.features.encoder import OBS_LAYOUT, embed_battle
 
 _LOGGER = logging.getLogger("test_action_space")
 
@@ -201,7 +201,7 @@ def test_illegal_action_falls_back_to_a_legal_order():
 
 
 def test_synthesized_mask_covers_canonical_slots():
-    from lategame.features.action_space import synthesize_action_mask
+    from rotomai.features.action_space import synthesize_action_mask
 
     battle = Battle("battle-gen9rb-t2", "Alice", _LOGGER, gen=9)
     for line in (

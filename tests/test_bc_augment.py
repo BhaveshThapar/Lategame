@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import torch
 
-from lategame.features.encoder import OBS_DIM, OBS_LAYOUT
-from lategame.train.augment import (
+from rotomai.features.encoder import OBS_DIM, OBS_LAYOUT
+from rotomai.train.augment import (
     augment_pp_full,
     augment_pp_noise,
     augment_pp_resample,

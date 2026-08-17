@@ -2,8 +2,8 @@
 # Shared job prologue: bring up a PRIVATE Showdown for this job and tear it down on exit.
 #
 # poke-env pins ws://localhost:8000, so two jobs on one host would share a server and silently
-# battle into each other's games. Each job therefore gets its own port, and lategame/config.py
-# reads it from LATEGAME_SHOWDOWN_PORT.
+# battle into each other's games. Each job therefore gets its own port, and rotomai/config.py
+# reads it from ROTOMAI_SHOWDOWN_PORT.
 #
 # Sourced, not executed:  source scripts/cluster/_job_common.sh
 set -euo pipefail
@@ -29,7 +29,7 @@ activate_env() {
   fi
   # shellcheck disable=SC1091
   source "$base/etc/profile.d/conda.sh"
-  conda activate lategame
+  conda activate rotomai
 }
 activate_env
 echo "[job] python: $(command -v python)  ($(python --version 2>&1))"
@@ -41,26 +41,26 @@ echo "[job] python: $(command -v python)  ($(python --version 2>&1))"
 # 0-2 arrays: without a distinct base they both compute 8100-8102, and any two tasks landing on the
 # same node share a server -- poke-env does not error, it silently battles into the other arm's
 # games, contaminating the exact comparison the build exists to make. So give each concurrent array
-# its own base:  LATEGAME_SHOWDOWN_PORT_BASE=8200 sbatch --array=0-2 ...
-# Set the BASE, never LATEGAME_SHOWDOWN_PORT itself -- that would pin all three tasks to one port.
+# its own base:  ROTOMAI_SHOWDOWN_PORT_BASE=8200 sbatch --array=0-2 ...
+# Set the BASE, never ROTOMAI_SHOWDOWN_PORT itself -- that would pin all three tasks to one port.
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-export LATEGAME_SHOWDOWN_PORT="${LATEGAME_SHOWDOWN_PORT:-$((${LATEGAME_SHOWDOWN_PORT_BASE:-8100} + TASK_ID))}"
+export ROTOMAI_SHOWDOWN_PORT="${ROTOMAI_SHOWDOWN_PORT:-$((${ROTOMAI_SHOWDOWN_PORT_BASE:-8100} + TASK_ID))}"
 
 # Server logs live under logs/showdown/<bucket>/, not the repo root. Resolved HERE rather than at
 # source time: callers set BUILD *after* sourcing this file (ppo_seed.slurm does), so a source-time
 # default would always miss it and bucket every arm under the job name instead. LOG_BUCKET wins if
-# set; then BUILD; then the job name with sbatch's `lg-` prefix stripped, which is what the
+# set; then BUILD; then the job name with sbatch's `ra-` prefix stripped, which is what the
 # non-ppo jobs (strength, b22-stageA, probe-rep) sort by.
 _resolve_server_log() {
   local bucket="${LOG_BUCKET:-${BUILD:-${SLURM_JOB_NAME:-local}}}"
-  SERVER_LOG="${SERVER_LOG:-logs/showdown/${bucket#lg-}/showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
+  SERVER_LOG="${SERVER_LOG:-logs/showdown/${bucket#ra-}/showdown_${SLURM_JOB_ID:-local}_${TASK_ID}.log}"
   mkdir -p "$(dirname "$SERVER_LOG")"
 }
 
 start_showdown() {
   _resolve_server_log
-  echo "[job] starting Showdown on port ${LATEGAME_SHOWDOWN_PORT}"
-  bash scripts/run_server.sh "$LATEGAME_SHOWDOWN_PORT" > "$SERVER_LOG" 2>&1 &
+  echo "[job] starting Showdown on port ${ROTOMAI_SHOWDOWN_PORT}"
+  bash scripts/run_server.sh "$ROTOMAI_SHOWDOWN_PORT" > "$SERVER_LOG" 2>&1 &
   SHOWDOWN_PID=$!
   # Do NOT proceed until the port actually accepts connections. poke-env does not fail fast on a
   # dead server -- it HANGS, for hours, which is how a whole run gets silently wasted.
@@ -69,7 +69,7 @@ start_showdown() {
 import socket,sys
 s=socket.socket()
 s.settimeout(1)
-sys.exit(0 if s.connect_ex(('127.0.0.1', ${LATEGAME_SHOWDOWN_PORT})) == 0 else 1)
+sys.exit(0 if s.connect_ex(('127.0.0.1', ${ROTOMAI_SHOWDOWN_PORT})) == 0 else 1)
 " 2>/dev/null; then
       echo "[job] Showdown up (pid $SHOWDOWN_PID)"
       return 0
@@ -81,7 +81,7 @@ sys.exit(0 if s.connect_ex(('127.0.0.1', ${LATEGAME_SHOWDOWN_PORT})) == 0 else 1
     fi
     sleep 2
   done
-  echo "[job] FATAL: Showdown never opened port ${LATEGAME_SHOWDOWN_PORT} after 120s" >&2
+  echo "[job] FATAL: Showdown never opened port ${ROTOMAI_SHOWDOWN_PORT} after 120s" >&2
   tail -20 "$SERVER_LOG" >&2
   exit 1
 }

@@ -1,6 +1,6 @@
 """The version lives in three files and they must agree.
 
-`pyproject.toml`, `lategame/__init__.py` and `CITATION.cff` each carry it, so a release bump that
+`pyproject.toml`, `rotomai/__init__.py` and `CITATION.cff` each carry it, so a release bump that
 touches one leaves the others quietly wrong -- the same drift that let a "2 known mypy errors"
 footnote and a "221 results files" count survive this repo for months. This is the cheap version of
 the fix: a bar the machine runs, so the three cannot disagree.
@@ -10,7 +10,7 @@ import re
 import tomllib
 from pathlib import Path
 
-import lategame
+import rotomai
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,7 +27,7 @@ def _citation_version() -> str:
 
 
 def test_the_three_version_strings_agree():
-    assert lategame.__version__ == _pyproject_version() == _citation_version()
+    assert rotomai.__version__ == _pyproject_version() == _citation_version()
 
 
 def test_the_version_is_a_release_number():

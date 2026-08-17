@@ -74,6 +74,6 @@ def test_a_built_wheel_actually_contains_them(tmp_path):
     missing = [d for d in RUNTIME_DATA if not any(d in n for n in names)]
     assert not missing, (
         f"{len(missing)} runtime data file(s) absent from the wheel: {missing}. "
-        f"`pip install lategame` would fail at first use. Check "
+        f"`pip install rotomai` would fail at first use. Check "
         f"[tool.setuptools.package-data] in pyproject.toml."
     )

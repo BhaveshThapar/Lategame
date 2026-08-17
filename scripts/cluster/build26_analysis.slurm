@@ -18,7 +18,7 @@
 # Colliding jobs on one node SILENTLY SHARE a server rather than failing, so they see each other's
 # battles. 8400 is clear of both PPO bases (8100-8102, 8200-8202) and of eval_ladder.slurm (8300).
 #
-#SBATCH --job-name=lg-b26-analysis
+#SBATCH --job-name=ra-b26-analysis
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=08:00:00
@@ -30,7 +30,7 @@
 # anyway -- the preflight refuses a short arm.
 
 set -euo pipefail
-export LATEGAME_SHOWDOWN_PORT_BASE="${LATEGAME_SHOWDOWN_PORT_BASE:-8400}"
+export ROTOMAI_SHOWDOWN_PORT_BASE="${ROTOMAI_SHOWDOWN_PORT_BASE:-8400}"
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"

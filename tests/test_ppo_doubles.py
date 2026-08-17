@@ -22,15 +22,15 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from lategame.data.rollout import RolloutBuffer, decision_stats  # noqa: E402
-from lategame.features.doubles_action_space import (  # noqa: E402
+from rotomai.data.rollout import RolloutBuffer, decision_stats  # noqa: E402
+from rotomai.features.doubles_action_space import (  # noqa: E402
     GEN9_DOUBLES_ACTION_SPACE_SIZE,
     GEN9_DOUBLES_SLOT_ACTIONS,
 )
-from lategame.features.doubles_encoder import OBS_DIM_DOUBLES, OBS_VERSION_DOUBLES  # noqa: E402
-from lategame.model.actor_critic import ActorCritic, value_support  # noqa: E402
-from lategame.model.policy import factored_logits, sample_factored_action  # noqa: E402
-from lategame.train.ppo import (  # noqa: E402
+from rotomai.features.doubles_encoder import OBS_DIM_DOUBLES, OBS_VERSION_DOUBLES  # noqa: E402
+from rotomai.model.actor_critic import ActorCritic, value_support  # noqa: E402
+from rotomai.model.policy import factored_logits, sample_factored_action  # noqa: E402
+from rotomai.train.ppo import (  # noqa: E402
     PPOConfig,
     _save_checkpoint,
     _surrogate_weights,
@@ -170,9 +170,9 @@ def test_the_update_runs_and_every_reported_stat_is_finite():
 def test_the_singles_path_keeps_its_unweighted_means():
     """The decision-row denominator is factored-ONLY. Applying it on singles would rescale the
     policy loss, entropy and KL of every OU build ever published."""
-    from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-    from lategame.features.encoder import OBS_DIM
-    from lategame.model.policy import masked_logits
+    from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
+    from rotomai.features.encoder import OBS_DIM
+    from rotomai.model.policy import masked_logits
 
     torch.manual_seed(0)
     n = 16
@@ -208,7 +208,7 @@ def test_a_doubles_checkpoint_is_stamped_with_the_doubles_fingerprint(tmp_path):
     """`_save_checkpoint` used to stamp the singles encoder constants unconditionally, so every
     PPO iteration checkpoint claimed to be singles -- rejected by `DoublesAgent` at the first
     eval, an iteration of rollout too late."""
-    from lategame.model.factory import build_model
+    from rotomai.model.factory import build_model
 
     path = tmp_path / "iter_01.pt"
     _save_checkpoint(_model(), str(path), "gen9vgc2025regi", -1.0, 1.0, N_BINS)
@@ -226,7 +226,7 @@ def test_run_ppo_refuses_a_singles_loop_penalty_on_a_doubles_format(tmp_path):
     recorded in the gate JSON as if it meant the same thing."""
     import asyncio
 
-    from lategame.train.ppo import run_ppo
+    from rotomai.train.ppo import run_ppo
 
     path = tmp_path / "init.pt"
     _save_checkpoint(_model(), str(path), "gen9vgc2025regi", -1.0, 1.0, N_BINS)
@@ -240,9 +240,9 @@ def test_run_ppo_refuses_a_singles_checkpoint_on_a_doubles_format(tmp_path):
     instead of silently accepting the singles constants."""
     import asyncio
 
-    from lategame.features.action_space import GEN9_ACTION_SPACE_SIZE
-    from lategame.features.encoder import OBS_DIM
-    from lategame.train.ppo import run_ppo
+    from rotomai.features.action_space import GEN9_ACTION_SPACE_SIZE
+    from rotomai.features.encoder import OBS_DIM
+    from rotomai.train.ppo import run_ppo
 
     path = tmp_path / "singles.pt"
     torch.save(

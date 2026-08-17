@@ -2,7 +2,7 @@
 
 from poke_env.battle import MoveCategory, PokemonType
 
-from lategame.engine.damage import (
+from rotomai.engine.damage import (
     expected_power,
     normalize_accuracy,
     score_move,

@@ -108,7 +108,7 @@ def test_the_committed_record_matches_a_fresh_run():
 def test_every_capability_names_a_runnable_reproduction_command():
     """The reason three producing scripts read as orphans until now.
 
-    The record named the *library* a capability rests on (`lategame/search/recon_check.py`) and not
+    The record named the *library* a capability rests on (`rotomai/search/recon_check.py`) and not
     the command that regenerates the JSON, so a mechanical reference scan flagged
     `rpredict_recon_gate.py`, `rpredict_recon_live_gate.py` and `rpredict_fidelity_gate.py` as
     referenced by nothing — while they are the reproduction path for a `check_artifacts` headline.

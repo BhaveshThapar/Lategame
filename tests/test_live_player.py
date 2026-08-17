@@ -14,17 +14,17 @@ from types import SimpleNamespace
 import pytest
 from poke_env import AccountConfiguration, ServerConfiguration
 
-import lategame.eval.arena as arena
-from lategame.live.player import (
+import rotomai.eval.arena as arena
+from rotomai.live.player import (
     LoginError,
     LoginWatch,
     build_live_player,
     live_agent_extras,
     wait_for_login,
 )
-from lategame.live.server import LIVE_SERVER
+from rotomai.live.server import LIVE_SERVER
 
-_ACCOUNT = AccountConfiguration("lategamebot", "hunter2-do-not-leak")
+_ACCOUNT = AccountConfiguration("rotomaibot", "hunter2-do-not-leak")
 _PRIVATE = ServerConfiguration("ws://localhost:8000/showdown/websocket", "https://x/action.php?")
 
 
@@ -49,7 +49,7 @@ def test_the_supplied_account_is_passed_through_untouched(captured):
     """THE guard against copying arena's random-suffix username onto a live server."""
     build_live_player("ppo", "gen9ou", _ACCOUNT)
     assert captured["ppo"]["account_configuration"] is _ACCOUNT
-    assert captured["ppo"]["account_configuration"].username == "lategamebot"
+    assert captured["ppo"]["account_configuration"].username == "rotomaibot"
 
 
 def test_defaults_to_the_live_server_and_starts_the_turn_timer(captured):
@@ -136,7 +136,7 @@ def _record(message: str) -> logging.LogRecord:
 
 def test_login_watch_diagnoses_a_taken_name():
     watch = LoginWatch()
-    watch.emit(_record("Error message received: |nametaken|lategamebot|already taken"))
+    watch.emit(_record("Error message received: |nametaken|rotomaibot|already taken"))
     assert watch.reason and "registered to someone else" in watch.reason
 
 
@@ -148,7 +148,7 @@ def test_login_watch_diagnoses_the_silent_guest_downgrade():
 
 def test_login_watch_diagnoses_a_rejected_login():
     watch = LoginWatch()
-    watch.emit(_record("Trying to login as lategamebot, showdown returned Guest 42"))
+    watch.emit(_record("Trying to login as rotomaibot, showdown returned Guest 42"))
     assert watch.reason and "rejected by the server" in watch.reason
 
 

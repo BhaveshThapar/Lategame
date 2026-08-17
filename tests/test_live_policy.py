@@ -8,7 +8,7 @@ These tests pin that both channels are load-bearing.
 
 import pytest
 
-from lategame.live.policy import (
+from rotomai.live.policy import (
     ALLOW_LADDER_ENV,
     LADDER_ACK,
     PASSWORD_ENV,
@@ -67,7 +67,7 @@ def test_module_has_no_heavy_imports():
     """cli.py imports this at module scope to build --help; it must not drag in torch/poke-env."""
     import sys
 
-    import lategame.live.policy as mod
+    import rotomai.live.policy as mod
 
     assert not hasattr(mod, "torch") and not hasattr(mod, "poke_env")
     # `os` is imported lazily inside check_ladder_optin, so it must not be a module attribute.
@@ -77,4 +77,4 @@ def test_module_has_no_heavy_imports():
 
 def test_credential_env_names_are_distinct_and_namespaced():
     assert USERNAME_ENV != PASSWORD_ENV
-    assert all(n.startswith("LATEGAME_") for n in (USERNAME_ENV, PASSWORD_ENV, ALLOW_LADDER_ENV))
+    assert all(n.startswith("ROTOMAI_") for n in (USERNAME_ENV, PASSWORD_ENV, ALLOW_LADDER_ENV))

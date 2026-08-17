@@ -42,7 +42,7 @@
     ],
     "backfilled_on": "2026-08-16",
     "note": "ADDED BY HAND -- NOT READ FROM THE SHARDS. The array (slurm 7258893) predates the `search_leaf` field by one commit, so its shards carry no value to pool.",
-    "evidence": "scripts/cluster/search_gate.slurm exports LATEGAME_SEARCH_SHAPED_ONLY=1 for any *vgc*/*doubles* format, and `arena._singles_only_agents` admits `search` to a doubles format ONLY in that mode -- so a doubles search run cannot have used any other leaf. Later runs record it themselves.",
+    "evidence": "scripts/cluster/search_gate.slurm exports ROTOMAI_SEARCH_SHAPED_ONLY=1 for any *vgc*/*doubles* format, and `arena._singles_only_agents` admits `search` to a doubles format ONLY in that mode -- so a doubles search run cannot have used any other leaf. Later runs record it themselves.",
     "why_it_matters": "ShapedOnlyPolicy is a weaker instrument than a trained value head. `expectimax.ShapedOnlyPolicy` pre-registers the asymmetry: a WIN is decisive, a NULL is suggestive only, because a shallower leaf could produce a null on its own.",
     "slurm_job": "7258893"
   }

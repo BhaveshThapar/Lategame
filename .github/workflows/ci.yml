@@ -1,4 +1,4 @@
-# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy lategame scripts.
+# The standing bar, run by a machine instead of by habit: pytest, ruff check ., mypy rotomai scripts.
 name: ci
 
 # EVERY branch, not a named list. It used to be `branches: [main, eval-ladder]` plus pull_request,
@@ -54,11 +54,11 @@ jobs:
 
       - run: ruff check .
 
-      # Both trees, exactly as README's Develop block is. It used to be `mypy lategame` alone, with
+      # Both trees, exactly as README's Develop block is. It used to be `mypy rotomai` alone, with
       # a footnote saying scripts/ carried "2 known pre-existing errors". The footnote was written
       # stale (7 of the 8 erroring files already existed) and had drifted to 10. A count nobody runs
       # is a claim nobody can check, so the count is gone and the checker covers both trees instead.
-      - run: mypy lategame scripts
+      - run: mypy rotomai scripts
 
       # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 16 tests
       # self-skip and 767 pass -- measured on a fresh clone, not inferred. A 17th skip means an

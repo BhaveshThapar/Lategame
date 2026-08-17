@@ -8,9 +8,9 @@ error paths must keep the secret out of the message.
 import pytest
 from poke_env import LocalhostServerConfiguration, ServerConfiguration, ShowdownServerConfiguration
 
-from lategame.config import LOCAL_SERVER
-from lategame.live.policy import PASSWORD_ENV, USERNAME_ENV
-from lategame.live.server import (
+from rotomai.config import LOCAL_SERVER
+from rotomai.live.policy import PASSWORD_ENV, USERNAME_ENV
+from rotomai.live.server import (
     LIVE_SERVER,
     CredentialsError,
     is_public,
@@ -58,9 +58,9 @@ def test_is_public_classification(url, public):
 
 
 def test_reads_credentials_from_the_environment():
-    env = {USERNAME_ENV: "lategamebot", PASSWORD_ENV: _SECRET}
+    env = {USERNAME_ENV: "rotomaibot", PASSWORD_ENV: _SECRET}
     account = live_account(server=LIVE_SERVER, env=env)
-    assert account.username == "lategamebot"
+    assert account.username == "rotomaibot"
     assert account.password == _SECRET
 
 

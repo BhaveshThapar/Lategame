@@ -13,9 +13,9 @@ import math
 import numpy as np
 import torch
 
-from lategame.agents.doubles_agent import resolve_switch_conflict
-from lategame.features.doubles_action_space import N_SWITCHES, SWITCH_BASE, joint_switch_conflict
-from lategame.model.policy import (
+from rotomai.agents.doubles_agent import resolve_switch_conflict
+from rotomai.features.doubles_action_space import N_SWITCHES, SWITCH_BASE, joint_switch_conflict
+from rotomai.model.policy import (
     NEG_INF,
     factored_accuracy,
     factored_cross_entropy,
