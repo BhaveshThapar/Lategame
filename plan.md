@@ -1,6 +1,6 @@
 # PRD — Competitive Pokémon Showdown ML Battle Agent
 
-**Working name:** RotomAI (placeholder)
+**Name:** RotomAI (settled 2026-08-17; was the working name "Lategame")
 **Author:** Bhavesh
 **Date:** June 26, 2026
 **Version:** 0.1 (draft)
