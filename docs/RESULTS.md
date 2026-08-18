@@ -7,8 +7,8 @@ reason the next one was chosen.
 
 This was `plan.md` §13.1, where it was 88% of the design document, and before that it was the
 README's `## Status`, where it was 78% of the README. It lives here so each of those can be what it
-is — [plan.md](../plan.md) the requirements and goals, [README](../README.md) the entry point, and
-this the lab notebook.
+is — [plan.md](../plan.md) the requirements and goals, [README](../README.md) the entry point,
+[OPERATIONS.md](OPERATIONS.md) the manual, and this the lab notebook.
 
 Section numbers referenced from docstrings elsewhere in the tree (`§3.1` goals, `§7` functional
 requirements, `§12` evaluation, `§15` ethics) all still point at [plan.md](../plan.md); only the
@@ -3196,3 +3196,302 @@ build log moved.
 
 ---
 
+
+## Build 28 — REBASING THE HEADLINE ONTO A BASELINE THE FIELD SHARES
+
+**Why.** Every strength number in this record is measured against `heuristic` — the agent in
+`rotomai/agents/heuristic_agent.py`, written here. It is a fine yardstick and a useless one to
+anybody outside this repo: an outside reader has no way to situate 0.7513. `simpleheuristics` has
+been in the registry since M1 (`rotomai/eval/arena.py:40`) and *is* poke-env's `SimpleHeuristicsPlayer`,
+imported unmodified (`arena.py:17-22`) — the rule-based baseline the poke-env literature inherits.
+Rebasing costs one gate run and converts a private number into a comparable one.
+
+**Pre-registered before running:** the same arm (`v26b` terminal, the three seed-best
+`ppo_v26b_s{0,1,2}/iter_320.pt`), the same protocol (`scripts/seed_strength_gate.py`, greedy through
+`offrl`, LoopGuard 4.0, gen9ou, the committed 12-team pool), n = 1000 per checkpoint. No contrast is
+declared: one build against one opponent is a LEVEL estimate with a Wilson interval, not a z-test.
+
+### The result
+
+| read | job | opponent | n | rate | Wilson 95% | per seed (s0/s1/s2) |
+|---|---|---|---|---|---|---|
+| run 1 (`tron62` 01:00) | 7267906 | poke-env `SimpleHeuristicsPlayer` | 3000 | 0.7293 | [0.7131, 0.7449] | 0.741 / 0.687 / 0.760 |
+| run 2 (`tron65` 02:14) | 7268170 | poke-env `SimpleHeuristicsPlayer` | 3000 | 0.7357 | [0.7196, 0.7511] | 0.769 / 0.692 / 0.746 |
+| run 3 (`tron62` 02:27) | 7268200 | poke-env `SimpleHeuristicsPlayer` | 3000 | 0.7260 | [0.7098, 0.7417] | 0.761 / 0.677 / 0.740 |
+| **pooled** | — | poke-env `SimpleHeuristicsPlayer` | **9000** | **0.7303** | **[0.7211, 0.7394]** | — |
+| control 1 (`tron62` 01:46) | 7268102 | in-repo `heuristic` | 3000 | 0.7500 | [0.7342, 0.7652] | 0.772 / 0.711 / 0.767 |
+| control 2 (`tron65` 02:14) | 7268170 | in-repo `heuristic` | 3000 | 0.7563 | [0.7406, 0.7714] | 0.784 / 0.703 / 0.782 |
+| control 3 (`tron62` 02:27) | 7268200 | in-repo `heuristic` | 3000 | 0.7450 | [0.7291, 0.7603] | 0.772 / 0.703 / 0.760 |
+| **pooled control** | — | in-repo `heuristic` | **9000** | **0.7504** | **[0.7414, 0.7593]** | — |
+| published (Build 26) | — | in-repo `heuristic` | 5400 | 0.7513 | [0.7396, 0.7626] | — |
+
+Records: `results/seed_strength_gate_v26b_simpleheuristics{,_paired}.json`,
+`results/seed_strength_gate_v26b_heuristic_{control,paired}.json`. **Four files, six reads** — see
+the output-path collision noted below; the primary record for every read is its job's stdout in
+`logs/slurm/slurm-ra-strength-<jobid>.out`, and the table above is derived from those, not from the
+JSONs.
+
+**WHY THERE ARE TWO RUNS AND A CONTROL.** The first read disagreed with one this project already
+held. `results/eval_ladder_gen9ou_v26.json` carries a `v26b` s0 vs `simpleheuristics` cell at 245/300
+= **0.8167**; run 1 measured that same checkpoint against that same opponent at **0.741** [0.713,
+0.767] at n = 1000. The intervals do not overlap, and two explanations with opposite consequences
+were available: either the n = 300 cell is an outlier, or the whole gate run is shifted low and
+0.7293 is a property of the run rather than the arm. One number cannot separate them.
+
+Two things separate them. **Two full replications** — the same arm and opponent re-scored in two
+further allocations, one on another node — landed **0.7357** and **0.7260**, spanning **0.0097**.
+And **three controls** re-read `heuristic` at the same n, one inside each allocation, pooling to
+**0.7504** against the published **0.7513** — **0.0009** apart. No run is shifted, and the n = 300
+ladder cell was the outlier. **0.7303 pooled over 9000 battles is booked as a property of the arm.**
+
+**THE REPLICATION IS ITSELF THE MORE USEFUL RESULT.** Per-checkpoint rates moved up to **0.028**
+across runs (s0: 0.741 → 0.769) on identical weights, identical opponent, identical settings — the
+same order as the 0.027 cross-run swing Build 22 measured on v20's identical checkpoints, and larger
+than many effects this project has gated on. The **seed-pooled** read spanned **0.0097** over the
+same three runs. That is the argument for the pooling protocol stated as a measurement rather than as
+a preference: pooling across seeds buys run-to-run stability that raising n within one run does not.
+It also retires the `eval-ladder` matrix as a source of strength claims — its n = 300 cells cluster
+by team matchup on a twelve-team pool and cannot carry a comparison, which §13.1 already said and
+this is the first direct demonstration of.
+
+**A GATE'S `--out` IS A GLOBAL, AND TWO CONCURRENT RUNS SILENTLY SHARED ONE.** Runs 2 and 3 overlapped
+in wall-clock and were launched with the same `OUT`/`OUT_2` paths, so each leg's JSON was written
+twice and the later writer won: `_simpleheuristics_paired.json` holds run 3, `_heuristic_control.json`
+holds control 2, and controls 1 and run 2 have **no surviving JSON at all** — they exist only in their
+job logs. Nothing errored, nothing warned, and the file mtimes are the only surface evidence. This is
+the `results/` twin of the `_job_common.sh` port collision (§Cluster): a shared default that is
+correct for one job and silently wrong for two. The reads are unaffected — each job's own stdout is
+intact and the table above is derived from it — but a number read out of the JSON alone would have
+been attributed to the wrong run. **Give every concurrent gate run its own `--out`.**
+
+**The rebase is not flattering, and that is reported rather than buried.** poke-env's baseline is the
+*harder* of the two by **0.0201** (0.7303 vs 0.7504, both pooled over 9000). The headline moved down.
+
+**What the number may NOT be compared to.** Results commonly cited against `SimpleHeuristicsPlayer`
+(~85%) are on **gen8randombattle**, where the server generates both teams. This is **gen9ou** with a
+committed twelve-team pool, where battles cluster by team matchup and the opponent must also solve
+teambuilding-shaped matchups it was never tuned for. Different task. The two sit side by side in the
+README with the format named on each row, and no difference between them is taken.
+
+## Build 28b — THE LIVE STACK COULD NOT HAVE PRODUCED A LADDER NUMBER
+
+Preparing the ranked-ladder run (G1b) meant reading `rotomai/live/` as something that would actually
+be *run* rather than something that passes its tests. Seven defects, none of which fail loudly:
+
+1. **`rotomai live --format gen9ou` built a TEAMLESS player.** `_run_eval` defaults the team pool
+   (`cli.py:84`); `_run_live` never did, and `build_live_player` never carried `build_player`'s
+   teamless refusal — so the fix Build 27 landed at the choke point had a second choke point nobody
+   had checked. The failure is the one already recorded above: a popup, a WARNING, no exception, and
+   a session that reports zero battles. The refusal is now a shared `arena.require_team_for_format`
+   called by both builders.
+2. **`--team-seed` was dead.** Threaded CLI → `LiveConfig` → and dropped: `from_packed_file` was
+   called without `seed=`, so every live session drew at seed 0 whatever was asked for.
+3. **`--agent ppo` with a checkpoint deployed the sampling rollout policy** — 0.675 vs 0.767 on
+   v25b. `eval-ladder` has refused `ppo@<ckpt>` since Build 23; `live` did not. Now refused there
+   too, and the live default moved `ppo` → `offrl`.
+4. **`--loop-penalty` defaulted to 0.0 on `live` while every published gen9ou number is at 4.0.**
+   A ladder run would have deployed a policy no measurement in this record describes.
+5. **No inter-battle pacing.** poke-env's `ladder(k)` re-searches the instant a game ends. Added
+   `--battle-delay`, default 0.0 (exact identity), recorded in the results file so the etiquette
+   claim travels with the number rather than living in a sentence about it.
+6. **A QUEUED `/search` WAS INDISTINGUISHABLE FROM A DEAD SOCKET.** The watchdog samples
+   `(finished battles, Σ turns)`; between battles both are frozen, so any ladder queue past
+   `stall_timeout = 300 s` tripped the wedge detector, burned a restart, rebuilt the client and
+   re-searched — which is both a spurious failure and precisely the reconnect-and-search traffic
+   pattern the pacing exists to avoid. Split into `stall_timeout` (a battle that stopped advancing)
+   and `queue_timeout` (nothing in progress).
+7. **Live doubles agents silently lost their LoopGuard**, because `live_agent_extras` gated on the
+   singles set alone where `build_player` gates on singles-or-doubles. **The parity test could not
+   have caught it**: it rebuilt its expectation from the live builder's own rule, so it agreed by
+   construction. It now derives the expectation by calling `build_player` and diffing.
+
+Also: the session results file now records `sample`, `loop_penalty`, `team_pool` and `team_seed`.
+Without them a session JSON names the weights but not the policy, and cannot be checked against a
+pre-registration — which is the entire point of pre-registering a live run.
+
+Bar after: 792 collected — 791 pass / 1 skip with a server up, 785 / 7 with `dist/` but no server,
+776 / 16 on a bare clone.
+
+---
+
+## G1b — RANKED LADDER MEASUREMENT — PRE-REGISTERED (written 2026-08-18, BEFORE running)
+
+**Status: not yet run.** This section is committed ahead of the first rated game so that the n, the
+bands and the protocol cannot be chosen after seeing a number. Record:
+`results/live_ladder_gen9ou_prereg.json`.
+
+**Why the scope moved.** Every strength number in this document is measured against agents, and the
+agent-only Glicko/GXE in Build 26 is explicitly *not* comparable to a Showdown GXE. The public
+ranked ladder is the only reading an outside reader can situate absolutely. NG3 previously put it
+out of scope; it has been amended (`plan.md:86`, §15) to allow exactly one bounded pre-registered
+run while leaving the farming prohibition intact. The distinction is enforced in code — concurrency
+1, a recorded inter-battle delay, a fixed n, a fatal-and-never-retried login, bounded restarts —
+rather than promised in prose.
+
+**Arm.** `offrl` on `checkpoints/ppo_v26b_s0/iter_320.pt` (sha256 `acb2a87d…`), greedy, LoopGuard
+4.0, `gen9ou`, the committed 12-team pool at seed 0. Identical to the protocol behind 0.7513 and the
+Build 28 rebase, so the ladder number describes the same policy those numbers describe.
+
+**n = 100**, concurrency 1, `--battle-delay 20`, `--use-live-ratings`, in four segments of 25.
+
+**Primary readout, declared now:** `https://pokemonshowdown.com/users/<userid>.json` →
+`ratings.gen9ou` (`elo`, `gxe`, `rpr`, `rprd`, `w`, `l`). poke-env only ever observes the *pre*-battle
+Elo, so the final rating cannot come from the session file at all. The session's own Glicko/GXE under
+`--use-live-ratings` approximates Showdown Elo as a Glicko rating and is **secondary**.
+
+**Bands, on Showdown's `elo` scale** — a new account starts at **1000**, not 1500 (verified against
+the endpoint, which returns `elo: 1000` for an unplayed format):
+
+| verdict | elo | GXE |
+|---|---|---|
+| WEAK | < 1200 | < 45% |
+| DECENT | 1200–1450 | 45–60% |
+| STRONG | > 1450 | > 60% |
+
+**Stopping rule.** No early stop on a good number and no top-up after a bad one: a short run reports
+its **achieved** n. Under 50 finished games it is a pilot and no band is read. The run happens once.
+
+**Pre-registered expectation.** A WEAK reading is a live possibility and will be published either
+way. This agent trained against self-play and a fixed heuristic and has never seen the human
+metagame — its opponent model, its twelve teams and its single-turn 761-d observation all come from
+that setting. A weak result diagnoses the unmeasured replay-data axis (`plan.md:54`), which is the
+axis a human-replay BC → offline-RL pass exists to move. It does not refute the project, and
+suppressing it would.
+
+**Two divergences to expect, and neither is a bug.** Showdown scores a disconnect as a loss while
+`telemetry.summarize` excludes unfinished battles, so the endpoint's `w/l` delta and the session's
+`finished` count can legitimately disagree — the record reports both rather than reconciling them
+silently. And the twelve-team pool is public and committed, so an opponent meeting this account
+repeatedly can pattern-match it.
+
+---
+
+## Build 28c — THE LIVE SESSION'S OWN RATING WAS ON THE WRONG SCALE
+
+Found by running the thing rather than testing it. The first ranked-ladder block (25 games, 7-18,
+mean opponent Elo 1045) reported **Glicko 501.4 / GXE 0.0242** in its session file while the
+account's own page reported **Elo 1017 / GXE 30%**. Both describe the same 25 games.
+
+**Cause: Elo and Glicko share the 400-point logistic and nothing else.** `summarize` built each
+opponent as `Rating(opponent_showdown_elo_before, opponent_rd)` and ran a Glicko update against it.
+But a new Showdown account sits at **Elo 1000** while Glicko starts it at **1500**, so every ladder
+opponent was read as roughly 500 points weaker than it was, and losing to one scored as a
+catastrophe. The module docstring already said the rating "never enters the Glicko math"; the
+`use_live_ratings` path had quietly made that false.
+
+**Fix, in two parts.** The Glicko/GXE pair is now scale-pure — computed against the pinned
+reference field whether or not `--use-live-ratings` is set, so an observed ladder rating can never
+move it. Observed opponents are summarised on **their own** scale instead: `rating.elo_mle` fits the
+single Elo that best explains the scores against the observed opponent Elos, reported under
+`showdown_elo` as `elo_mle` with `expected_score_vs_mean_opponent`. On block 1 it returns **879.0**
+with an expected score of 0.277 against the observed 0.280.
+
+That fit is deliberately **not** Showdown's ladder Elo, which is sequential, K-factor driven and
+order-dependent — 879 against the account page's 1017 is the two methods disagreeing as expected,
+not an error, and the pre-registration already names the account page as primary. A record with no
+wins or no losses returns `elo_mle_bounded: false` and a null rating, because the likelihood is
+monotone there and the MLE is infinite; emitting the clamp would be a confident wrong number.
+
+**`--opponent-rd` was deleted rather than left as a no-op.** Its only job was tuning how an observed
+Elo entered the Glicko update. That path was the units error, so the flag went with it.
+
+**What this cost and what it did not.** The pre-registration named the account endpoint as the
+primary readout *before* the run precisely because poke-env only ever sees pre-battle Elo, so no
+published claim ever rested on the broken field. What it would have cost is a session JSON carrying
+GXE 0.0242 into the record, which someone would eventually have quoted.
+
+**SEGMENTS 0 AND 1 CARRY THE SUPERSEDED FIELDS, AND ARE DELIBERATELY NOT REWRITTEN.** They were
+played by processes that started before the fix, so their summary blocks still report
+`glicko` 501.4 / 647.0, `gxe` 0.0242 / 0.0407 and `opponent_rating_source:
+showdown_elo_approximated_as_glicko`. Their per-battle records — the raw observations — are
+unaffected, and `merge_live_sessions.py` recomputes the summary from those records through the
+corrected code, which is precisely why it recomputes rather than averaging what the segments
+happen to say. Editing a results file after its run is the failure this project already recorded
+once in Build 28 (the `--out` collision), so the segments stand as written and **the merged record
+is the authoritative one**. Do not quote a per-segment GXE from seg0 or seg1.
+
+## Build 28d — TOOLING THE LADDER RUN NEEDED
+
+- `scripts/fetch_ladder_rating.py` — reads `ratings.<format>` from the public user endpoint, which
+  is the only place the FINAL rating exists: `abstract_battle` parses the first number on the
+  `|raw|` line, i.e. the rating *before* that game, so the last battle of a session carries the
+  rating going into it and never the one coming out. Network failure exits non-zero without writing
+  rather than dying, since this runs immediately after a multi-hour session.
+- `scripts/merge_live_sessions.py` — pools the per-segment session files. Segments exist because
+  `run_session` has no cross-process resume and `_flush` rewrites `--out` from an empty log, so a
+  second process pointed at the first one's file erases it. The merge **refuses** segments that
+  disagree on any arm field (agent, checkpoint, sample, loop_penalty, team_pool, team_seed, format,
+  mode, username, ack) or on the ladder ack, dedupes battles by tag, and recomputes the summary
+  through `telemetry.summarize` over the union rather than averaging per-segment rates.
+- **`ladder_games_delta`** is the cross-check that makes a disconnect visible: Showdown scores a
+  disconnect as a LOSS while `summarize` excludes unfinished battles, so the endpoint's w+l+t can
+  exceed the session's finished count. The rating already paid for those games and the win rate did
+  not, and that gap is now reported instead of being reconciled away.
+- The verdict refuses to read a band under 50 finished games, per the pre-registration's own floor.
+
+---
+
+## Build 29 — G1b: THE PUBLIC RANKED LADDER. PRE-REGISTERED WEAK, AND PUBLISHED.
+
+The pre-registration is `results/live_ladder_gen9ou_prereg.json`, committed with the bands, the n,
+the primary readout and the exact argv **before the first rated game**. The verdict below is read
+off it without modification.
+
+### Result
+
+| | |
+|---|---|
+| account | `RotomLover12`, gen9ou clean at start (no prior games in the format) |
+| games | **100**, exactly the pre-registered n |
+| record | **35-65**, score rate **0.350**, Wilson 95% [0.264, 0.448] |
+| **Elo** | **1004.08** |
+| **GXE** | **30%** |
+| Glicko | rpr 1339.53 +/- rprd 35.96 |
+| mean opponent Elo | 1045 -> 1069 across blocks |
+| **VERDICT** | **WEAK** (pre-registered: Elo < 1200 or GXE < 45%) |
+
+Record: `results/live_ladder_gen9ou.json`, merged from four 25-game segments by
+`scripts/merge_live_sessions.py`; primary readout from the account endpoint via
+`scripts/fetch_ladder_rating.py`.
+
+**THE RUN WAS CLEAN, WHICH IS WHAT MAKES THE NUMBER READABLE.** `ladder_games_delta` is **0**: the
+endpoint counted exactly the 100 games the session observed, so no game was lost to a disconnect
+and charged as a loss the record could not see. Zero restarts across all four blocks. Concurrency
+1, 20 s between games, one dedicated account.
+
+**THE PER-BLOCK DRIFT IS NOISE, AND IS NOT REPORTED AS ANYTHING ELSE.** Blocks scored 0.280, 0.360,
+0.360, 0.400 against a mean opponent Elo rising 1045 -> 1069. It is tempting to read that as the
+agent settling in. It cannot be: the policy is a frozen checkpoint read greedily, with no state
+carried between battles beyond the per-battle LoopGuard. A linear-trend test gives **z = 0.844,
+p = 0.40** — indistinguishable from noise at 25 games per block, exactly as the small-n lesson from
+Build 28 predicts.
+
+### What it means, and what it does not
+
+**It does not refute the strength result.** The same checkpoint scores **0.7303** [0.7211, 0.7394]
+against poke-env's `SimpleHeuristicsPlayer` over 9000 battles (Build 28) and **0.350** against
+~1055-Elo humans. Both are correct. They measure different things, and the distance between them is
+the finding: **a bot-baseline win rate does not predict human-ladder performance**, and no amount of
+further self-play against a fixed heuristic would have revealed that. This project's own instruments
+could not see it before today, because every instrument it had pointed at an agent field.
+
+**The diagnosis is specific.** The policy has never seen the human metagame. It was trained on
+self-play plus a fixed heuristic; it plays a committed 12-team pool against opponents who bring
+anything; and it decides from a 761-d **single-turn** observation with no trajectory context. Each
+of those is a concrete gap, and the first is the one `plan.md:54` already flags as unmeasured — the
+replay-data axis of G3, measured once on OU Builds 2-4 and never scaled.
+
+**So the next training work is BC on human replays -> offline RL**, not more self-play. That is a
+claim this record can now support with a measurement rather than an intuition, which is the whole
+reason the run was worth its ~10 hours.
+
+### Honesty notes
+
+- The account carried 9 prior rated games in `gen8anythinggoes` from earlier human play. gen9ou was
+  clean, so the reading is unaffected, but `plan.md` section 15 asks for a DEDICATED bot account and
+  this one was not fresh. Recorded rather than omitted.
+- The run happened **once**, at the pre-registered n, with no early stop and no top-up. The bands
+  were fixed before the first game and a WEAK reading was named in advance as a live possibility.
+- Segments 0 and 1 carry superseded rating fields (Build 28c); the merged record is authoritative.
+
+---
