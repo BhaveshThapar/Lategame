@@ -121,6 +121,52 @@ python -m rotomai.cli live --server ws://localhost:8000/showdown/websocket --all
 `/trn <name>,0,` , get back `|updateuser| Guest N`, never set `logged_in`, never raise, and hang
 forever. `--allow-guest` is for private servers only.
 
+### Running it as a standing service
+
+`--n 0` means "play until stopped" and turns `accept` mode into the always-on
+"challenge RotomAI" bot. Three things had to change for that to be safe, and each is a test:
+
+**`--n 0` is refused for `--mode ladder`.** A rated run's *n* is its pre-registration
+(`results/live_ladder_gen9ou_prereg.json` freezes n=100, played once, no top-up); an open-ended
+rated run is a selected sample by construction. The refusal happens before any player is built.
+
+**Use `--out-dir`, not `--out`, for anything restartable.** `_flush` rebuilds `--out` from an empty
+log at startup, so a second process aimed at the same path erases the first one's record — the
+failure `scripts/merge_live_sessions.py` exists to work around. `--out-dir` claims the next free
+`session_<NNN>.json` at startup instead, and that same merge script pools them. `--out` is left
+untouched when `--out-dir` is set.
+
+**Signals drain rather than kill.** The first SIGINT/SIGTERM sets the stop event, which is honoured
+between chunks *after* the flush, so the battle in progress finishes and is recorded; the handler
+then removes itself so a second signal is a normal `KeyboardInterrupt`. The systemd unit uses
+`KillSignal=SIGINT` with `TimeoutStopSec=300` for exactly this reason — killing mid-battle forfeits
+a real person's game.
+
+Committed deployment surface: [`Dockerfile`](../Dockerfile),
+[`deploy/rotomai-accept.service`](../deploy/rotomai-accept.service),
+[`requirements-live.txt`](../requirements-live.txt).
+
+**Off-cluster gotchas, measured:**
+
+- **Pin poke-env.** `pyproject.toml` says `poke-env>=0.8`, but `live/` is written against 0.15
+  semantics specifically — the swallowed `|nametaken|` diagnosis, `max_concurrent_battles` reading 0
+  as UNLIMITED, and poke-env neither raising nor reconnecting on a dead socket (the whole reason the
+  watchdog exists). A resolver that picks a different version produces a bot that looks connected
+  and never battles, not an `ImportError`. `requirements-live.txt` pins what the ladder run played on.
+- **Install torch from the CPU index first**, or pip resolves ~2 GB of CUDA wheels for a 4.56M
+  parameter net. `pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu`.
+- **Size for the install, not the run.** The agent idles in tens of MB; pip's peak RSS unpacking the
+  torch wheel will OOM a 512 MB box. 1 GB is the floor.
+- **`node` and `third_party/pokemon-showdown` are not needed.** They are the local `--no-security`
+  sim for training and gating. Live play talks to the public server. (`--agent search` and
+  `resim-replays` do need node; neither is on the live path.)
+- **Team pools now resolve from any working directory.** `DEFAULT_OU_POOL` stays repo-relative
+  because its string is written into every results file as `team_pool` and
+  `merge_live_sessions.py` refuses to pool segments whose arm fields disagree — so
+  `teambuilding.pool.resolve_pool_path` falls back to the installed package data instead of
+  absolutising the constant. `--checkpoint` and `--out-dir` are still cwd-relative; set
+  `WorkingDirectory=`.
+
 ### Timeouts, pacing and the watchdog
 
 | flag | default | what it bounds |
@@ -308,15 +354,41 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 
 ## Producing the README demo GIF
 
+**The committed asset is rendered from the log, and regenerating it needs nothing:**
+
+```bash
+python scripts/make_battle_gif.py                      # -> assets/rotomai_gen9ou.gif, 23 frames, 75 KiB
+python scripts/make_battle_gif.py --list replays/live_ladder_gen9ou   # rank replays by watchability
+```
+
+`scripts/make_battle_gif.py` imports nothing outside the standard library — the 5×7 font, the
+rasteriser and the GIF89a/LZW encoder are all in that one file, because Pillow is not installed and
+one committed asset does not justify an imaging dependency. It walks the `battle-log-data` log and
+draws the beats directly: rosters, active Pokemon, HP bars, KO pips, and a caption per move. It is a
+**log replay, not the sprite view**, and the README says so rather than implying otherwise.
+
+Regeneration must be byte-identical to the committed file —
+`tests/test_make_battle_gif.py::test_the_committed_gif_is_reproducible_from_the_replay` fails if the
+asset and the code have drifted apart. That test self-skips on a clone (`replays/` is gitignored);
+the committed GIF is still decoded and budget-checked there.
+
+A malformed LZW stream decodes to plausible noise rather than failing, and there is no image library
+here to open the result with. So the test module carries a **second, independent** GIF decoder
+written from the spec, and every frame of the real battle is round-tripped through it. Two
+implementations agreeing is the evidence; neither alone is.
+
+### The sprite version, if a browser is ever available
+
 `--save-replays <dir>` writes a self-contained `<username> - <battle_tag>.html` per battle
 (poke-env `player.py:682-703`). It renders by loading `replay-embed.js` from
 play.pokemonshowdown.com, so it needs **a browser with network** — there is no headless path on the
-cluster box, which has no browser, no `ffmpeg` and no image tooling.
+cluster box, which has no browser, no `ffmpeg` and no image tooling, and no egress either (the
+`replay-embed.js` fetch returns an HTTP error from here). That is why the log renderer above exists.
 
 **Pick the battle from the log, not by opening 40 replays.** Each file embeds the full battle log
 in a `battle-log-data` script tag, so the watchable ones can be found programmatically: count
 `|faint|p1` (their KOs) against `|faint|p2` (ours), and treat a `|win|` with 0 turns or a handful of
-turns as an opponent forfeit rather than a win worth showing.
+turns as an opponent forfeit rather than a win worth showing. `--list` does exactly this.
 
 The one selected from the first ladder block:
 

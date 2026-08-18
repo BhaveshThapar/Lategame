@@ -22,6 +22,29 @@ DEFAULT_OU_POOL = Path("rotomai/teambuilding/data/teams_gen9ou.packed")
 # one battle at a time, and a typo'd path is a FileNotFoundError only if you are lucky.
 DEFAULT_VGC_POOL = Path("rotomai/teambuilding/data/teams_gen9vgc.packed")
 
+#: Where the pools actually live once the package is imported, wherever the process was started.
+_PACKAGE_DATA = Path(__file__).resolve().parent / "data"
+
+
+def resolve_pool_path(path: str | Path) -> Path:
+    """Find a pool file whether or not the process was started from the repo root.
+
+    The ``DEFAULT_*_POOL`` constants are deliberately REPO-RELATIVE and stay that way: their string
+    form is written verbatim into every results file and pre-registration as ``team_pool``, and
+    ``merge_live_sessions.py`` refuses to pool segments whose arm fields disagree. Rewriting them to
+    absolute paths would make two runs of the same arm on two machines look like two experiments.
+
+    So the constant stays relative and resolution happens here instead: if the literal path does not
+    exist, fall back to the same basename inside the installed package data. That is what makes a
+    long-lived ``accept``-mode service work -- it is launched by systemd or a container from ``/``,
+    not from a checkout, and before this the pool lookup died with a bare ``FileNotFoundError``.
+    """
+    p = Path(path)
+    if p.exists():
+        return p
+    candidate = _PACKAGE_DATA / p.name
+    return candidate if candidate.exists() else p
+
 
 class TeamPool(Teambuilder):
     """Yields a uniformly-random packed team from ``teams`` on each ``yield_team`` call."""
@@ -42,7 +65,7 @@ class TeamPool(Teambuilder):
     @classmethod
     def from_packed_file(cls, path: str | Path = DEFAULT_OU_POOL, seed: int = 0) -> TeamPool:
         """Load a pool from a file with one packed team per line (blank lines ignored)."""
-        p = Path(path)
+        p = resolve_pool_path(path)
         if not p.exists():
             raise FileNotFoundError(
                 f"team pool {p} not found -- run scripts/build_ou_teampool.py first"

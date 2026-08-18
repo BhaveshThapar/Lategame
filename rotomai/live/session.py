@@ -25,6 +25,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from poke_env.player import Player
@@ -66,6 +67,12 @@ class LiveConfig:
     allow_guest: bool = False
     save_replays: str | None = None
     out: str = "results/live_session.json"
+    #: Write to a fresh ``session_<NNN>.json`` under this directory instead of rewriting ``out``.
+    #: ``_flush`` rebuilds ``out`` from an empty log on start, so a long-lived service restarting
+    #: onto the same path erases its own history -- the failure `scripts/merge_live_sessions.py`
+    #: exists to work around. With a directory, each process claims the next free index and the
+    #: same merge script pools them.
+    out_dir: str | None = None
     battle_timeout: float = 900.0
     #: Deadline for a battle that has stopped advancing turns.
     stall_timeout: float = 300.0
@@ -99,6 +106,8 @@ class SessionOutcome:
     records: list[Any] = field(default_factory=list)
     restarts: int = 0
     stopped_early: bool = False
+    #: Where the record was actually written -- with ``out_dir`` the caller does not choose it.
+    out_path: str = ""
 
 
 def _accept_list(opponent: str | None) -> str | list[str] | None:
@@ -107,6 +116,38 @@ def _accept_list(opponent: str | None) -> str | list[str] | None:
         return None
     names = [part.strip() for part in opponent.split(",") if part.strip()]
     return names or None
+
+
+def is_unbounded(cfg: LiveConfig) -> bool:
+    """``--n 0`` means "play until stopped" -- the standing-service mode."""
+    return cfg.n <= 0
+
+
+def remaining_battles(cfg: LiveConfig, finished: int) -> int:
+    """Battles still owed. An unbounded session always owes another full chunk."""
+    if is_unbounded(cfg):
+        return max(1, cfg.concurrency)
+    return cfg.n - finished
+
+
+def next_segment_path(out_dir: str | Path) -> Path:
+    """The next free ``session_<NNN>.json`` in ``out_dir``.
+
+    Claimed once per process, before the first battle. Scanning for the highest existing index
+    rather than using a timestamp keeps the merge order the play order, and keeps the filenames
+    stable enough to name in a pre-registration.
+    """
+    directory = Path(out_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    used = set()
+    for existing in directory.glob("session_*.json"):
+        stem = existing.stem.removeprefix("session_")
+        if stem.isdigit():
+            used.add(int(stem))
+    index = 0
+    while index in used:
+        index += 1
+    return directory / f"session_{index:03d}.json"
 
 
 def _public_config(cfg: LiveConfig, username: str, ws_url: str) -> dict[str, Any]:
@@ -130,6 +171,10 @@ def _public_config(cfg: LiveConfig, username: str, ws_url: str) -> dict[str, Any
         "concurrency": cfg.concurrency,
         "battle_delay": cfg.battle_delay,
         "requested_battles": cfg.n,
+        # A standing service has no target n, so `requested_battles` alone cannot distinguish
+        # "played 0 of 100" from "played 40 and was told to stop". Both readers of this file --
+        # `merge_live_sessions` and a human -- need that distinction.
+        "unbounded": is_unbounded(cfg),
         # Recorded for the same reason `ladder_ack` is: a published rating has to carry the basis
         # it was computed on, and "were opponents rated or pinned" is that basis.
         "use_live_ratings": cfg.use_live_ratings,
@@ -243,6 +288,15 @@ async def run_session(
             f"published number in this project scores these checkpoints through {instead!r}. "
             f"Use --agent {instead}, and add --sample if you deliberately want the sampled policy."
         )
+    if is_unbounded(cfg) and cfg.mode == "ladder":
+        # An unbounded RATED run cannot be pre-registered: the stopping rule IS the
+        # pre-registration (`results/live_ladder_gen9ou_prereg.json` freezes n=100, played once, no
+        # top-up), and "play until I get bored" is the protocol that turns a measurement into a
+        # selected sample.
+        raise ValueError(
+            "--n 0 (play until stopped) is not available for --mode ladder: a ranked run must "
+            "declare its n before the first game. Use a fixed --n, or --mode accept."
+        )
     if cfg.mode == "ladder":
         # Raises PolicyError unless BOTH opt-in channels are present.
         check_ladder_optin(cfg.ladder_ack)
@@ -252,9 +306,10 @@ async def run_session(
     log = LiveLog()
     outcome = SessionOutcome()
     attempt = 0
+    out_path = str(next_segment_path(cfg.out_dir)) if cfg.out_dir else cfg.out
 
     while True:
-        remaining = cfg.n - sum(1 for r in log.records if r.finished)
+        remaining = remaining_battles(cfg, sum(1 for r in log.records if r.finished))
         if remaining <= 0 or (stop is not None and stop.is_set()):
             break
         if attempt > cfg.max_restarts:
@@ -296,8 +351,8 @@ async def run_session(
                 chunk.result()  # surface a genuine error from the mode call
 
                 log.harvest(player, cfg.mode, attempt, cfg.battle_format)
-                _flush(cfg, log, player, outcome)
-                remaining = cfg.n - sum(1 for r in log.records if r.finished)
+                _flush(cfg, log, player, outcome, out_path)
+                remaining = remaining_battles(cfg, sum(1 for r in log.records if r.finished))
 
                 # Pace the NEXT search. After the flush, so a Ctrl-C during the pause loses nothing,
                 # and skipped on the last chunk, where it would only delay the summary.
@@ -309,7 +364,7 @@ async def run_session(
                         )
 
             log.finalize(player, cfg.mode, attempt, cfg.battle_format)
-            _flush(cfg, log, player, outcome)
+            _flush(cfg, log, player, outcome, out_path)
 
         except LoginError:
             await _shutdown(player, watch, guard, tripped)
@@ -319,7 +374,7 @@ async def run_session(
             outcome.restarts += 1
             attempt += 1
             await _shutdown(player, watch, guard, tripped)
-            _flush(cfg, log, None, outcome)
+            _flush(cfg, log, None, outcome, out_path)
             if attempt > cfg.max_restarts:
                 break
             if cfg.backoff_base > 0:
@@ -332,12 +387,17 @@ async def run_session(
             with contextlib.suppress(Exception):
                 player.logger.removeHandler(watch)
 
-    outcome.stopped_early = bool(stop is not None and stop.is_set()) or (
-        sum(1 for r in log.records if r.finished) < cfg.n
+    # An unbounded session has no target to fall short of: being stopped IS how it finishes, and
+    # flagging that as `stopped_early` would put a "this run was cut short" caveat on every service
+    # shutdown.
+    outcome.stopped_early = (not is_unbounded(cfg)) and (
+        bool(stop is not None and stop.is_set())
+        or sum(1 for r in log.records if r.finished) < cfg.n
     )
     outcome.records = log.records
     outcome.summary = _summarize(cfg, log)
-    _flush(cfg, log, None, outcome)
+    outcome.out_path = out_path
+    _flush(cfg, log, None, outcome, out_path)
     return outcome
 
 
@@ -353,14 +413,20 @@ def _summarize(cfg: LiveConfig, log: LiveLog) -> dict[str, Any]:
     )
 
 
-def _flush(cfg: LiveConfig, log: LiveLog, player: Player | None, outcome: SessionOutcome) -> None:
+def _flush(
+    cfg: LiveConfig,
+    log: LiveLog,
+    player: Player | None,
+    outcome: SessionOutcome,
+    out_path: str | None = None,
+) -> None:
     """Rewrite the results file. Called after EVERY battle, so a SIGKILL loses at most one game."""
     username = getattr(player, "username", None) or (cfg.username or "")
     public = _public_config(cfg, username, cfg.ws_url or "wss://sim3.psim.us/showdown/websocket")
     public["restarts"] = outcome.restarts
     public["stopped_early"] = outcome.stopped_early
     with contextlib.suppress(OSError):
-        write_results(cfg.out, public, _summarize(cfg, log), log.records)
+        write_results(out_path or cfg.out, public, _summarize(cfg, log), log.records)
 
 
 async def _shutdown(

@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -448,3 +449,107 @@ async def test_battle_delay_is_interruptible_by_the_stop_event(tmp_path):
 
     assert out.stopped_early
     assert out.summary["finished"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Standing-service mode: --n 0, segment output, and what stays gated
+# --------------------------------------------------------------------------- #
+
+
+async def test_an_unbounded_session_plays_until_it_is_stopped(tmp_path):
+    """`--n 0` is the "challenge RotomAI right now" form: no target, stop is the terminator."""
+    stop = asyncio.Event()
+
+    class _Stopping(FakePlayer):
+        async def accept_challenges(self, opponent, k, packed_team=None):
+            await FakePlayer.accept_challenges(self, opponent, k)
+            if self.n_finished_battles >= 7:
+                stop.set()
+
+    player = _Stopping()
+    out = await run_session(_cfg(tmp_path, mode="accept", n=0), lambda c: player, stop=stop)
+
+    assert out.summary["finished"] == 7
+    # Being stopped IS how an unbounded session finishes; flagging it as cut short would put a
+    # caveat on every clean service shutdown.
+    assert out.stopped_early is False
+
+
+async def test_an_unbounded_session_records_that_it_had_no_target(tmp_path):
+    stop = asyncio.Event()
+
+    class _Stopping(FakePlayer):
+        async def accept_challenges(self, opponent, k, packed_team=None):
+            await FakePlayer.accept_challenges(self, opponent, k)
+            stop.set()
+
+    await run_session(_cfg(tmp_path, mode="accept", n=0), lambda c: _Stopping(), stop=stop)
+    written = json.loads((tmp_path / "live.json").read_text())
+    assert written["unbounded"] is True
+    assert written["requested_battles"] == 0
+
+
+async def test_a_bounded_session_is_not_marked_unbounded(tmp_path):
+    await run_session(_cfg(tmp_path, mode="accept", n=1), lambda c: FakePlayer())
+    assert json.loads((tmp_path / "live.json").read_text())["unbounded"] is False
+
+
+async def test_an_unbounded_ranked_run_is_refused(tmp_path, monkeypatch):
+    """The n IS the pre-registration; an open-ended rated run is a selected sample."""
+    monkeypatch.setenv(ALLOW_LADDER_ENV, "1")
+    with pytest.raises(ValueError, match="not available for --mode ladder"):
+        await run_session(
+            _cfg(tmp_path, mode="ladder", n=0, ladder_ack=LADDER_ACK), lambda c: FakePlayer()
+        )
+
+
+async def test_the_ladder_refusal_precedes_building_any_player(tmp_path, monkeypatch):
+    monkeypatch.setenv(ALLOW_LADDER_ENV, "1")
+    built = []
+    with pytest.raises(ValueError):
+        await run_session(
+            _cfg(tmp_path, mode="ladder", n=0, ladder_ack=LADDER_ACK),
+            lambda c: built.append(c) or FakePlayer(),
+        )
+    assert built == []
+
+
+async def test_out_dir_claims_a_fresh_segment_per_process(tmp_path):
+    """Two runs aimed at one directory must not erase each other -- the whole point of segments."""
+    seg_dir = tmp_path / "segments"
+    for _ in range(3):
+        cfg = LiveConfig(out=str(tmp_path / "unused.json"), mode="accept", n=1,
+                         out_dir=str(seg_dir))
+        out = await run_session(cfg, lambda c: FakePlayer())
+        assert out.out_path.endswith(".json")
+
+    names = sorted(p.name for p in seg_dir.glob("session_*.json"))
+    assert names == ["session_000.json", "session_001.json", "session_002.json"]
+    assert not (tmp_path / "unused.json").exists(), "--out must be left alone when --out-dir is set"
+    for name in names:
+        assert json.loads((seg_dir / name).read_text())["finished"] == 1
+
+
+async def test_out_dir_fills_a_gap_rather_than_overwriting(tmp_path):
+    seg_dir = tmp_path / "segments"
+    seg_dir.mkdir()
+    (seg_dir / "session_001.json").write_text("{}")
+    cfg = LiveConfig(out=str(tmp_path / "u.json"), mode="accept", n=1, out_dir=str(seg_dir))
+    out = await run_session(cfg, lambda c: FakePlayer())
+    assert out.out_path.endswith("session_000.json")
+    assert (seg_dir / "session_001.json").read_text() == "{}", "an existing segment is untouched"
+
+
+async def test_segments_carry_the_arm_fields_merge_checks(tmp_path):
+    """`merge_live_sessions` refuses to pool segments whose arm fields disagree, so they must be
+    present in a segment file exactly as they are in a single-file run."""
+    seg_dir = tmp_path / "segments"
+    cfg = LiveConfig(out=str(tmp_path / "u.json"), mode="accept", n=1, out_dir=str(seg_dir),
+                     team_pool="rotomai/teambuilding/data/teams_gen9ou.packed", team_seed=3)
+    out = await run_session(cfg, lambda c: FakePlayer())
+    written = json.loads(Path(out.out_path).read_text())
+    for key in ("agent", "checkpoint", "sample", "loop_penalty", "team_pool", "team_seed",
+                "battle_format", "mode", "username"):
+        assert key in written, key
+    assert written["team_pool"] == "rotomai/teambuilding/data/teams_gen9ou.packed"
+    assert written["team_seed"] == 3

@@ -30,6 +30,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import signal
+import sys
 
 # NOTE: `live.policy` has NO imports of its own, which is why it -- and not `live.session` --
 # is the module imported here: building --help must not pay for poke-env or torch.
@@ -271,6 +274,32 @@ def _print_live_summary(outcome: object) -> None:
         print(f"  reconnects: {outcome.restarts}")  # type: ignore[attr-defined]
 
 
+def _install_stop_handlers(stop: asyncio.Event) -> None:
+    """First SIGINT/SIGTERM drains cleanly; a second one is a hard exit.
+
+    A standing ``--mode accept`` service is stopped by a signal, and killing it mid-battle both
+    forfeits a real opponent's game and loses the record of it. The first signal therefore sets the
+    stop event, which `run_session` honours between chunks, after the flush. The handler then
+    removes itself so an impatient operator's second Ctrl-C gets Python's normal KeyboardInterrupt
+    rather than an unresponsive process.
+    """
+    loop = asyncio.get_running_loop()
+
+    def handle(sig: int) -> None:
+        with contextlib.suppress(NotImplementedError, RuntimeError):
+            loop.remove_signal_handler(sig)
+        stop.set()
+        print(
+            "\nstopping after the current battle -- signal again to abandon it",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError, AttributeError):
+            loop.add_signal_handler(sig, handle, sig)
+
+
 async def _run_live(args: argparse.Namespace) -> None:
     from rotomai.live.session import LiveConfig, run_session
 
@@ -287,16 +316,18 @@ async def _run_live(args: argparse.Namespace) -> None:
         start_timer=args.start_timer,
         username=args.username, avatar=args.avatar,
         ws_url=args.server, auth_url=args.auth_url, allow_guest=args.allow_guest,
-        save_replays=args.save_replays, out=args.out,
+        save_replays=args.save_replays, out=args.out, out_dir=args.out_dir,
         battle_timeout=args.battle_timeout, stall_timeout=args.stall_timeout,
         queue_timeout=args.queue_timeout,
         login_timeout=args.login_timeout, max_restarts=args.max_restarts,
         ladder_ack=args.ladder_ack, log_level=args.log_level,
         use_live_ratings=args.use_live_ratings,
     )
-    outcome = await run_session(cfg)
+    stop = asyncio.Event()
+    _install_stop_handlers(stop)
+    outcome = await run_session(cfg, stop=stop)
     _print_live_summary(outcome)
-    print(f"\nwrote {args.out}")
+    print(f"\nwrote {outcome.out_path or args.out}")
 
 
 async def _run_eval_ladder(args: argparse.Namespace) -> None:
@@ -812,7 +843,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="challenge: username to challenge (REQUIRED). accept: comma-separated allowlist; "
              "omit to accept anyone",
     )
-    live.add_argument("--n", type=int, default=1, help="Number of battles to play")
+    live.add_argument(
+        "--n", type=int, default=1,
+        help="Number of battles to play. 0 means run until SIGINT/SIGTERM -- the standing-service "
+             "form for --mode accept. Refused for --mode ladder, where the n IS the "
+             "pre-registration",
+    )
     live.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT,
         help="Showdown format string. FIXED for the session: poke-env silently ignores "
@@ -867,6 +903,13 @@ def build_parser() -> argparse.ArgumentParser:
     live.add_argument(
         "--out", default="results/live_session.json",
         help="Per-battle records + Glicko-1/GXE summary (rewritten after every battle)",
+    )
+    live.add_argument(
+        "--out-dir", default=None,
+        help="Write session_<NNN>.json into this directory instead of rewriting --out, claiming "
+             "the next free index at startup. Use this for anything long-lived or restarted: --out "
+             "is rebuilt from an empty log on start, so a second process aimed at it erases the "
+             "first one's record. Merge with scripts/merge_live_sessions.py",
     )
     live.add_argument("--battle-timeout", type=float, default=900.0, help="Per-battle ceiling (s)")
     live.add_argument(

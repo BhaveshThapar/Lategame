@@ -5,8 +5,17 @@ simulator. Behaviour cloning → offline RL → PPO self-play, across three form
 `gen9ou` and `gen9vgc2025regi` — with **every published number gated on a pre-registered evaluation**
 and the negative results kept.
 
-[**Results**](#results) · [**How it works**](#how-it-works) · [**Operations**](docs/OPERATIONS.md) ·
+[**Results**](#results) · [**Scale & systems**](#scale--systems) · [**How it works**](#how-it-works) ·
+[**Challenge it**](#challenge-rotomai) · [**Operations**](docs/OPERATIONS.md) ·
 [**Build log**](docs/RESULTS.md) · [**Design doc**](plan.md) · [**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
+
+![RotomAI closing out a rated gen9ou ladder game — turns 13-17, three consecutive Sucker Punch
+KOs](assets/rotomai_gen9ou.gif)
+
+*Turns 13–17 of `battle-gen9ou-2666751310`, a real rated ladder game against a 1004-Elo human — the
+agent's Kingambit closes 6–3. This is the battle **log** rendered directly
+([`scripts/make_battle_gif.py`](scripts/make_battle_gif.py), no dependencies, no browser), not the
+Showdown sprite view; the log is the authoritative record and the sprites are a rendering of it.*
 
 ---
 
@@ -120,6 +129,35 @@ in [plan.md](plan.md).
 
 ---
 
+## Scale & systems
+
+Every number above was produced on **CPU only**, on a shared Slurm cluster, by an orchestration layer
+that had to be measured rather than guessed.
+
+| | |
+|---|---|
+| hardware | **no GPU, ever** — the net is 4.56M parameters and RAM is the binding constraint (64 GB/task) |
+| throughput | **209–242 self-play battles/min** at concurrency 20, measured |
+| a training build | **107 task-hours ≈ 32 h wall-clock**, 9 arms × 120–160 PPO iterations, 4.8–5.3 min/iter |
+| real parallelism | **4 concurrent tasks**, not 9 — the `tron` QoS caps a user at `cpu=32,mem=256G` and every job asks 8 CPU / 64 GB, so estimate in **task-hours ÷ 4** |
+| binding constraint | **disk, not time** — ~17.5 MB/checkpoint × 160 iterations × 9 arms ≈ **23 GB** per build |
+| durable record | 248 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
+
+**The bug worth stating out loud: two jobs on one node silently shared a simulator.** poke-env's
+`LocalhostServerConfiguration` hardcodes `ws://localhost:8000`. Slurm array tasks routinely land on
+the same node (measured: `7141999` tasks 1 and 2 both on `tron64`), so two arms opened the same
+Showdown server and battled into *each other's* games — no error, no warning, and a comparison that
+looked fine and was corrupt. The fix is a per-task port: `scripts/cluster/_job_common.sh` computes
+`8100 + TASK_ID`, and each non-array wrapper claims a base clear of the others. `results/` has the
+same failure mode — a gate's `--out` is a global, and two overlapping jobs with the same path leave
+only the later one's JSON; Build 28 lost two of six reads that way before it was caught.
+
+Full resource verdicts, the port-base allocation and the submission recipes:
+[docs/OPERATIONS.md](docs/OPERATIONS.md#cluster) and
+[scripts/cluster/README.md](scripts/cluster/README.md).
+
+---
+
 ## How it works
 
 ```mermaid
@@ -148,6 +186,41 @@ never scaled, so no claim rests on it. Self-play is the axis with a dose-respons
 
 **Operational manual — environment, cluster, pipelines, live play:
 [docs/OPERATIONS.md](docs/OPERATIONS.md).**
+
+---
+
+## Challenge RotomAI
+
+The live client's default mode is `accept`: it takes **opt-in challenges only**, and `--n 0` makes
+it a standing service rather than a fixed-length run. One command, on any 1 GB box:
+
+```bash
+export ROTOMAI_PS_USERNAME=YourBotAccount ROTOMAI_PS_PASSWORD=...
+
+python -m rotomai.cli live --mode accept --n 0 \
+  --agent offrl --checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
+  --format gen9ou --concurrency 1 --battle-delay 10 --out-dir results/accept
+```
+
+Then challenge that account to a `[Gen 9] OU` game on [Pokémon Showdown](https://play.pokemonshowdown.com/).
+`--opponent a,b,c` narrows it to an allowlist. Ctrl-C finishes the battle in progress, flushes the
+record and exits; a second Ctrl-C abandons it.
+
+A [`Dockerfile`](Dockerfile) and a [systemd unit](deploy/rotomai-accept.service) are committed for
+the always-on version, and [`requirements-live.txt`](requirements-live.txt) pins the exact versions
+the published ladder run was played on — `pyproject.toml` declares floors, which is right for a
+library and wrong for a service, since `rotomai/live/` is written against poke-env 0.15 semantics in
+particular.
+
+**What you will be playing.** The gen9ou policy that scored **0.7303 against poke-env's
+`SimpleHeuristicsPlayer`** and **Elo 1004 / GXE 30% against humans**. It is a weak-to-average ladder
+opponent that will nonetheless punish a loose switch — see [the ladder result](#results) for why
+those two numbers disagree.
+
+**Ranked play is a different, gated path.** `--mode ladder` additionally requires `--ladder-ack` and
+`ROTOMAI_LIVE_ALLOW_LADDER`, and it refuses `--n 0` outright: a rated run's *n* is its
+pre-registration, and an open-ended one is a selected sample by construction. `accept` mode is
+ungated because a human chose to press the challenge button.
 
 ---
 
@@ -231,7 +304,7 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every published number was produced from files that exist only on the machine that
-ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 240
+ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 248
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`rotomai/features/data/`), and the pinned simulator rev.
@@ -253,7 +326,7 @@ Every checkpoint those records name is present on the machine that produced them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-240 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+248 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
