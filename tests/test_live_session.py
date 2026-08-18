@@ -6,14 +6,17 @@ checkpoint is touched by these tests.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
+import time
 from types import SimpleNamespace
 
 import pytest
 
 from rotomai.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PolicyError
 from rotomai.live.session import LiveConfig, _accept_list, chunk_count, run_session
+from rotomai.live.telemetry import LiveLog
 
 
 class FakePlayer:
@@ -183,8 +186,10 @@ async def test_a_wedged_connection_trips_the_watchdog_and_restarts(tmp_path, mon
         built.append(player)
         return player
 
-    cfg = _cfg(tmp_path, mode="accept", n=1, stall_timeout=0.15, battle_timeout=30.0,
-               max_restarts=2, backoff_base=0.0)
+    # BOTH deadlines: a client that hangs before its first battle is in the "no battle in
+    # progress" state, which is governed by queue_timeout, not stall_timeout.
+    cfg = _cfg(tmp_path, mode="accept", n=1, stall_timeout=0.15, queue_timeout=0.15,
+               battle_timeout=30.0, max_restarts=2, backoff_base=0.0)
     out = await run_session(cfg, factory)
 
     assert len(built) == 2  # rebuilt, because a dead socket cannot be reconnected
@@ -201,8 +206,8 @@ async def test_restarts_are_bounded(tmp_path, monkeypatch):
         built.append(FakePlayer(hang=True))
         return built[-1]
 
-    cfg = _cfg(tmp_path, mode="accept", n=1, stall_timeout=0.1, max_restarts=2,
-               backoff_base=0.0)
+    cfg = _cfg(tmp_path, mode="accept", n=1, stall_timeout=0.1, queue_timeout=0.1,
+               max_restarts=2, backoff_base=0.0)
     out = await run_session(cfg, factory)
 
     assert out.restarts == 3  # attempts 0,1,2 then the bound stops it
@@ -261,8 +266,8 @@ async def test_use_live_ratings_reaches_the_summary(tmp_path):
     cfg = _cfg(tmp_path, mode="accept", n=2, use_live_ratings=True)
     out = await run_session(cfg, lambda c: FakePlayer(opp_rating=1800))
 
-    assert out.summary["opponent_rating_source"] == "showdown_elo_approximated_as_glicko"
-    assert "units are not identical" in out.summary["gxe_basis"]
+    assert out.summary["opponent_rating_source"] == "showdown_elo_fitted_on_the_elo_scale"
+    assert out.summary["showdown_elo"]["opponent_mean"] == 1800
 
 
 async def test_default_still_pins_the_field(tmp_path):
@@ -286,15 +291,160 @@ async def test_incremental_writes_agree_with_the_final_summary(tmp_path):
     assert written["use_live_ratings"] is True
 
 
-async def test_opponent_rd_is_threaded(tmp_path):
-    """A tighter deviation on the opponent makes its rating count for more, so the same record
-    must not produce the same GXE at both settings."""
-    loose = await run_session(
-        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True, opponent_rd=350.0),
+async def test_observed_ratings_never_move_the_glicko_pair(tmp_path):
+    """`--opponent-rd` used to exist to tune how an observed Elo entered the Glicko update. That
+    path was a units error and is gone, so the flag went with it rather than surviving as a no-op.
+    What must hold now: the Glicko/GXE pair is scale-pure, and the opponents' observed strength
+    cannot move it no matter what they are rated."""
+    weak = await run_session(
+        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True),
+        lambda c: FakePlayer(opp_rating=1000),
+    )
+    strong = await run_session(
+        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True),
         lambda c: FakePlayer(opp_rating=1900),
     )
-    tight = await run_session(
-        _cfg(tmp_path, mode="accept", n=3, use_live_ratings=True, opponent_rd=30.0),
-        lambda c: FakePlayer(opp_rating=1900),
-    )
-    assert loose.summary["gxe"] != tight.summary["gxe"]
+    assert weak.summary["gxe"] == strong.summary["gxe"]
+    assert weak.summary["glicko"] == strong.summary["glicko"]
+    # The difference shows up on the Elo scale, where it belongs.
+    assert weak.summary["showdown_elo"]["opponent_mean"] == 1000
+    assert strong.summary["showdown_elo"]["opponent_mean"] == 1900
+
+
+async def test_a_queued_search_is_not_a_dead_socket(tmp_path, monkeypatch):
+    """Between battles both watchdog samples are frozen, so a ladder queue looks exactly like a
+    wedged client. Under one deadline a slow queue burned a restart and reconnected-and-researched
+    -- the traffic pattern the pacing exists to avoid."""
+    from rotomai.live.session import _watchdog
+
+    monkeypatch.setattr("rotomai.live.session._WATCHDOG_PERIOD", 0.02)
+    period = 0.02
+
+    async def wedged(stall, queue, in_battle):
+        player = FakePlayer()
+        if in_battle:
+            player.battles["b1"] = SimpleNamespace(finished=False, turn=3)
+        tripped = asyncio.Event()
+        cfg = _cfg(tmp_path, stall_timeout=stall, queue_timeout=queue)
+        task = asyncio.create_task(_watchdog(player, LiveLog(), cfg, tripped))
+        try:
+            await asyncio.wait_for(tripped.wait(), timeout=period * 20)
+            return True
+        except TimeoutError:
+            return False
+        finally:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    # No battle in progress: the short stall deadline must NOT apply; the long queue one governs.
+    assert await wedged(stall=0.0, queue=3600.0, in_battle=False) is False
+    # A battle that stopped advancing turns still trips on the stall deadline.
+    assert await wedged(stall=0.0, queue=3600.0, in_battle=True) is True
+    # And a queue that outlasts even the queue deadline is still detected.
+    assert await wedged(stall=3600.0, queue=0.0, in_battle=False) is True
+
+
+async def test_the_deployed_policy_is_recorded_not_just_the_weights(tmp_path):
+    """`sample` and `loop_penalty` each select a measurably different policy from one checkpoint,
+    so a session file without them cannot be checked against a pre-registration."""
+    cfg = _cfg(tmp_path, mode="accept", n=1, checkpoint="c.pt", sample=True,
+               loop_penalty=4.0, team_pool="p.packed", team_seed=7)
+    await run_session(cfg, lambda c: FakePlayer())
+
+    written = json.loads((tmp_path / "live.json").read_text())
+    assert written["sample"] is True
+    assert written["loop_penalty"] == 4.0
+    assert written["team_pool"] == "p.packed"
+    assert written["team_seed"] == 7
+
+
+def test_the_live_defaults_are_the_measured_policy():
+    """The defaults a ladder run inherits must be the ones every published number describes:
+    the GREEDY read (`offrl`, not the sampling rollout agent) with the LoopGuard on."""
+    from rotomai.eval.ladder import DEFAULT_LOOP_PENALTY
+
+    cfg = LiveConfig()
+    assert cfg.agent == "offrl"
+    assert cfg.loop_penalty == DEFAULT_LOOP_PENALTY == 4.0
+    assert cfg.sample is False
+    assert cfg.concurrency == 1
+
+
+async def test_team_seed_is_threaded(tmp_path):
+    """`team_seed` reached LiveConfig and stopped there: `from_packed_file` was called without it,
+    so every live session drew from the pool at seed 0 no matter what was asked for."""
+    pool = tmp_path / "teams.packed"
+    pool.write_text("\n".join(f"team{i}|" for i in range(20)) + "\n")
+
+    def draws(seed):
+        cfg = _cfg(tmp_path, battle_format="gen9ou", team_pool=str(pool), team_seed=seed)
+        team = _default_factory_team(cfg)
+        return [team.yield_team() for _ in range(10)]
+
+    assert draws(0) != draws(1)
+    assert draws(0) == draws(0)
+
+
+def _default_factory_team(cfg):
+    """The pool `_default_factory` would build, without standing up a player."""
+    from rotomai.teambuilding.pool import TeamPool
+
+    assert cfg.team_pool is not None
+    return TeamPool.from_packed_file(cfg.team_pool, seed=cfg.team_seed)
+
+
+async def test_training_rollout_agent_is_refused_with_a_checkpoint(tmp_path):
+    """`ppo` forces sample=True. Deploying a checkpoint through it plays a policy ~9 points weaker
+    than the one every published number describes, and `eval-ladder` already refuses the same
+    thing -- `live` was the one place a checkpoint could still be deployed the wrong way."""
+    with pytest.raises(ValueError, match="TRAINING rollout agent"):
+        await run_session(
+            _cfg(tmp_path, agent="ppo", checkpoint="checkpoints/whatever.pt"),
+            lambda c: FakePlayer(),
+        )
+    # No checkpoint: `ppo` reads its own default and there is nothing to misattribute.
+    out = await run_session(_cfg(tmp_path, agent="ppo", n=1), lambda c: FakePlayer())
+    assert out.summary["finished"] == 1
+
+
+async def test_battle_delay_paces_between_chunks_and_is_recorded(tmp_path):
+    """N battles at concurrency 1 pay N-1 pauses -- not N. A one-battle session must not sit
+    through etiquette it never used, and the last battle must not delay the summary."""
+    delay = 0.05
+    for n, expected_pauses in ((1, 0), (3, 2)):
+        cfg = _cfg(tmp_path, mode="accept", n=n, battle_delay=delay)
+        started = time.monotonic()
+        out = await run_session(cfg, lambda c: FakePlayer())
+        elapsed = time.monotonic() - started
+
+        assert out.summary["finished"] == n
+        assert elapsed >= expected_pauses * delay
+        assert elapsed < (expected_pauses + 1) * delay
+
+    written = json.loads((tmp_path / "live.json").read_text())
+    assert written["battle_delay"] == delay
+
+
+async def test_battle_delay_defaults_to_exact_identity(tmp_path):
+    cfg = _cfg(tmp_path, mode="accept", n=2)
+    await run_session(cfg, lambda c: FakePlayer())
+    written = json.loads((tmp_path / "live.json").read_text())
+    assert written["battle_delay"] == 0.0
+
+
+async def test_battle_delay_is_interruptible_by_the_stop_event(tmp_path):
+    """A 20s ladder pause must not make Ctrl-C wait it out, so the pause RACES the stop event
+    rather than being an unconditional sleep."""
+    stop = asyncio.Event()
+    player = FakePlayer()
+    cfg = _cfg(tmp_path, mode="accept", n=5, battle_delay=3600.0)
+
+    task = asyncio.create_task(run_session(cfg, lambda c: player, stop))
+    while player.n_finished_battles < 1:
+        await asyncio.sleep(0.01)
+    stop.set()
+    out = await asyncio.wait_for(task, timeout=5.0)
+
+    assert out.stopped_early
+    assert out.summary["finished"] == 1

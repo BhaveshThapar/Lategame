@@ -21,7 +21,13 @@ from poke_env import AccountConfiguration, ServerConfiguration
 from poke_env.player import Player
 from poke_env.teambuilder import Teambuilder
 
-from rotomai.eval.arena import _CHECKPOINT_AGENTS, _LOOP_GUARD_AGENTS, AGENTS
+from rotomai.eval.arena import (
+    _CHECKPOINT_AGENTS,
+    _DOUBLES_LOOP_GUARD_AGENTS,
+    _LOOP_GUARD_AGENTS,
+    AGENTS,
+    require_team_for_format,
+)
 from rotomai.live.server import LIVE_SERVER
 
 
@@ -61,6 +67,10 @@ def build_live_player(
             f"max_concurrent_battles must be >= 1, got {max_concurrent_battles} "
             "(poke-env treats 0 as unlimited)"
         )
+    # Same refusal `build_player` makes, and for a sharper reason: a teamless search on a public
+    # ladder does not fail, it just never battles, and the only evidence is a WARNING in poke-env's
+    # log next to an empty results file.
+    require_team_for_format(name, battle_format, team)
 
     cls = AGENTS[name]
     extra = live_agent_extras(
@@ -104,7 +114,10 @@ def live_agent_extras(
         extra["sample"] = sample
         if checkpoint_path is not None:
             extra["checkpoint_path"] = checkpoint_path
-    if name in _LOOP_GUARD_AGENTS:
+    # BOTH guard sets, exactly as `arena.build_player` does. Gating on the singles set alone
+    # silently dropped the per-slot guard from every live doubles agent -- and the parity test
+    # could not see it, because it rebuilt its expectation from this rule instead of arena's.
+    if name in _LOOP_GUARD_AGENTS or name in _DOUBLES_LOOP_GUARD_AGENTS:
         extra["loop_penalty"] = loop_penalty
     return extra
 

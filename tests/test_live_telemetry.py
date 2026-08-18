@@ -162,10 +162,34 @@ def test_showdown_elo_is_reported_separately_and_never_enters_glicko():
     assert without["showdown_elo"]["n_reported"] == 0
 
 
-def test_use_live_ratings_is_opt_in_and_stamps_its_units_caveat():
-    got = summarize([_rec("win", opp_elo=1800)] * 5, use_live_ratings=True)
-    assert got["opponent_rating_source"] == "showdown_elo_approximated_as_glicko"
-    assert got["glicko"] > summarize([_rec("win")] * 5)["glicko"]  # beating a stronger field
+def test_use_live_ratings_summarises_on_the_elo_scale_not_the_glicko_one():
+    """Elo and Glicko share the 400-point logistic and NOTHING else. Feeding an observed ladder
+    Elo into `Rating` read every opponent as ~500 points weaker than it was: a real 7-18 session
+    against mean opponent Elo 1045 reported Glicko 501.4 / GXE 0.0242 while the account's own page
+    said Elo 1017 / GXE 30%. The Glicko half must therefore be scale-pure -- identical with the
+    flag on or off -- and the observed ratings summarised on their own scale."""
+    live = summarize([_rec("win", opp_elo=1800)] * 3 + [_rec("loss", opp_elo=1800)] * 2,
+                     use_live_ratings=True)
+    pinned = summarize([_rec("win")] * 3 + [_rec("loss")] * 2)
+
+    assert live["opponent_rating_source"] == "showdown_elo_fitted_on_the_elo_scale"
+    # The Glicko/GXE pair is the PINNED-field one either way; observed Elo never enters it.
+    assert live["glicko"] == pinned["glicko"]
+    assert live["gxe"] == pinned["gxe"]
+    # ...and the observed opponents are summarised on the Elo scale instead.
+    e = live["showdown_elo"]
+    assert e["elo_mle_bounded"] is True
+    assert e["elo_mle"] > 1800  # won 3 of 5 against 1800s, so it fits above them
+    assert 0.0 < e["expected_score_vs_mean_opponent"] < 1.0
+
+
+def test_an_all_wins_record_has_no_finite_elo_and_says_so():
+    """The likelihood is monotone with no losses, so the MLE is infinite. Emitting the clamp as if
+    it were a measurement is exactly the kind of confident-wrong number this file exists to stop."""
+    got = summarize([_rec("win", opp_elo=1200)] * 4, use_live_ratings=True)
+    assert got["showdown_elo"]["elo_mle_bounded"] is False
+    assert got["showdown_elo"]["elo_mle"] is None
+    assert got["showdown_elo"]["expected_score_vs_mean_opponent"] is None
 
 
 # --------------------------------------------------------------------------- #

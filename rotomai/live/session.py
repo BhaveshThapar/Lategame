@@ -30,7 +30,7 @@ from typing import Any
 from poke_env.player import Player
 
 from rotomai.config import DEFAULT_FORMAT
-from rotomai.eval.rating import MAX_RD
+from rotomai.eval.ladder import _TRAINING_ONLY_AGENTS, DEFAULT_LOOP_PENALTY
 from rotomai.live.player import LoginError, LoginWatch, build_live_player, wait_for_login
 from rotomai.live.policy import POLICY_NOTE, check_ladder_optin
 from rotomai.live.server import live_account, live_server
@@ -44,14 +44,17 @@ _WATCHDOG_PERIOD = 5.0
 
 @dataclass(frozen=True)
 class LiveConfig:
-    agent: str = "ppo"
+    agent: str = "offrl"
     mode: str = "accept"
     battle_format: str = DEFAULT_FORMAT
     n: int = 1
     opponent: str | None = None
     checkpoint: str | None = None
     sample: bool = False
-    loop_penalty: float = 0.0
+    #: The guarded policy, because that is the one every published gen9ou number describes
+    #: (`eval-ladder`, `seed_strength_gate`, `results/*_v26*.json` are all at 4.0). At 0.0 a live
+    #: session deploys a policy no measurement in this repo covers.
+    loop_penalty: float = DEFAULT_LOOP_PENALTY
     team_pool: str | None = None
     team_seed: int = 0
     concurrency: int = 1
@@ -64,12 +67,23 @@ class LiveConfig:
     save_replays: str | None = None
     out: str = "results/live_session.json"
     battle_timeout: float = 900.0
+    #: Deadline for a battle that has stopped advancing turns.
     stall_timeout: float = 300.0
+    #: Deadline while there is NO battle in progress -- queued for `/search`, or serving
+    #: `battle_delay`. Separate from `stall_timeout` because the watchdog's two samples cannot
+    #: move between battles, so one deadline would have to be set by the slower of the two
+    #: situations and would then be useless for the other. See `_watchdog`.
+    queue_timeout: float = 900.0
     login_timeout: float = 30.0
     max_restarts: int = 3
     #: Seconds before the first reconnect attempt; doubles per attempt, capped at 60. Configurable
     #: so a caller that already knows the server is up (or a test) need not sit through the ramp.
     backoff_base: float = 5.0
+    #: Seconds to wait between battle chunks. 0.0 is exact identity, so nothing existing changes.
+    #: poke-env's `ladder(k)` re-searches the instant a game ends, and back-to-back searches with no
+    #: gap are the traffic pattern a ranked ladder reads as farming. Recorded in the results file
+    #: rather than only in the command, so the etiquette claim travels with the number.
+    battle_delay: float = 0.0
     ladder_ack: str | None = None
     log_level: int | None = None
     #: Rate opponents at their OBSERVED Showdown rating rather than pinning the field at the
@@ -77,7 +91,6 @@ class LiveConfig:
     #: session's own GXE is a reparameterisation of its score rate no matter what it played, which
     #: is precisely the number G2 cannot be settled with. See ``telemetry.summarize``.
     use_live_ratings: bool = False
-    opponent_rd: float = MAX_RD
 
 
 @dataclass
@@ -101,11 +114,21 @@ def _public_config(cfg: LiveConfig, username: str, ws_url: str) -> dict[str, Any
     public: dict[str, Any] = {
         "agent": cfg.agent,
         "checkpoint": cfg.checkpoint,
+        # The POLICY, not just the weights. `sample` and `loop_penalty` each select a measurably
+        # different policy from the same checkpoint (0.675 vs 0.767 on v25b; every published gen9ou
+        # number is at loop_penalty 4.0), and `team_pool`/`team_seed` decide what it played with.
+        # Without them a session file cannot be checked against a pre-registration -- which is the
+        # whole point of pre-registering a live run.
+        "sample": cfg.sample,
+        "loop_penalty": cfg.loop_penalty,
+        "team_pool": cfg.team_pool,
+        "team_seed": cfg.team_seed,
         "mode": cfg.mode,
         "battle_format": cfg.battle_format,
         "username": username,
         "server": ws_url,
         "concurrency": cfg.concurrency,
+        "battle_delay": cfg.battle_delay,
         "requested_battles": cfg.n,
         # Recorded for the same reason `ladder_ack` is: a published rating has to carry the basis
         # it was computed on, and "were opponents rated or pinned" is that basis.
@@ -127,7 +150,7 @@ def _default_factory(cfg: LiveConfig) -> Player:
     if cfg.team_pool:
         from rotomai.teambuilding.pool import TeamPool
 
-        team = TeamPool.from_packed_file(cfg.team_pool)
+        team = TeamPool.from_packed_file(cfg.team_pool, seed=cfg.team_seed)
 
     return build_live_player(
         cfg.agent,
@@ -176,12 +199,20 @@ async def _watchdog(player: Player, log: LiveLog, cfg: LiveConfig, tripped: asyn
                 int(getattr(player, "n_finished_battles", 0)),
                 sum(int(getattr(b, "turn", 0) or 0) for b in battles.values()),
             )
+            # BETWEEN battles both samples are frozen, so a healthy session looks exactly like a
+            # dead one. On the ranked ladder that is not an edge case: `/search` can sit in the
+            # queue for minutes, and `battle_delay` deliberately adds to the gap. Under a single
+            # deadline a slow queue reads as a wedge, burns a restart, and reconnects-and-researches
+            # -- the traffic pattern the pacing exists to avoid. So which deadline applies depends
+            # on whether there is a battle to make progress in.
+            waiting = not any(not getattr(b, "finished", False) for b in battles.values())
         except Exception:  # never let telemetry kill the session
             continue
+        limit = cfg.queue_timeout if waiting else cfg.stall_timeout
         now = time.monotonic()
         if sample != last:
             last, last_change = sample, now
-        elif now - last_change > cfg.stall_timeout:
+        elif now - last_change > limit:
             tripped.set()
             return
 
@@ -199,6 +230,19 @@ async def run_session(
         raise ValueError(f"unknown mode {cfg.mode!r}; choose from {', '.join(MODES)}")
     if cfg.mode == "challenge" and not cfg.opponent:
         raise ValueError("--mode challenge requires --opponent (the username to challenge)")
+    if cfg.checkpoint and cfg.agent in _TRAINING_ONLY_AGENTS:
+        # The same refusal `eval.ladder.parse_field` makes, for the same reason, at the only other
+        # place a checkpoint gets a policy attached to it. Refused rather than silently rewritten:
+        # the results file names the agent it was told, and a swap would make the artifact disagree
+        # with the command that produced it.
+        instead = _TRAINING_ONLY_AGENTS[cfg.agent]
+        raise ValueError(
+            f"--agent {cfg.agent!r} with --checkpoint: {cfg.agent!r} is the TRAINING rollout agent "
+            f"and forces sample=True, so it deploys a different -- and measurably weaker -- policy "
+            f"than the same checkpoint read greedily (~9 points vs the heuristic on v25b). Every "
+            f"published number in this project scores these checkpoints through {instead!r}. "
+            f"Use --agent {instead}, and add --sample if you deliberately want the sampled policy."
+        )
     if cfg.mode == "ladder":
         # Raises PolicyError unless BOTH opt-in channels are present.
         check_ladder_optin(cfg.ladder_ack)
@@ -255,6 +299,15 @@ async def run_session(
                 _flush(cfg, log, player, outcome)
                 remaining = cfg.n - sum(1 for r in log.records if r.finished)
 
+                # Pace the NEXT search. After the flush, so a Ctrl-C during the pause loses nothing,
+                # and skipped on the last chunk, where it would only delay the summary.
+                if cfg.battle_delay > 0 and remaining > 0:
+                    with contextlib.suppress(asyncio.TimeoutError):
+                        await asyncio.wait_for(
+                            stop.wait() if stop is not None else asyncio.Event().wait(),
+                            timeout=cfg.battle_delay,
+                        )
+
             log.finalize(player, cfg.mode, attempt, cfg.battle_format)
             _flush(cfg, log, player, outcome)
 
@@ -296,7 +349,7 @@ def _summarize(cfg: LiveConfig, log: LiveLog) -> dict[str, Any]:
     look like a corrupted file rather than a wiring bug. Both paths come through here.
     """
     return summarize(
-        log.records, use_live_ratings=cfg.use_live_ratings, opponent_rd=cfg.opponent_rd
+        log.records, use_live_ratings=cfg.use_live_ratings
     )
 
 

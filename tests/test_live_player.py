@@ -26,6 +26,9 @@ from rotomai.live.server import LIVE_SERVER
 
 _ACCOUNT = AccountConfiguration("rotomaibot", "hunter2-do-not-leak")
 _PRIVATE = ServerConfiguration("ws://localhost:8000/showdown/websocket", "https://x/action.php?")
+#: Teambuilt formats refuse a teamless build (arena.require_team_for_format), so every gen9ou
+#: build here carries one. Contents are irrelevant -- the agents are kwarg recorders.
+_TEAM = "packed"
 
 
 @pytest.fixture
@@ -47,19 +50,21 @@ def captured(monkeypatch):
 
 def test_the_supplied_account_is_passed_through_untouched(captured):
     """THE guard against copying arena's random-suffix username onto a live server."""
-    build_live_player("ppo", "gen9ou", _ACCOUNT)
+    build_live_player("ppo", "gen9ou", _ACCOUNT, team=_TEAM)
     assert captured["ppo"]["account_configuration"] is _ACCOUNT
     assert captured["ppo"]["account_configuration"].username == "rotomaibot"
 
 
 def test_defaults_to_the_live_server_and_starts_the_turn_timer(captured):
-    build_live_player("ppo", "gen9ou", _ACCOUNT)
+    build_live_player("ppo", "gen9ou", _ACCOUNT, team=_TEAM)
     assert captured["ppo"]["server_configuration"] is LIVE_SERVER
     assert captured["ppo"]["start_timer_on_battle_start"] is True
 
 
 def test_private_server_and_timer_are_overridable(captured):
-    build_live_player("ppo", "gen9ou", _ACCOUNT, _PRIVATE, start_timer_on_battle_start=False)
+    build_live_player(
+        "ppo", "gen9ou", _ACCOUNT, _PRIVATE, team=_TEAM, start_timer_on_battle_start=False
+    )
     assert captured["ppo"]["server_configuration"] is _PRIVATE
     assert captured["ppo"]["start_timer_on_battle_start"] is False
 
@@ -72,29 +77,46 @@ def test_unknown_agent_is_rejected():
 @pytest.mark.parametrize("bad", [0, -1])
 def test_zero_concurrency_is_rejected_because_poke_env_reads_it_as_unlimited(bad):
     with pytest.raises(ValueError, match="unlimited"):
-        build_live_player("ppo", "gen9ou", _ACCOUNT, max_concurrent_battles=bad)
+        build_live_player("ppo", "gen9ou", _ACCOUNT, team=_TEAM, max_concurrent_battles=bad)
+
+
+def test_a_teamless_build_on_a_teambuilt_format_is_refused(captured):
+    """`build_player` has refused this since the curriculum-gate bug; the live builder did not,
+    so `rotomai live --format gen9ou` produced a player that searched, was rejected by popup, and
+    reported an empty session with no error anywhere. Same guard, same message, both builders."""
+    with pytest.raises(ValueError, match="needs a `team`"):
+        build_live_player("ppo", "gen9ou", _ACCOUNT)
+    with pytest.raises(ValueError, match="needs a `team`"):
+        build_live_player("doubles", "gen9vgc2025regi", _ACCOUNT)
+    # Random Battles must NOT be refused -- the server supplies the teams there.
+    build_live_player("ppo", "gen9randombattle", _ACCOUNT)
+    assert "team" not in captured["ppo"]
 
 
 def test_optional_kwargs_are_forwarded_only_when_set(captured):
-    build_live_player("ppo", "gen9ou", _ACCOUNT)
+    # Random Battles are the one format where a teamless build is correct, so it is also the
+    # only one where "team is absent" can be asserted at all.
+    build_live_player("ppo", "gen9randombattle", _ACCOUNT)
     bare = captured["ppo"]
     for key in ("team", "avatar", "log_level", "save_replays"):
         assert key not in bare
 
     build_live_player(
-        "ppo", "gen9ou", _ACCOUNT, team="packed", avatar="red",
+        "ppo", "gen9ou", _ACCOUNT, team=_TEAM, avatar="red",
         log_level=logging.DEBUG, save_replays="/tmp/replays",
     )
     rich = captured["ppo"]
-    assert rich["team"] == "packed" and rich["avatar"] == "red"
+    assert rich["team"] == _TEAM and rich["avatar"] == "red"
     assert rich["log_level"] == logging.DEBUG and rich["save_replays"] == "/tmp/replays"
 
 
 def test_checkpoint_and_loop_penalty_reach_only_the_agents_that_accept_them(captured):
-    build_live_player("ppo", "gen9ou", _ACCOUNT, checkpoint_path="x.pt", sample=True,
+    build_live_player("ppo", "gen9ou", _ACCOUNT, team=_TEAM, checkpoint_path="x.pt",
+                      sample=True, loop_penalty=4.0)
+    build_live_player("random", "gen9ou", _ACCOUNT, team=_TEAM, checkpoint_path="x.pt",
                       loop_penalty=4.0)
-    build_live_player("random", "gen9ou", _ACCOUNT, checkpoint_path="x.pt", loop_penalty=4.0)
-    build_live_player("search", "gen9ou", _ACCOUNT, checkpoint_path="x.pt", loop_penalty=4.0)
+    build_live_player("search", "gen9ou", _ACCOUNT, team=_TEAM, checkpoint_path="x.pt",
+                      loop_penalty=4.0)
 
     assert captured["ppo"]["checkpoint_path"] == "x.pt" and captured["ppo"]["sample"] is True
     assert captured["ppo"]["loop_penalty"] == 4.0
@@ -110,18 +132,35 @@ def test_checkpoint_and_loop_penalty_reach_only_the_agents_that_accept_them(capt
 def test_parity_with_arena_for_every_registered_agent(name):
     """Anti-rot guard for importing arena's two private capability sets.
 
-    Mirrors arena.build_player's own selection logic; if a future agent is added to one set and
-    not reflected here, this fails instead of silently dropping a kwarg on live play.
+    Derives the expectation by CALLING arena's builder, not by restating live's own rule. The
+    earlier version restated the rule, so it agreed with `live_agent_extras` by construction and
+    passed for a year while live doubles agents silently lost their per-slot LoopGuard: arena gates
+    on `_LOOP_GUARD_AGENTS | _DOUBLES_LOOP_GUARD_AGENTS`, live gated on the singles set alone.
+    A parity test that cannot fail when the two disagree is not a parity test.
     """
     kwargs = {"checkpoint_path": "x.pt", "sample": True, "loop_penalty": 4.0}
     got = live_agent_extras(name, **kwargs)
 
-    expected: dict[str, object] = {}
-    if name in arena._CHECKPOINT_AGENTS:
-        expected["sample"] = True
-        expected["checkpoint_path"] = "x.pt"
-    if name in arena._LOOP_GUARD_AGENTS:
-        expected["loop_penalty"] = 4.0
+    captured: dict[str, dict] = {}
+
+    class _Recorder:
+        def __init__(self, **kw):
+            captured["kw"] = kw
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setitem(arena.AGENTS, name, _Recorder)
+        mp.setattr(arena, "_with_team_preview", lambda cls, fmt: cls)
+        arena.build_player(name, "gen9ou", team="packed", **kwargs)
+
+    # Everything arena forwards that is not a connection kwarg or the team.
+    connection = {
+        "account_configuration", "battle_format", "server_configuration",
+        "max_concurrent_battles", "team",
+    }
+    expected = {k: v for k, v in captured["kw"].items() if k not in connection}
+    # `max_battle_turns` is a doubles-only forfeit ceiling that the live builder has no parameter
+    # for. Excluded deliberately and named here so the gap stays visible rather than absorbed.
+    expected.pop("max_battle_turns", None)
     assert got == expected
 
 
