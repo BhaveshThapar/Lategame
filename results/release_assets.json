@@ -33,7 +33,8 @@
       "bytes": 18266900,
       "sha256": "a91b34266e22faa46d896197cafdf3d70a7e51248be87da8be5195bcd916db93",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     },
@@ -153,7 +154,9 @@
       "sha256": "acb2a87d409422e86cc93e2552b2d20dc888a2eac35fc9ee54d166d6ace80b1d",
       "backs": [
         "gen9ou 0.7513 selection-free terminal",
-        "gen9ou Glicko 1776.3 / GXE 0.7434"
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)",
+        "gen9ou Glicko 1776.3 / GXE 0.7434",
+        "gen9ou ranked ladder Elo 1004 / GXE 30% (n=100, pre-registered WEAK)"
       ],
       "runnable": "gen9ou -- the ladder top (Glicko 1776.3 / GXE 0.7434) and the strongest agent here"
     },
@@ -162,7 +165,8 @@
       "bytes": 18265232,
       "sha256": "a92b8184a7e8529d24f959ca0e0158faabdab4d759519e0301bf23374c28c5f6",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     },
@@ -171,7 +175,8 @@
       "bytes": 18265232,
       "sha256": "30a3c2dcb9c257410c1bdb1cfb81e14b971f3d066110dc1b34a4b385a57a2976",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     }

@@ -52,7 +52,32 @@ HEADLINE: dict[str, tuple[str, ...]] = {
         "ppo_ou_gate_v26b_terminal.json",
         "seed_strength_gate_v26_terminal.json",
     ),
+    # The same arm, same protocol, against the baseline the FIELD shares rather than the one this
+    # repo wrote -- the only strength number here an outside reader can situate. The controls are
+    # part of the headline on purpose: they re-read `heuristic`, whose value this project has
+    # already published, in the same protocol at the same n, and that is what licenses reading the
+    # simpleheuristics rate as the ARM's rather than the RUN's. One control shares an allocation
+    # with a simpleheuristics read, so the opponent gap is measured within a run as well as across.
+    "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)": (
+        "ppo_ou_gate_v26b_terminal.json",
+        "seed_strength_gate_v26b_simpleheuristics.json",
+        "seed_strength_gate_v26b_simpleheuristics_paired.json",
+        "seed_strength_gate_v26b_heuristic_control.json",
+        "seed_strength_gate_v26b_heuristic_paired.json",
+    ),
     "gen9ou Glicko 1776.3 / GXE 0.7434": ("eval_ladder_gen9ou_v26.json",),
+    # G1b. The only number here measured against HUMANS, and the only one an outside reader can
+    # situate absolutely. Cites the pre-registration alongside the record on purpose: the bands and
+    # the n are what make a WEAK verdict a result rather than a disappointment, and a headline that
+    # cited only the outcome could be re-read later against bands chosen to fit it.
+    "gen9ou ranked ladder Elo 1004 / GXE 30% (n=100, pre-registered WEAK)": (
+        "live_ladder_gen9ou.json",
+        "live_ladder_gen9ou_prereg.json",
+        "live_ladder_gen9ou_seg0.json",
+        "live_ladder_gen9ou_seg1.json",
+        "live_ladder_gen9ou_seg2.json",
+        "live_ladder_gen9ou_seg3.json",
+    ),
     "VGC B6f C1 0.530": (
         "ppo_vgc_gate_b6f.json",
         "ppo_vgc_gate_b6f_s0.json",

@@ -1,0 +1,80 @@
+{
+  "schema": "rotomai.live.prereg/1",
+  "gate": "live_ladder",
+  "written_at": "2026-08-18",
+  "status": "PRE-REGISTERED -- written and committed BEFORE the first rated game",
+  "why": "Every strength number in this project is measured against agents. The public ranked ladder is the only reading an outside reader can situate absolutely, and it is the bar the field's human-level claims are evaluated on. NG3 was amended (plan.md:86, plan.md section 15) to allow exactly one bounded pre-registered run; farming stays out of scope.",
+  "account": {
+    "userid": "rotomlover12",
+    "note": "Filled in the commit that runs the first game, which changes nothing else. The bands, n and protocol below are fixed NOW -- those are what pre-registration exists to freeze. The account must be dedicated, <=18 chars (rotomai/live/server.py:83-87), and its profile must identify it as a bot running this repository.",
+    "username": "RotomLover12",
+    "auth_verified": "challstr -> action.php returned an assertion; curuser.loggedin true",
+    "pre_run_gen9ou": {
+      "present": false,
+      "note": "No gen9ou ladder history before game 1 -- the format starts at elo 1000. Read from https://pokemonshowdown.com/users/rotomlover12.json immediately before the first segment, so the post-run delta is attributable to this run alone."
+    },
+    "other_format_history": {
+      "gen8anythinggoes": {
+        "w": 5,
+        "l": 4
+      },
+      "note": "Prior non-gen9ou play on this account, recorded rather than omitted. It cannot affect the gen9ou reading, which starts fresh, but plan.md section 15 asks for a DEDICATED bot account and this one has nine games of earlier human play in another format."
+    }
+  },
+  "arm": {
+    "agent": "offrl",
+    "checkpoint": "checkpoints/ppo_v26b_s0/iter_320.pt",
+    "checkpoint_sha256": "acb2a87d409422e86cc93e2552b2d20dc888a2eac35fc9ee54d166d6ace80b1d",
+    "sample": false,
+    "loop_penalty": 4.0,
+    "battle_format": "gen9ou",
+    "team_pool": "rotomai/teambuilding/data/teams_gen9ou.packed",
+    "team_pool_teams": 12,
+    "team_seed": 0,
+    "note": "The deployed policy, read greedily through `offrl` at LoopGuard 4.0 -- identical to the protocol behind 0.7513 and the simpleheuristics rebase. The team pool is public and committed (12 teams), so an opponent meeting this account repeatedly could pattern-match it; stated up front rather than discovered later."
+  },
+  "protocol": {
+    "n_target": 100,
+    "concurrency": 1,
+    "battle_delay_s": 20.0,
+    "use_live_ratings": true,
+    "segments": "blocks of 25, each writing its own --out; merged after the run",
+    "command": "ROTOMAI_LIVE_ALLOW_LADDER=1 python -m rotomai.cli live --mode ladder --ladder-ack i-have-read-plan-md-section-15 --agent offrl --checkpoint checkpoints/ppo_v26b_s0/iter_320.pt --format gen9ou --team-pool rotomai/teambuilding/data/teams_gen9ou.packed --team-seed 0 --loop-penalty 4 --concurrency 1 --battle-delay 20 --use-live-ratings --n 25 --save-replays replays/live_ladder_gen9ou --out results/live_ladder_gen9ou_seg{k}.json"
+  },
+  "primary_readout": {
+    "source": "https://pokemonshowdown.com/users/<userid>.json -> ratings.gen9ou",
+    "fields": [
+      "elo",
+      "gxe",
+      "rpr",
+      "rprd",
+      "w",
+      "l"
+    ],
+    "note": "Declared primary BEFORE the run so the choice cannot be made after seeing the numbers. poke-env only ever sees the PRE-battle Elo (rotomai/live/telemetry.py:11-16), so the final rating cannot come from the session file. The session's own Glicko/GXE under --use-live-ratings approximates Showdown Elo as a Glicko rating and is SECONDARY."
+  },
+  "bands": {
+    "scale": "Showdown `elo` for gen9ou. A new account starts at elo 1000, NOT 1500 -- verified against the endpoint, which returns elo 1000 for an unplayed format. `rpr`/`rprd` are the Glicko pair and live on a different scale; they are reported, not adjudicated.",
+    "WEAK": {
+      "elo": "< 1200",
+      "gxe": "< 45%"
+    },
+    "DECENT": {
+      "elo": "1200-1450",
+      "gxe": "45-60%"
+    },
+    "STRONG": {
+      "elo": "> 1450",
+      "gxe": "> 60%"
+    }
+  },
+  "reported_not_adjudicating": [
+    "final rpr / rprd",
+    "mean opponent elo",
+    "mean turns",
+    "unfinished count",
+    "ladder w/l/t delta from the endpoint vs the session's own finished count -- Showdown scores a disconnect as a loss while the session excludes unfinished battles, so these can legitimately disagree and the gap must be visible rather than reconciled silently"
+  ],
+  "stopping_rule": "n is fixed at 100. No early stop on a good number, and no top-up after seeing a bad one: if the run ends short, the record states the ACHIEVED n and why. Under 50 finished games the run is reported as a pilot and NO band is read. The run happens once.",
+  "pre_registered_expectation": "A WEAK reading is a live possibility and is published either way. The agent was trained against self-play and a fixed heuristic and has never seen the human metagame; its opponent model, its 12-team pool and its 761-d single-turn observation all come from that setting. A weak result diagnoses the replay-data axis (plan.md:54) rather than refuting the project."
+}

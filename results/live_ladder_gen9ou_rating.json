@@ -1,0 +1,13 @@
+{
+  "elo": 1004.0812165835689,
+  "gxe": 30,
+  "rpr": 1339.530339478253,
+  "rprd": 35.96481881184175,
+  "w": 35,
+  "l": 65,
+  "coil": null,
+  "userid": "rotomlover12",
+  "battle_format": "gen9ou",
+  "source": "https://pokemonshowdown.com/users/rotomlover12.json",
+  "scale_note": "`elo` is Showdown's sequential ladder Elo (new accounts start at 1000). `rpr`/`rprd` are the Glicko pair (centred at 1500). Same games, different scales -- do not compare them."
+}

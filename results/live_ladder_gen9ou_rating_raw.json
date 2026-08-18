@@ -1,0 +1,26 @@
+{
+  "username": "RotomLover12",
+  "userid": "rotomlover12",
+  "registertime": 1787011200,
+  "group": 1,
+  "ratings": {
+    "gen8anythinggoes": {
+      "elo": 1103.427414269,
+      "gxe": 49.3,
+      "rpr": 1494.5993734509,
+      "rprd": 89.053226084744,
+      "w": 5,
+      "l": 4,
+      "coil": null
+    },
+    "gen9ou": {
+      "elo": 1004.0812165835689,
+      "gxe": 30,
+      "rpr": 1339.530339478253,
+      "rprd": 35.96481881184175,
+      "w": 35,
+      "l": 65,
+      "coil": null
+    }
+  }
+}
