@@ -70,6 +70,12 @@ else
   ARM="hist"; HISTORY="${HISTORY_K:-4}"; SEED="$(( TASK - SEEDS_PER_ARM ))"
 fi
 
+# STAGE=bc stops after behaviour cloning. Used by the episode-split re-read, which is a question
+# about the VALIDATION SPLIT and needs no AWR stage to answer -- and AWR is 80% of a task's cost.
+STAGE="${STAGE:-all}"
+# SPLIT=episode holds out whole battles instead of random turns. See rotomai/data/history.py.
+SPLIT="${SPLIT:-row}"
+
 BC_SHARD="${BC_SHARD:-data/gen9ou_v7_bc_rebuilt.npz}"
 RL_SHARD="${RL_SHARD:-data/gen9ou_v7_rl.npz}"
 BC_EPOCHS="${BC_EPOCHS:-20}"
@@ -101,32 +107,41 @@ if verdict != "PASS":
 print(f"[job] shard fidelity: {verdict}")
 PY
 
-echo "[job] BUILD=$BUILD arm=$ARM history=$HISTORY seed=$SEED"
+echo "[job] BUILD=$BUILD arm=$ARM history=$HISTORY seed=$SEED stage=$STAGE split=$SPLIT"
 
-{
-  python -u -m rotomai.cli train \
-    --data "$BC_SHARD" \
-    --out  "$BC_OUT" \
-    --model-type entity_transformer \
-    --id-embed-init prior \
-    --history "$HISTORY" \
-    --epochs "$BC_EPOCHS" \
-    --seed "$SEED" \
-    --device cpu
+# Each stage tees separately rather than wrapping both in `{ ... } | tee`. A brace group feeding a
+# pipe runs in a SUBSHELL, so an `exit` inside it would end the subshell and let the rest of this
+# script run on regardless -- the STAGE gate below would have printed that it was stopping and then
+# not stopped. `set -o pipefail` is on, so a failing python still fails the job through the tee.
+python -u -m rotomai.cli train \
+  --data "$BC_SHARD" \
+  --out  "$BC_OUT" \
+  --model-type entity_transformer \
+  --id-embed-init prior \
+  --history "$HISTORY" \
+  --split "$SPLIT" \
+  --epochs "$BC_EPOCHS" \
+  --seed "$SEED" \
+  --device cpu 2>&1 | tee -a "$RUN_LOG"
 
-  # --history MUST match the BC init's: the AWR warm-start does a STRICT state-dict load, so a
-  # mismatch fails on `time_embed` rather than silently training a sequence critic on flat frames.
-  python -u -m rotomai.cli train-rl \
-    --data "$RL_SHARD" \
-    --out  "$RL_OUT" \
-    --model entity_transformer \
-    --id-embed-init prior \
-    --history "$HISTORY" \
-    --bc-init "$BC_OUT" \
-    --epochs "$RL_EPOCHS" \
-    --seed "$SEED" \
-    --device cpu
-} 2>&1 | tee -a "$RUN_LOG"
+if [[ "$STAGE" == "bc" ]]; then
+  echo "[job] STAGE=bc -- stopped after behaviour cloning, no AWR" | tee -a "$RUN_LOG"
+  echo "[job] $ARM seed $SEED done -> $BC_OUT"
+  exit 0
+fi
+
+# --history MUST match the BC init's: the AWR warm-start does a STRICT state-dict load, so a
+# mismatch fails on `time_embed` rather than silently training a sequence critic on flat frames.
+python -u -m rotomai.cli train-rl \
+  --data "$RL_SHARD" \
+  --out  "$RL_OUT" \
+  --model entity_transformer \
+  --id-embed-init prior \
+  --history "$HISTORY" \
+  --bc-init "$BC_OUT" \
+  --epochs "$RL_EPOCHS" \
+  --seed "$SEED" \
+  --device cpu 2>&1 | tee -a "$RUN_LOG"
 
 echo "[job] $ARM seed $SEED done -> $RL_OUT"
 echo "[job] stage 3 (PPO) reuses the existing wrapper, one array per arm, distinct port bases:"

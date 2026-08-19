@@ -48,6 +48,44 @@ def episode_start_index(done: np.ndarray) -> np.ndarray:
     return starts
 
 
+def episode_split(
+    done: np.ndarray, val_frac: float, seed: int
+) -> tuple[list[int], list[int]]:
+    """Train/val row indices split by WHOLE EPISODE rather than by row.
+
+    `random_split` over rows is the default everywhere in this project, and for a single-turn
+    observation it is defensible: consecutive turns are correlated, but the input is one frame and
+    the leakage is bounded. With trajectory context it stops being defensible for an obvious reason
+    -- a validation row's window is built from frames that are themselves inputs of the neighbouring
+    TRAINING rows, so the two sets overlap in their raw material even though no row is shared.
+
+    Splitting on episodes removes the question: a validation battle contributes none of its turns to
+    training, so a gain has to come from generalising across battles. Episodes are assigned in
+    shuffled order until the row quota is met, so the realised val fraction lands near `val_frac`
+    but is not exact -- episodes are 1 to ~200 turns and cannot be cut.
+    """
+    ends = np.flatnonzero(np.asarray(done, dtype=bool))
+    if ends.size == 0:
+        raise ValueError("cannot split by episode: the shard's `done` column is all False")
+    starts = np.concatenate(([0], ends[:-1] + 1))
+
+    order = np.random.default_rng(seed).permutation(len(ends))
+    target = int(len(done) * val_frac)
+    val_rows: list[int] = []
+    val_episodes = set()
+    for episode in order:
+        if len(val_rows) >= target:
+            break
+        val_episodes.add(int(episode))
+        val_rows.extend(range(int(starts[episode]), int(ends[episode]) + 1))
+
+    in_val = np.zeros(len(done), dtype=bool)
+    in_val[val_rows] = True
+    # Rows past the final `done` belong to a truncated trailing episode; they are kept in train
+    # rather than dropped, matching how `segment_episodes` treats them.
+    return np.flatnonzero(~in_val).tolist(), sorted(val_rows)
+
+
 def window_indices(index: int, start: int, history: int) -> list[int]:
     """Row indices for the window ending at ``index``; ``-1`` marks a zero-padded frame."""
     if history < 0:

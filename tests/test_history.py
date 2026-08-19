@@ -20,6 +20,7 @@ import torch
 from rotomai.data.history import (
     HistoryBuffer,
     PerBattleHistory,
+    episode_split,
     episode_start_index,
     stack_history,
     window_indices,
@@ -258,3 +259,48 @@ def test_trajectory_context_actually_reaches_the_output():
     b = torch.cat([torch.randn(1, 2, OBS_DIM).abs(), now], dim=1)
     with torch.no_grad():
         assert not torch.allclose(model(a)[0], model(b)[0])
+
+
+# --------------------------------------------------------------------------- #
+# Episode-grouped train/val split
+# --------------------------------------------------------------------------- #
+
+
+def test_an_episode_split_puts_no_battle_on_both_sides():
+    """The property the whole thing exists for: a val battle contributes no turn to training."""
+    done = np.zeros(60, dtype=bool)
+    done[9::10] = True
+    train, val = episode_split(done, val_frac=0.2, seed=0)
+    assert set(train).isdisjoint(val)
+    assert sorted(train + val) == list(range(60))
+    for episode in range(6):
+        rows = set(range(episode * 10, episode * 10 + 10))
+        assert rows <= set(train) or rows <= set(val), f"episode {episode} straddles the split"
+
+
+def test_an_episode_split_lands_near_the_requested_fraction():
+    """Episodes are 1..~200 turns and cannot be cut, so the realised fraction is near, not exact."""
+    done = np.zeros(1000, dtype=bool)
+    done[9::10] = True
+    _, val = episode_split(done, val_frac=0.1, seed=0)
+    assert 0.08 <= len(val) / 1000 <= 0.13
+
+
+def test_an_episode_split_is_seed_deterministic_and_seed_sensitive():
+    done = np.zeros(200, dtype=bool)
+    done[9::10] = True
+    assert episode_split(done, 0.2, seed=3) == episode_split(done, 0.2, seed=3)
+    assert episode_split(done, 0.2, seed=3) != episode_split(done, 0.2, seed=4)
+
+
+def test_an_episode_split_needs_boundaries():
+    with pytest.raises(ValueError, match="all False"):
+        episode_split(np.zeros(10, dtype=bool), 0.1, 0)
+
+
+def test_rows_past_the_last_boundary_stay_in_train():
+    """A truncated trailing episode is kept, matching how `segment_episodes` treats it."""
+    done = np.zeros(25, dtype=bool)
+    done[9] = done[19] = True
+    train, val = episode_split(done, val_frac=0.4, seed=0)
+    assert set(range(20, 25)) <= set(train)

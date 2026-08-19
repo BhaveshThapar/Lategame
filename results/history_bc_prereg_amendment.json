@@ -1,0 +1,42 @@
+{
+  "schema": "rotomai.gate.prereg_amendment/1",
+  "amends": "results/history_bc_prereg.json",
+  "gate": "history_bc",
+  "written_at": "2026-08-19",
+  "status": "WRITTEN AFTER SEEING THE STAGE 1+2 NUMBERS. This is an errata and a clarification for FUTURE gates. It does NOT retroactively change how the v30h run is adjudicated, and the original pre-registration file is left byte-for-byte as it was committed before the run.",
+  "why_this_file_exists": "The original's kill criterion reads 'AWR value-MAE above 0.60 on either arm -> the critic did not fit and the AWR stage is not interpretable; report and stop rather than proceeding to PPO'. It does not say whether 'on either arm' means per SEED or per ARM MEAN, and the run produced a result that separates the two readings. Resolving that ambiguity after seeing the numbers, in the direction that permits proceeding, is exactly the failure pre-registration exists to prevent -- so the ambiguity is recorded here and the strict reading was honoured.",
+  "what_happened": {
+    "value_mae_per_seed": {
+      "control_s0": 0.5305,
+      "control_s1": 0.6304,
+      "control_s2": 0.5584,
+      "hist_s0": 0.4323,
+      "hist_s1": 0.5366,
+      "hist_s2": 0.4689
+    },
+    "value_mae_arm_mean": {
+      "control": 0.5731,
+      "hist": 0.4793
+    },
+    "per_seed_reading": "TRIPPED -- control seed 1 at 0.6304 exceeds 0.60.",
+    "arm_mean_reading": "PASSED -- both arm means are under 0.60.",
+    "which_was_honoured": "PER SEED, the strict reading. It is also the reading the project's own idiom uses: docs/RESULTS.md quotes value-MAE per seed ('3 AWR seeds healthy (value-MAE 0.452/0.476/0.554)').",
+    "decision": "STOP. The PPO stage was NOT launched on the v30h AWR checkpoints.",
+    "note_against_self_interest": "The trip is on the CONTROL arm, not the arm under test, which makes proceeding tempting and is precisely why the strict reading was taken rather than argued around."
+  },
+  "clarification_for_future_gates": {
+    "rule": "A per-seed threshold is TRIPPED IF ANY SEED TRIPS IT, unless the gate says 'arm mean' in those words. Gates that intend an arm-level statistic must name the statistic AND its dispersion (e.g. 'mean value-MAE over 3 seeds, reported with the seed spread').",
+    "applies_from": "the next gate declared after 2026-08-19; NOT to v30h"
+  },
+  "second_finding_not_a_kill_criterion": {
+    "what": "BC validation accuracy moved far more than expected: control 0.6562 +/- 0.0062, hist 0.7708 +/- 0.0551. The +0.115 gap is large and the history arm's seed spread is ~9x the control's.",
+    "confounds_tested_and_not_supported": [
+      "Neighbour leakage from the row-level random split. Measured on the trained checkpoints: val accuracy by how many of the 4 preceding frames were training rows is 0.6845 / 0.7229 / 0.7024 for 2/3/4 -- flat, not monotone. LOW POWER, because 94% of val rows have >=3 of 4 preceding frames in train, so there is little contrast.",
+      "Degenerate action persistence. 'Repeat the previous action' scores 0.2081 on mid-episode rows against a majority-class baseline of 0.2123, so the gain is not trivial repetition."
+    ],
+    "confound_still_open": "A random split over ROWS on temporally correlated turns, generally. Settled by re-running BC with an EPISODE-GROUPED split (rotomai/data/history.py::episode_split), where a validation battle contributes no turn to training.",
+    "status": "BUILD=v30e submitted 2026-08-19, STAGE=bc SPLIT=episode, same two arms and seeds.",
+    "how_to_read_it": "If the arm gap survives an episode split, the secondary readout is real. If it collapses, the 0.7708 must not be published as a generalisation result, and the v30h BC numbers stand only as a row-split measurement."
+  },
+  "unchanged": "Every other term of the original pre-registration stands: the arms, the seeds, the primary readout (seed-pooled score rate vs SimpleHeuristicsPlayer at n=3000), the bands (|delta| < 0.030 is NULL), the stopping rule, and NULL as the pre-registered likeliest outcome."
+}

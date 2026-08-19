@@ -37,6 +37,9 @@ class BCDataset(Dataset):
         self.mask = torch.from_numpy(data["mask"]).bool()
         self.battle_format = battle_format
         self.codec = codec
+        #: Episode boundaries when the shard carries them. Kept regardless of `history` because the
+        #: EPISODE-GROUPED train/val split needs them even at history=0 -- see `episode_split`.
+        self.done = np.asarray(data["done"], dtype=bool) if "done" in data else None
 
         self.history = history
         if history:
