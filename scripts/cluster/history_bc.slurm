@@ -20,15 +20,29 @@
 # checkpoint. That also means no port to allocate, so this wrapper is the one thing in
 # scripts/cluster/ that cannot collide with a concurrent job over ws://localhost.
 #
-# Only 4 tasks run concurrently (tron caps a user at cpu=32,mem=256G and each task asks 8/64G), so
-# budget in TASK-HOURS / 4: 6 tasks x ~2-4 h = ~12-24 task-hours, i.e. ~4-7 h wall-clock. The
-# history arm is slower per step -- 5 frames means 5x the tokens through the encoder -- and that
-# cost is REPORTED, not adjudicated (see the pre-registration).
+# COST, MEASURED BEFORE SUBMITTING rather than projected from the token count. Benchmarked on this
+# box at 8 threads, batch 256, the trainer's default d128/2L/4H arch:
+#
+#     history=0    252 ms/step   1.02 min/epoch over the 61,766-row BC shard
+#     history=4   1476 ms/step   5.93 min/epoch          -- 5.8x, not the 5x the token count suggests
+#
+# So a task is roughly:  control  BC 20ep ~20 min + AWR 30ep ~1.5 h  = ~2 h
+#                        history  BC 20ep ~2 h   + AWR 30ep ~8.7 h   = ~10.6 h
+#
+# AWR dominates because it runs 30 epochs over the 119,996-row RL shard and fits a critic as well as
+# an actor. Only 4 tasks run concurrently (tron caps a user at cpu=32,mem=256G and each asks 8/64G),
+# so 6 tasks is ~37 task-hours and ~11 h wall-clock, set by the slowest history arm.
+#
+# THE WALL CLOCK IS 24h AND THAT IS NOT PADDING. At 12h the history arm had ~1.4 h of margin against
+# an estimate whose AWR term is the least certain part of it, and `ppo_continue_gate`-style work has
+# no resume here: a walltime kill loses the whole arm, not the last epoch. medium allows 2 days
+# (`sacctmgr show qos where name=medium`), so the headroom is free -- Slurm bills what is used, not
+# what is asked for.
 #
 #SBATCH --job-name=ra-histbc
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/slurm/slurm-%x-%A_%a.out
 # NOTE: no --gres=gpu. The net is 4.56M parameters and RAM is the binding constraint.
 
@@ -36,6 +50,12 @@ set -euo pipefail
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [[ -f "$COMMON_DIR/_job_common.sh" ]] || COMMON_DIR="${SLURM_SUBMIT_DIR:-$COMMON_DIR}/scripts/cluster"
 source "$COMMON_DIR/_job_common.sh"
+
+# torch otherwise sizes its thread pool from the NODE's core count, not the cgroup's, and on a
+# shared node that oversubscribes the 8 CPUs this task was actually allocated -- which shows up as a
+# slower run rather than an error, and would make the measured per-epoch costs above wrong.
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+export MKL_NUM_THREADS="$OMP_NUM_THREADS"
 
 BUILD="${BUILD:?set BUILD, e.g. BUILD=v30h sbatch --array=0-5 ...}"
 TASK="${SLURM_ARRAY_TASK_ID:-0}"
