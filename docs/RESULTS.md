@@ -3771,3 +3771,61 @@ No strength number. The primary readout is the seed-pooled score rate vs `Simple
 after PPO, and PPO did not run. **A BC accuracy gain is not a strength result** — this project has
 already measured a BC warm start contributing 0.6485 accuracy and nothing at all to final strength
 (Build 21). The bands (|delta| < 0.030 is NULL) remain unread.
+
+## Build 34 — THE SPLIT CONFOUND IS DEAD. THE HISTORY GAIN IS REAL, AND BIGGER THAN THE ROW SPLIT SHOWED.
+
+Job `7282958`, `BUILD=v30e STAGE=bc SPLIT=episode`, six tasks, all COMPLETED 0:0. Control 15 min,
+history ~1h23 per task — BC only, so ~20% of a v30h task.
+
+`results/history_bc_split_check.json`.
+
+| split | arm | per-seed BC val-acc | mean | sd |
+|---|---|---|---|---|
+| row | control | 0.6524 / 0.6634 / 0.6530 | 0.6562 | 0.0062 |
+| row | hist | 0.7082 / 0.7921 / 0.8122 | 0.7708 | 0.0551 |
+| **episode** | control | 0.6419 / 0.6547 / 0.6307 | **0.6424** | 0.0120 |
+| **episode** | hist | 0.8153 / 0.8080 / 0.7904 | **0.8046** | 0.0128 |
+
+**gap: +0.1146 (row) -> +0.1622 (episode).**
+
+### THE PREDICTION WAS THAT THE GAP WOULD COLLAPSE. IT GREW.
+
+Build 33 flagged the row-level split as the last untested confound: a validation row's history window
+is built from frames that are themselves inputs of neighbouring TRAINING rows, so train and val
+overlap in raw material even though no row is shared. The episode-grouped split
+(`rotomai.data.history.episode_split`) removes the question — a validation battle contributes no turn
+to training, realised at 55,587 train / 6,179 val rows with no battle spanning both.
+
+A leakage artifact shrinks under a stricter split. This one **widened by 0.0476**, and the history
+arm's seed spread **collapsed from 0.0551 to 0.0128** — the row-split history runs were the noisy
+ones. Both facts point the same way: the row split was *understating* the effect, not manufacturing
+it.
+
+### THE OFF-BY-ONE CHECK, BECAUSE +0.16 DESERVES ONE
+
+The one mechanism that would produce exactly this signature is a shard whose `obs[t]` already
+reflects `action[t]` — then the window carries the label and every history number is worthless.
+Tested directly: for rows whose action is a switch to ego slot `k`, is slot `k` marked active
+(feature 1 of its Pokemon block) in `obs[t]` or in `obs[t+1]`?
+
+    target slot active in obs[t]     0.000   <- a leak would be high
+    target slot active in obs[t+1]   0.845   <- correct alignment
+
+`obs[t]` is the state BEFORE the action, as it should be. (The 0.155 miss at `t+1` is ordinary: the
+mon can be KO'd on entry, or a forced switch intervenes.) A second, independent argument for the same
+conclusion: if `obs[t]` leaked `action[t]`, the **history=0** arm would also score near 1.0. It scores
+0.6424.
+
+### WHAT THIS IS, AND WHAT IT IS NOT
+
+**It is** a clean imitation result on an episode-disjoint split: four turns of trajectory context
+take next-action prediction on human gen9ou replays from 0.642 to 0.805, three seeds, tight spread.
+
+**It is not a strength result and must not be quoted as one.** The gate's primary readout is the
+seed-pooled score rate vs `SimpleHeuristicsPlayer` after PPO, and PPO has not run — the AWR value-MAE
+kill criterion tripped on control seed 1 (Build 33, `results/history_bc_prereg_amendment.json`).
+Build 21 measured a BC warm start contributing **0.6485 accuracy and nothing at all** to final
+strength; imitation accuracy and battle strength have already come apart once in this project, which
+is the whole reason the primary readout is a win rate and not a validation number.
+
+The bands (|delta| < 0.030 is NULL) remain unread.

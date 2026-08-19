@@ -140,13 +140,20 @@ which is exactly why it was not argued around. The ambiguity and the wording fix
 in [`results/history_bc_prereg_amendment.json`](results/history_bc_prereg_amendment.json), a separate
 dated file; the original pre-registration is untouched.
 
-BC accuracy did move a long way — control **0.6562 ± 0.0062**, history **0.7708 ± 0.0551** — and two
-attempts to explain it away both failed: neighbour leakage from the row-level split is flat across
-exposure (0.6845 / 0.7229 / 0.7024, though at low power), and "repeat the previous action" scores
-0.2081 against a 0.2123 majority baseline. The one confound still open is the row-level split itself,
-now being re-read with an episode-grouped split where no battle spans train and val. **No strength
-number is claimed**: the primary readout needs PPO, and this project has already measured a BC
-warm-start contributing nothing to final strength.
+**The imitation result survived every attempt to break it.** Four turns of trajectory context take
+next-action prediction on human replays from **0.6424 ± 0.0120 to 0.8046 ± 0.0128** — and that is on
+an *episode-disjoint* split, where no battle contributes turns to both training and validation. The
+row-level split had shown +0.115; the stricter split shows **+0.162**. A leakage artifact shrinks
+under a stricter split, so the row split was understating the effect rather than manufacturing it.
+Three prior explanations were tested and all failed: neighbour leakage (flat across exposure),
+degenerate action persistence (0.2081 against a 0.2123 majority baseline), and an off-by-one shard
+alignment (the switch target is active in `obs[t]` 0.000 of the time and in `obs[t+1]` 0.845).
+[`results/history_bc_split_check.json`](results/history_bc_split_check.json).
+
+**No strength number is claimed, and this one is not it.** The primary readout needs PPO, which is
+blocked. This project has already measured a BC warm-start contributing 0.6485 accuracy and *nothing*
+to final strength — imitation accuracy and battle strength have come apart here before, which is why
+the primary readout is a win rate.
 
 Its blocking precondition has passed. The human-replay BC shard was lost to a scratch teardown and
 cannot be re-fetched without confounding the comparison, so it is **reconstructed** from the
@@ -182,7 +189,7 @@ that had to be measured rather than guessed.
 | a training build | **107 task-hours ≈ 32 h wall-clock**, 9 arms × 120–160 PPO iterations, 4.8–5.3 min/iter |
 | real parallelism | **4 concurrent tasks**, not 9 — the `tron` QoS caps a user at `cpu=32,mem=256G` and every job asks 8 CPU / 64 GB, so estimate in **task-hours ÷ 4** |
 | binding constraint | **disk, not time** — ~17.5 MB/checkpoint × 160 iterations × 9 arms ≈ **23 GB** per build |
-| durable record | 251 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
+| durable record | 252 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
 
 **The bug worth stating out loud: two jobs on one node silently shared a simulator.** poke-env's
 `LocalhostServerConfiguration` hardcodes `ws://localhost:8000`. Slurm array tasks routinely land on
@@ -350,7 +357,7 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every published number was produced from files that exist only on the machine that
-ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 251
+ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 252
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`rotomai/features/data/`), and the pinned simulator rev.
@@ -372,7 +379,7 @@ Every checkpoint those records name is present on the machine that produced them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-251 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+252 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs

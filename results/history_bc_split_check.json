@@ -1,0 +1,73 @@
+{
+  "schema": "rotomai.gate.history_bc_split_check/1",
+  "question": "Is the history arm's BC gain an artifact of the row-level random train/val split?",
+  "why": "A row split leaves a validation row's history window built from frames that are inputs of neighbouring TRAINING rows. An episode-grouped split holds out whole battles, so a gain must generalise across them.",
+  "jobs": {
+    "row": "7279778 (BUILD=v30h)",
+    "episode": "7282958 (BUILD=v30e, STAGE=bc SPLIT=episode)"
+  },
+  "protocol": {
+    "epochs": 20,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "model": "entity_transformer, id_embed_init=prior",
+    "shard": "data/gen9ou_v7_bc_rebuilt.npz",
+    "episode_split_realised": "55587 train / 6179 val rows (0.100); no battle spans both"
+  },
+  "results": {
+    "row": {
+      "control": {
+        "val_acc": [
+          0.6523639896373057,
+          0.6633743523316062,
+          0.6530116580310881
+        ],
+        "mean": 0.65625,
+        "sd": 0.006178362703477649
+      },
+      "hist": {
+        "val_acc": [
+          0.7082253886010362,
+          0.792098445595855,
+          0.8121761658031088
+        ],
+        "mean": 0.7708333333333334,
+        "sd": 0.05514158838736846
+      },
+      "gap": 0.11458333333333337
+    },
+    "episode": {
+      "control": {
+        "val_acc": [
+          0.6418514322705939,
+          0.6546716152977247,
+          0.6307369101486748
+        ],
+        "mean": 0.6424199859056645,
+        "sd": 0.011977477512813457
+      },
+      "hist": {
+        "val_acc": [
+          0.8153422883961806,
+          0.8079715991608843,
+          0.7904007756948933
+        ],
+        "mean": 0.8045715544173194,
+        "sd": 0.012813664274937188
+      },
+      "gap": 0.1621515685116549
+    }
+  },
+  "verdict": "NOT AN ARTIFACT. The gap GREW under the stricter split (+0.1146 row -> +0.1622 episode), and the history arm's seed spread collapsed (0.0551 -> 0.0128). A leakage artifact would have shrunk the gap, not widened it.",
+  "alignment_check": {
+    "what": "obs[t] must be the state BEFORE action[t]; an off-by-one would put the label in the window.",
+    "method": "for rows whose action is a switch to ego slot k, is slot k marked active in obs[t] or obs[t+1]?",
+    "target_active_in_obs_t": 0.0,
+    "target_active_in_obs_t_plus_1": 0.845,
+    "conclusion": "correctly aligned; no off-by-one leak"
+  },
+  "not_claimed": "This is IMITATION accuracy, not strength. The gate's primary readout is the seed-pooled score rate vs SimpleHeuristicsPlayer after PPO, which has not run -- the AWR kill criterion tripped (results/history_bc_prereg_amendment.json). Build 21 measured a BC warm start contributing 0.6485 accuracy and nothing to final strength, so a BC gain does not license a strength claim."
+}
