@@ -286,13 +286,13 @@ than reporting them as a failed download.
 ## Develop
 
 ```bash
-pytest            # 941 tests. MEASURED on a full dev box (node ON PATH, a local server up,
-                  #   checkpoints/ and data/ staged): 934 pass, 7 skip. The 7 are the opt-in
-                  #   live-client smoke plus the server/node-gated simulator tests.
-                  #   Skips are all self-gating on things a clone does not have -- a local server,
-                  #   a built dist/, checkpoints/, data/, replays/ -- so a bare clone skips MORE
-                  #   and passes fewer, and that is the condition CI runs under. Every gated test
-                  #   names its reason; an UNexplained skip is a regression, not noise.
+pytest            # 942 tests, both figures MEASURED rather than projected.
+                  #   Full dev box (node ON PATH, a local server up, checkpoints/ + data/ +
+                  #     replays/ staged):            935 pass,  7 skip
+                  #   Fresh worktree (none of the above, which is CI's condition):
+                  #                                  919 pass, 23 skip
+                  #   Every one of the 23 self-gates on something a clone does not have and names
+                  #   its reason. An UNexplained skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form -- and `python -m pytest` has already
                   #   hidden a total collection failure here once.
