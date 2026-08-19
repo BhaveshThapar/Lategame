@@ -97,6 +97,10 @@ class OfflineRLConfig:
     id_embed: bool = True
     id_embed_dim: int = 32
     id_embed_init: str = "random"  # "random" | "prior"
+    # Trajectory context (transformer only). Must MATCH the warm-start checkpoint's history: the
+    # strict state-dict load would otherwise fail on `time_embed`, and a silent mismatch would
+    # train a sequence critic on single-turn features. 0 is exact identity.
+    history: int = 0
     # Fixed value support: when both set, skip deriving it from the shard's returns.
     # The self-play loop pins these to the warm-start checkpoint's support so the
     # carried-over value head stays calibrated across iterations.
@@ -113,6 +117,7 @@ class OfflineRLConfig:
             "id_embed": self.id_embed,
             "id_embed_dim": self.id_embed_dim,
             "id_embed_init": self.id_embed_init,
+            "history": self.history,
         }
 
 
@@ -214,7 +219,7 @@ def train_offline_rl(data_path: str | Path, out_path: str | Path, config: Offlin
     device = select_device(config.device)
     print(f"training on {device}")
 
-    dataset = RLDataset(data_path)
+    dataset = RLDataset(data_path, history=config.history)
     codec = codec_for(dataset.battle_format)
     print(f"codec: {codec.name} (obs {codec.obs_dim}, {codec.n_actions} logits)")
     if config.v_min is not None and config.v_max is not None:

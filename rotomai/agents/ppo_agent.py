@@ -25,6 +25,7 @@ from pathlib import Path
 from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder
 
+from rotomai.agents.history_input import observe
 from rotomai.agents.offline_rl_agent import (
     CHECKPOINT_ENV_VAR,
     DEFAULT_CHECKPOINT,
@@ -69,6 +70,10 @@ class PPORecordingAgent(PPORecordMixin, OfflineRLAgent):
             self.dropped += 1
             return self.choose_default_move()
 
+        # The WINDOW, not the turn: what the model consumed is what the PPO update has to
+        # recompute log-probs on, or the ratio is between two different functions. The rollout
+        # buffer stacks on dim 0, so a [K+1, D] row flows through as [B, K+1, D] unchanged.
+        obs_np = observe(self._frames, battle, obs_np)
         obs = torch.from_numpy(obs_np).float().unsqueeze(0)
         mask = torch.from_numpy(mask_np).unsqueeze(0)
         with torch.no_grad():

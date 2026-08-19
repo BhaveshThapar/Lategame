@@ -1,0 +1,72 @@
+{
+  "schema": "rotomai.gate.prereg/1",
+  "gate": "history_bc",
+  "written_at": "2026-08-18",
+  "status": "PRE-REGISTERED -- written and committed BEFORE the first training job is submitted",
+  "why": "The public ranked ladder came back WEAK (Elo 1004 / GXE 30%, results/live_ladder_gen9ou_prereg.json), and that run's own pre-registered expectation named the diagnosis in advance: the policy 'decides from a 761-d single-turn observation with no trajectory context' and 'a weak result diagnoses the replay-data axis'. This gate tests that standing prediction rather than retrofitting an explanation to it. The human-level results this project benchmarks against came from sequence models over historical gameplay; this is the smallest honest version of that lever.",
+  "what_is_NOT_being_tested_and_why": "Plain BC-on-human-replays followed by AWR is NOT this experiment, because this project has already run it and booked the answer: docs/RESULTS.md records Gate B RED and Gate B2 RED (offrl vs random 0.063 against a 0.55 bar), and a from-scratch control matched the BC warm-start at 0.6485 accuracy EXACTLY -- the warm start contributed nothing to final strength. The deployed ladder checkpoint ppo_v26b_s0 already descends from offrl_gen9ou_wide_s0, so the human-replay lineage is inside the agent that scored 1004. Re-running it flat would re-measure a null. The flat lineage appears here as the CONTROL arm, which is the only role the record supports.",
+  "data": {
+    "rl_shard": "data/gen9ou_v7_rl.npz",
+    "rl_shard_sha256": "6ba40c208a31e77dbbe698c2123b70380e4a730af586717c4ca3f3e69a13a17b",
+    "rl_shard_rows": 119996,
+    "bc_shard": "rebuilt by scripts/rebuild_bc_shard.py from the RL shard",
+    "bc_shard_rows_expected": 61766,
+    "bc_shard_rows_recorded": 61723,
+    "note": "data/gen9ou_v7_bc.npz and the 2,760 source replays under replays/gen9ou/ are both off disk, and scripts/cluster/README.md forbids re-fetching because Showdown's live search index has drifted -- a re-fetch would confound this comparison with data rather than the lever. The BC rows are therefore reconstructed from the surviving RL shard by pairing each replay's two POV episodes and taking the higher terminal reward as the winner. Measured before this file was written: 61,766 rows against the recorded 61,723, a 0.07% difference. The sign-of-terminal-reward shortcut gives 62,425 (1.1%) and is NOT used.",
+    "blocking_precondition": "scripts/bc_shard_fidelity_gate.py must return PASS (|mean BC val-acc - 0.647| <= 0.020 over 3 seeds) before ANY arm below is submitted. If it FAILS, this gate does not run and the reconstruction is reported as rejected."
+  },
+  "arms": {
+    "control": {
+      "history": 0,
+      "note": "The existing flat lineage, re-run on the reconstructed shard so the two arms differ ONLY in trajectory context. Not the published checkpoint: comparing a new arm against an old run would confound the lever with the run, and this project has measured identical checkpoints 0.027 apart across runs."
+    },
+    "arm": {
+      "history": 4,
+      "note": "Four previous turns plus the current one. One K, chosen before running and not swept: a sweep with this budget would select the best of several noisy reads, which is the selection bias scripts/seed_strength_gate.py exists to avoid."
+    },
+    "shared": {
+      "model_type": "entity_transformer",
+      "id_embed": true,
+      "id_embed_init": "prior",
+      "seeds": [0, 1, 2],
+      "stages": "BC on the reconstructed shard -> AWR (offline RL) warm-started from that BC -> PPO self-play warm-started from the AWR checkpoint",
+      "note": "Both arms share every other hyperparameter, the same shard, the same seeds and the same eval protocol. history is the only difference."
+    }
+  },
+  "primary_readout": {
+    "metric": "seed-pooled score rate vs poke-env's SimpleHeuristicsPlayer on gen9ou, 12-team committed pool, greedy read at LoopGuard 4.0",
+    "n_per_arm": 3000,
+    "tool": "scripts/seed_strength_gate.py",
+    "note": "The same opponent and protocol as the published 0.7303 headline, so the arm's number is directly comparable to a figure an outside reader can already situate. Every seed's best checkpoint is scored and pooled -- selection-free -- and BOTH inference levels are reported: `pooled` (these checkpoints) and `seed_level` (the training procedure)."
+  },
+  "secondary_readouts": [
+    "BC validation accuracy per arm (does trajectory context help imitation at all, before any RL)",
+    "AWR value-MAE per arm (a sequence critic that cannot fit the value function invalidates the AWR stage regardless of strength)",
+    "score rate vs the in-repo `heuristic`, as the within-run control the simpleheuristics rebase established"
+  ],
+  "bands": {
+    "scale": "Difference in seed-pooled score rate vs SimpleHeuristicsPlayer, arm minus control.",
+    "NULL": "|delta| < 0.030 -- NOT A RESULT. This project's standing measurement rule (docs/RESULTS.md): identical checkpoints scored 0.472 and 0.499 in two separate runs, 0.027 apart against a 0.023 SE, so cross-run differences below ~0.03 are noise.",
+    "POSITIVE": "delta >= +0.030 with the pooled z-test significant. Trajectory context helps, and the ladder diagnosis is supported.",
+    "NEGATIVE": "delta <= -0.030. Trajectory context hurts at this budget; the ladder loss is not primarily the missing time axis."
+  },
+  "reported_not_adjudicating": [
+    "wall-clock and task-hours per arm (the history arm is ~5x the tokens per forward pass and will be slower; that is a cost, not a result)",
+    "parameter count delta (one time embedding, d_model x n_frames)",
+    "per-seed spread, which the seed_level block reports separately because between-seed sd has measured ~2.5x the within-seed binomial",
+    "any live ladder reading -- a rated run needs its own pre-registration and is not part of this gate"
+  ],
+  "stopping_rule": "Three seeds per arm, submitted once. No extra seed added after seeing the numbers, and no K swept in after a NULL. If an arm dies (preemption, OOM), its seed is re-run at the SAME configuration and the re-run is recorded; a seed that cannot be completed is reported as an achieved n of 2, not silently dropped -- scripts/merge_gate_seeds.py still prints a verdict on a dropped seed and that is how power gets halved without anyone noticing.",
+  "pre_registered_expectation": "NULL is the most likely single outcome and is published either way. The budget is three seeds on a 61.8k-row shard of 2,760 human replays; the sequence-model results this lever is borrowed from used far more data. A NULL here bounds the effect at this budget rather than refuting the idea, and that bound is the useful thing -- the alternative is spending the next phase on a lever with no measured floor.",
+  "kill_criteria": [
+    "BC validation accuracy on the reconstructed shard outside 0.647 +/- 0.020 -> the shard is rejected and nothing else runs (scripts/bc_shard_fidelity_gate.py)",
+    "AWR value-MAE above 0.60 on either arm -> the critic did not fit and the AWR stage is not interpretable; report and stop rather than proceeding to PPO",
+    "PPO entropy -> 0 or vs_iter0 < 0.5 late -> COLLAPSE, the warm-start failure rotomai/train/ppo.py:74 warns about. Reported as a collapse, never as a NULL"
+  ],
+  "provenance": {
+    "deployed_checkpoint": "checkpoints/ppo_v26b_s0/iter_320.pt",
+    "deployed_checkpoint_sha256": "acb2a87d409422e86cc93e2552b2d20dc888a2eac35fc9ee54d166d6ace80b1d",
+    "obs_version": "v5-09831e17c378",
+    "note": "OBS_VERSION does NOT move for this gate. Trajectory context is assembled from unchanged 761-d frames (rotomai/data/history.py), so the encoder, every shard and every existing checkpoint stay valid -- which is load-bearing, because a bump would strand the only surviving human-replay shard. tests/test_history.py asserts that a history=0 model is byte-identical to one built before the parameter existed."
+  }
+}

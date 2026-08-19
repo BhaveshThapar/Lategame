@@ -2,10 +2,10 @@
   "schema": "rotomai.release_assets/1",
   "note": "Derived from check_artifacts.HEADLINE, not hand-kept, so it cannot drift from the claims it backs. `runnable` marks the minimum set needed to PLAY a format; the rest is provenance for a curve.",
   "verify": "python scripts/release_assets.py --verify",
-  "n_assets": 18,
+  "n_assets": 19,
   "n_runnable": 3,
   "runnable_bytes": 24298165,
-  "total_bytes": 252526522,
+  "total_bytes": 270793978,
   "missing_locally": [],
   "assets": [
     {
@@ -27,6 +27,15 @@
         "VGC corrected ladder BC 0.453 / AWR 0.467"
       ],
       "runnable": "gen9vgc2025regi -- the AWR doubles policy, and the only viable self-play warm start (the BC one carries no value support)"
+    },
+    {
+      "path": "checkpoints/offrl_gen9ou_wide_e10_s0.pt",
+      "bytes": 18267456,
+      "sha256": "2b933fca21b51ef8563874666de1959685e5a37bc90cdabc515ba12645cc8a26",
+      "backs": [
+        "paper: the diagnostic retired for a 2.7x probe-seed swing on a FIXED checkpoint"
+      ],
+      "runnable": null
     },
     {
       "path": "checkpoints/offrl_gen9ou_wide_s0.pt",

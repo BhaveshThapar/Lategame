@@ -3495,3 +3495,170 @@ reason the run was worth its ~10 hours.
 - Segments 0 and 1 carry superseded rating fields (Build 28c); the merged record is authoritative.
 
 ---
+
+## Build 30 — THE REPO BECOMES READABLE FROM OUTSIDE, AND THE AGENT BECOMES CHALLENGEABLE
+
+No experiment. Three gaps between "the work exists" and "anyone can see or use it", each of which
+had a concrete failure mode rather than being cosmetic.
+
+- **The systems story was filed where operators look, not where readers do.** Throughput
+  (209-242 battles/min at concurrency 20), the no-GPU rationale, task-hours / 4, the ~23 GB-per-build
+  disk ceiling and THE PORT COLLISION all lived in `docs/OPERATIONS.md`. New README `## Scale &
+  systems` section carries them, leading with the port collision stated as a *result*: two array
+  tasks on one node silently shared a Showdown server and battled into each other's games, no error,
+  corrupted comparisons. `OPERATIONS.md` stays the source of truth and the README links to it.
+
+- **A counted claim had rotted.** The README said **240** committed `results/*.json` in two places
+  against an actual 248. Fixed, and `tests/test_paper_and_figures.py` now fails when the write-up's
+  equivalent count drifts -- the same rot, caught by machine next time.
+
+- **THE DEMO GIF COULD NOT BE PRODUCED THE DOCUMENTED WAY, AND THE DOCUMENTED WAY WAS THE ONLY WAY.**
+  `OPERATIONS.md` describes screen-recording the saved `.html` and running two-pass `ffmpeg`. This
+  host has no `ffmpeg`, no Pillow, no chromium/node -- and **no network egress**: the
+  `play.pokemonshowdown.com/js/replay-embed.js` fetch the replay page needs returns an HTTP error, so
+  even the installed Firefox cannot render it. Measured, not assumed.
+  - Fixed by rendering the **log** instead of the sprites: `scripts/make_battle_gif.py` parses the
+    `battle-log-data` tag and draws the beats directly. It imports **nothing outside the standard
+    library** -- the 5x7 font, the rasteriser and the GIF89a/LZW encoder are all in that one file,
+    because adding an imaging dependency for one committed asset is a bad trade. 23 frames, 75 KiB
+    against the 3 MB budget. `assets/rotomai_gen9ou.gif`.
+  - **The verification problem is the interesting part.** A malformed LZW stream does not fail --
+    it decodes to plausible noise partway through -- and there is no image library here to open the
+    result with. So `tests/test_make_battle_gif.py` carries a SECOND, independent GIF decoder written
+    from the spec, and every frame of the real battle round-trips through it, including the
+    dictionary-full Clear-and-restart branch a short test never reaches. Regeneration is asserted
+    byte-identical to the committed asset.
+  - The `ffmpeg` sprite recipe is kept for a machine that has a browser, now labelled as such.
+
+- **`--mode accept` already existed and was already the default; what was missing was the service.**
+  Four changes, each with a failure it prevents:
+  - `--n 0` plays until stopped. **Refused for `--mode ladder`, before any player is built**: a rated
+    run's n IS its pre-registration, and an open-ended one is a selected sample by construction.
+  - `--out-dir` claims the next free `session_<NNN>.json` at startup. `_flush` rebuilds `--out` from
+    an empty log on start, so a restarted service erased its own history -- the failure
+    `merge_live_sessions.py` was written to work around. That script pools the segments unchanged.
+  - SIGINT/SIGTERM drain rather than kill: honoured between chunks AFTER the flush, so the battle in
+    progress finishes and is recorded; the handler removes itself so a second signal is a normal
+    interrupt. Killing mid-battle forfeits a real person's game.
+  - `teambuilding.pool.resolve_pool_path` falls back to the installed package data, so a pool loads
+    from any cwd. **`DEFAULT_*_POOL` stays REPO-RELATIVE on purpose**: its string is written into
+    every results file as `team_pool` and `merge_live_sessions.py` refuses to pool segments whose arm
+    fields disagree, so absolutising it would make one arm on two machines look like two experiments.
+  - `Dockerfile`, `deploy/rotomai-accept.service`, `requirements-live.txt`. The pins are not
+    bureaucracy: `pyproject.toml` declares `poke-env>=0.8` while `live/` is written against 0.15
+    semantics specifically (the swallowed `|nametaken|` diagnosis, `max_concurrent_battles` reading 0
+    as UNLIMITED, and poke-env neither raising nor reconnecting on a dead socket -- the whole reason
+    the watchdog exists). A resolver that picks something else yields a bot that looks connected and
+    never battles, which is not an `ImportError`.
+  - Etiquette unchanged: concurrency floor of 1, `--battle-delay`, fatal-never-retried login, and the
+    ladder double opt-in gate.
+
+Suite 817 -> 870 pass, 7 skip (824 -> 877 collected). ruff/mypy clean.
+
+---
+
+## Build 31 — THE LADDER'S OWN DIAGNOSIS, BUILT AND PRE-REGISTERED. NOT YET RUN.
+
+Build 29's pre-registration named the diagnosis in advance -- "a weak result diagnoses the
+replay-data axis" -- and the obvious reading of that is "do BC on human replays, then offline RL".
+
+**That reading is wrong, and this project's own record says so.** BC and AWR are the production
+lineage, not a missing capability. They ran end to end on 2,760 rated gen9ou replays and booked
+**Gate B RED** and **Gate B2 RED** (offrl vs random 0.063 against a 0.55 bar), and Build 21 measured
+a from-scratch control matching the BC warm-start at **0.6485 accuracy exactly** -- the warm start
+contributed nothing to final strength. `ppo_v26b_s0` already warm-starts from `offrl_gen9ou_wide_s0`,
+so the human-replay lineage is *inside* the checkpoint that scored 1004. Re-running it flat would
+re-measure a null.
+
+What has **not** been tried is the other half of the same sentence in the ladder write-up: the agent
+"decides from a 761-d **single-turn** observation with no trajectory context", while the human-level
+results this project benchmarks against came from sequence models over historical gameplay. So the
+two items fuse into one gate, with the flat lineage as the CONTROL arm -- the only role the record
+supports.
+
+- **THE SHARD IS RECONSTRUCTABLE, WHICH WAS NOT OBVIOUS.** `data/gen9ou_v7_bc.npz` and the 2,760 raw
+  replay JSONs are both off disk; `scripts/cluster/README.md:86` forbids re-fetching because the live
+  search index has drifted and a re-fetch confounds data with lever. But the RL shard survived, and
+  the two shards came out of ONE `_ShardBuilder` pass -- the BC rows are the same rows filtered to
+  the POVs that won, so only the *label* was lost.
+  - **Sign of the terminal reward is the wrong rule**: 62,425 rows against the recorded 61,723, a
+    702-row (1.1%) error. The terminal reward is `state_value(terminal) - state_value(last)`, mixing
+    the victory jump with that step's HP and faint deltas, so a losing POV that lands a big final hit
+    still diffs positive. 515 pairs on the real shard have two same-sign POVs.
+  - **Higher terminal reward of the POV PAIR is the right rule**: the shaping terms are shared
+    between the pair and cancel, leaving the victory jump as the discriminator. **61,766 rows against
+    61,723 -- 43 rows, 0.07%.** `scripts/rebuild_bc_shard.py`.
+  - The 43-row residue is structural: 5,503 episodes is odd and short of 2 x 2,760, so 17 POVs were
+    dropped as unusable at ingest and their partners are unpaired. Reported, not hidden.
+  - The rebuilt shard carries a `done` column the BC schema never had, because history-conditioned
+    training must know where an episode starts or it stacks the tail of one battle onto the head of
+    the next. Extra keys are ignored by `BCDataset`, so nothing existing changes.
+
+- **TRAJECTORY CONTEXT WITHOUT AN `OBS_VERSION` BUMP.** A wider encoder would have bumped the
+  fingerprint that every shard and checkpoint asserts -- stranding the only surviving human-replay
+  shard, whose source replays are gone. Instead history is assembled from unchanged 761-d frames:
+  `rotomai/data/history.py` defines the window ONCE and both the dataset and the live agent call it,
+  and `EntityTransformer(history=K)` tokenizes `(K+1) x 17` tokens with a learned time embedding.
+  `input_dim` stays the per-frame width, so `_layout_for` is untouched.
+  - `history=0` is asserted **byte-identical** to a model built before the parameter existed: same
+    state-dict keys, no `time_embed`, same `arch` block. `checkpoints/ppo_v26b_s0/iter_320.pt` still
+    loads strictly at 4,555,629 params and its recorded `arch` still round-trips.
+  - **The train==eval seam is the one this project has been burned on twice** (the opponent-roster
+    and own-team mismatches that took a 0.71-accuracy BC policy to random-quality play). A dataset
+    stacker plus a separate live ring buffer would be that failure with a third chance, so
+    `tests/test_history.py` asserts the two produce identical tensors turn for turn, including across
+    a battle boundary.
+  - Refusals rather than silent reinterpretation: the flat MLP refuses `--history`, the pp
+    augmentations refuse to combine with it (they index a single turn's `OBS_LAYOUT` offsets), and a
+    BC shard without `done` refuses to be windowed.
+
+- **PRE-REGISTERED, WITH A BLOCKING PRECONDITION.** `results/history_bc_prereg.json`: control
+  `history=0` vs arm `history=4`, seeds 0/1/2, BC -> AWR -> PPO, primary readout the seed-pooled
+  score rate vs `SimpleHeuristicsPlayer` at n=3000 through `seed_strength_gate.py`. Bands honour the
+  standing measurement rule: |delta| < 0.030 is NULL, not a result. **NULL is named in advance as
+  the likeliest single outcome.** One K, declared before running and not swept -- a sweep at this
+  budget selects the best of several noisy reads.
+  - The precondition: `scripts/bc_shard_fidelity_gate.py` must PASS (|mean BC val-acc - 0.647| <=
+    0.020 over 3 seeds, against the recorded 0.647 +/- 0.002) before any arm is submitted. Row-count
+    agreement is necessary and NOT sufficient -- taking the wrong POV of every pair would also give
+    the right number of rows. `scripts/cluster/history_bc.slurm` refuses to start without a PASS
+    on disk.
+  - **Band width is deliberate and stated**: 0.020, not the recorded 0.002 seed spread, because the
+    recorded run's epoch count is not in the record and a band tight enough to catch a schedule
+    difference would fail for reasons unrelated to the reconstruction. A first pass at 6 epochs read
+    0.6227 with the best epoch being the LAST one -- undertrained, and the reason the gate runs at
+    the trainer's default 20.
+  - A negative control is scored alongside: the same training on the shard the SIGN rule would have
+    produced. If both arms pass, the gate is reported as having no teeth rather than as a result.
+
+- **NOT SUBMITTED.** The wrappers are staged and the submit commands are printed; scavenger is
+  holding an unrelated 40-task chain and the QoS caps useful parallelism at four tasks.
+
+---
+
+## Build 32 — THE WRITE-UP, AND FIGURES THAT CANNOT DRIFT
+
+`paper/rotomai.md` and `blog/rotomai.md`. The claim is the methodology one, not the Pokemon one: what
+it costs to measure a small effect in self-play RL, and why a bot-baseline win rate does not license
+a claim about human-relative strength.
+
+- **Figures are generated from `results/*.json`, not drawn.** `scripts/make_figures.py` emits SVG by
+  hand -- matplotlib is not installed and three figures do not justify the dependency. SVG is also
+  the better artifact here: it is text, so a figure diffs like code and a moved number shows up as a
+  changed line. `make_figures.py --check` fails if a committed figure is no longer what the data
+  produces, and a test runs it.
+- **The figures say what is missing.** Only two of the three simpleheuristics reads survive as JSON
+  -- Build 28 lost the third to the shared `--out` -- so `fig_measurement.svg` plots two and states
+  the loss on its face rather than quietly plotting what survived.
+- **`236 pre-registered gates` is not a number this repo can support.** It appears nowhere; grep
+  returns zero hits. The write-up uses figures that can be counted (248 result JSONs, 16 gate
+  scripts, 156 `verdict` keys across 88 files) and a test forbids the unsupported one.
+- `check_artifacts.py` gains the retired gradient-noise diagnostic as a headline, because the paper
+  reports its 2.7x probe-seed swing as a result and that claim is only re-derivable from the two
+  probes differing solely in `--seed`.
+- Threats to validity are written out rather than implied: one ladder run at n=100 on one account and
+  one format, no comparison against another published agent under the same protocol, gen8-vs-gen9
+  non-comparability, two of three formats ceiling-bound, and variance estimates that are themselves
+  small-sample.
+
+Nothing is posted and nothing is pushed; that is the author's to trigger.

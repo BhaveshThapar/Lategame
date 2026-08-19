@@ -7,7 +7,8 @@ and the negative results kept.
 
 [**Results**](#results) · [**Scale & systems**](#scale--systems) · [**How it works**](#how-it-works) ·
 [**Challenge it**](#challenge-rotomai) · [**Operations**](docs/OPERATIONS.md) ·
-[**Build log**](docs/RESULTS.md) · [**Design doc**](plan.md) · [**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
+[**Build log**](docs/RESULTS.md) · [**Write-up**](paper/rotomai.md) · [**Design doc**](plan.md) ·
+[**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
 
 ![RotomAI closing out a rated gen9ou ladder game — turns 13-17, three consecutive Sucker Punch
 KOs](assets/rotomai_gen9ou.gif)
@@ -119,9 +120,24 @@ because every instrument this project had pointed at an agent field.
 
 The diagnosis is specific rather than vague: the policy never saw the human metagame. It trained on
 self-play plus a fixed heuristic, brings a committed 12-team pool against opponents who bring
-anything, and decides from a 761-d **single-turn** observation. That points at the replay-data axis
-of G3, which this repo already flagged as measured once and never scaled — so the next training
-work is BC on human replays → offline RL, not more self-play.
+anything, and decides from a 761-d **single-turn** observation with no trajectory context.
+
+**And the obvious next step is the one this repo has already measured as null.** "BC on human
+replays, then offline RL" is not missing here — it is the production lineage, it ran end to end on
+2,760 rated gen9ou replays, and it booked Gate B RED and Gate B2 RED; a from-scratch control matched
+the BC warm-start at 0.6485 accuracy *exactly*, so the warm start contributed nothing to final
+strength. The ladder checkpoint already descends from that lineage. What has **not** been tried is
+the part the ladder write-up actually indicts: the missing time axis. That is
+[`results/history_bc_prereg.json`](results/history_bc_prereg.json) — history-conditioned BC → AWR →
+PPO against the existing flat lineage as the control arm, pre-registered, NULL declared the likeliest
+outcome, not yet run.
+
+**The write-up.** The methodology result — what it costs to measure a small effect in self-play RL,
+and why a bot-baseline win rate does not license a claim about human-relative strength — is written
+up in **[paper/rotomai.md](paper/rotomai.md)**, with a shorter version in
+[blog/rotomai.md](blog/rotomai.md). Its figures are generated straight from the committed result
+JSONs by `python scripts/make_figures.py`, so a figure cannot drift from the record; a test fails if
+one does.
 
 Full experimental record, every build in the order it ran with its pre-registration and verdict:
 **[docs/RESULTS.md](docs/RESULTS.md)**. The design document, requirements and milestone roadmap are
@@ -141,7 +157,7 @@ that had to be measured rather than guessed.
 | a training build | **107 task-hours ≈ 32 h wall-clock**, 9 arms × 120–160 PPO iterations, 4.8–5.3 min/iter |
 | real parallelism | **4 concurrent tasks**, not 9 — the `tron` QoS caps a user at `cpu=32,mem=256G` and every job asks 8 CPU / 64 GB, so estimate in **task-hours ÷ 4** |
 | binding constraint | **disk, not time** — ~17.5 MB/checkpoint × 160 iterations × 9 arms ≈ **23 GB** per build |
-| durable record | 248 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
+| durable record | 249 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
 
 **The bug worth stating out loud: two jobs on one node silently shared a simulator.** poke-env's
 `LocalhostServerConfiguration` hardcodes `ws://localhost:8000`. Slurm array tasks routinely land on
@@ -261,14 +277,16 @@ than reporting them as a failed download.
 ## Develop
 
 ```bash
-pytest            # 792 tests. With the env active (node ON PATH) + a local server up: 791 pass,
-                  #   1 skip -- the opt-in live-client smoke, which ROTOMAI_LIVE_TEST=1 enables
-                  #   for 792/0. `node` on PATH is load-bearing: without it six simulator tests
-                  #   self-skip even with dist/ built; with dist/ but no server, 785 pass / 7 skip.
-                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
-                  #   and 776 pass. That is what CI runs; a 17th skip is a regression, not noise.
+pytest            # 941 tests. MEASURED on a full dev box (node ON PATH, a local server up,
+                  #   checkpoints/ and data/ staged): 934 pass, 7 skip. The 7 are the opt-in
+                  #   live-client smoke plus the server/node-gated simulator tests.
+                  #   Skips are all self-gating on things a clone does not have -- a local server,
+                  #   a built dist/, checkpoints/, data/, replays/ -- so a bare clone skips MORE
+                  #   and passes fewer, and that is the condition CI runs under. Every gated test
+                  #   names its reason; an UNexplained skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
-                  #   two agree, and CI runs the bare form.
+                  #   two agree, and CI runs the bare form -- and `python -m pytest` has already
+                  #   hidden a total collection failure here once.
 ruff check .
 mypy rotomai scripts   # both trees; CI runs the same two arguments
 ```
@@ -287,7 +305,7 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 | `rotomai/features/` | `embed_battle` 761-d singles encoder (`OBS_LAYOUT`) / 888-d doubles encoder + action-space codec |
 | `rotomai/model/` | MLP actor-critic + entity transformer + build factory |
 | `rotomai/agents/` | `heuristic`, `bc`, `offrl`, `ppo` agents |
-| `rotomai/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2) |
+| `rotomai/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2), trajectory context (`history.py`) |
 | `rotomai/train/` | BC, offline RL, self-play, PPO training loops |
 | `rotomai/search/` | R-PREDICT: forward model, determinization, expectimax, opponent model |
 | `rotomai/teambuilding/` | R-TEAM: validator-checked packed team pools for teambuilt formats |
@@ -297,6 +315,9 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 | `rotomai/live/` | M5 deploy / G1: live-server client, policy gate, session supervisor, telemetry |
 | `rotomai/cli.py` | all subcommands (eval / collect / train / data / live) |
 | `scripts/` | local Showdown server + simulator setup/run, and every experiment gate |
+| `paper/`, `blog/` | the write-up; figures regenerated from `results/` by `scripts/make_figures.py` |
+| `assets/` | the demo GIF and the SVG figures -- both generated, both committed |
+| `Dockerfile`, `deploy/` | the always-on `--mode accept` service |
 
 ---
 
@@ -304,7 +325,7 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every published number was produced from files that exist only on the machine that
-ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 248
+ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 249
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`rotomai/features/data/`), and the pinned simulator rev.
@@ -326,7 +347,7 @@ Every checkpoint those records name is present on the machine that produced them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-248 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+249 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs

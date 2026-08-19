@@ -18,6 +18,7 @@ from pathlib import Path
 from poke_env.battle import AbstractBattle
 from poke_env.player import BattleOrder, Player
 
+from rotomai.agents.history_input import _history_tracker, observe
 from rotomai.features.action_space import action_mask, action_to_order
 from rotomai.features.encoder import OBS_DIM, OBS_VERSION, embed_battle
 
@@ -75,13 +76,15 @@ class BCAgent(Player):
         self._policy_logits = policy_logits
         self._sample = sample
         self._loop_guard = LoopGuard(loop_penalty)
+        self._frames = _history_tracker(model, OBS_DIM)
 
     def choose_move(self, battle: AbstractBattle) -> BattleOrder:
         if not battle.available_moves and not battle.available_switches:
             return self.choose_default_move()
 
         torch = self._torch
-        obs = torch.from_numpy(embed_battle(battle)).float().unsqueeze(0)
+        obs = torch.from_numpy(observe(self._frames, battle, embed_battle(battle))).float()
+        obs = obs.unsqueeze(0)
         mask = torch.from_numpy(action_mask(battle)).unsqueeze(0)
         with torch.no_grad():
             logits = self._masked_logits(self._policy_logits(self._model(obs)), mask)

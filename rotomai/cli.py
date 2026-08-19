@@ -110,6 +110,7 @@ def _run_train(args: argparse.Namespace) -> None:
         model_type=args.model_type,
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
+        history=args.history,
         seed=args.seed,
         max_samples=args.max_samples,
         pp_aug_frac=args.pp_aug_frac,
@@ -173,6 +174,7 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         arch_explicit=any(v is not None for v in requested.values()),
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
+        history=args.history,
         seed=args.seed,
     )
     train_offline_rl(args.data, args.out, config)
@@ -563,6 +565,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train.set_defaults(id_embed=True)
     train.add_argument(
+        "--history", type=int, default=0,
+        help="Trajectory context: also condition on the last N turns of the same battle "
+             "(entity_transformer only). 0 is exact identity -- no extra parameter, no shape "
+             "change. Needs a shard with a `done` column; scripts/rebuild_bc_shard.py writes one",
+    )
+    train.add_argument(
         "--id-embed-init",
         default="random",
         choices=["random", "prior"],
@@ -671,6 +679,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="entity_transformer: disable learned species/move/item/ability embeddings",
     )
     train_rl.set_defaults(id_embed=True)
+    train_rl.add_argument(
+        "--history", type=int, default=0,
+        help="Trajectory context: also condition on the last N turns of the same battle "
+             "(entity_transformer only). 0 is exact identity. Must MATCH --bc-init's history, "
+             "or the strict state-dict load fails on `time_embed`",
+    )
     train_rl.add_argument(
         "--id-embed-init",
         default="random",

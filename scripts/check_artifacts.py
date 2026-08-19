@@ -97,6 +97,15 @@ HEADLINE: dict[str, tuple[str, ...]] = {
     "G5 MET -- four capabilities, each on its own gate's pass criterion": (
         "g5_capability_gate.json",
     ),
+    # `paper/rotomai.md` reports the retired gradient-noise diagnostic as a RESULT -- the instrument
+    # whose probe-seed swing (2.7x) exceeded the effect it was pre-registered to detect (2.2x). That
+    # claim is only re-derivable from the two probes that differ in nothing but `--seed`, so they
+    # are audited like any other headline. Their absence would leave a published methodology claim
+    # standing on prose alone.
+    "paper: the diagnostic retired for a 2.7x probe-seed swing on a FIXED checkpoint": (
+        "grad_noise_diag_b22_stageB0_e10.json",
+        "grad_noise_diag_b22_stageB0_e10_seed1.json",
+    ),
 }
 
 
