@@ -1,0 +1,51 @@
+{
+  "schema": "rotomai.gate.bc_shard_fidelity/1",
+  "gate": "Does the reconstructed BC shard teach what the lost one taught?",
+  "recorded": {
+    "val_acc": 0.647,
+    "seed_spread": 0.002,
+    "rows": 61723,
+    "source": "docs/RESULTS.md, the v5 BC gate (ET + dex prior, 3 seeds)"
+  },
+  "protocol": {
+    "band": 0.02,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "epochs": 20,
+    "model": "entity_transformer, id_embed_init=prior, trainer defaults otherwise"
+  },
+  "arms": [
+    {
+      "arm": "pairwise",
+      "rows": 61766,
+      "val_acc": [
+        0.6513924870466321,
+        0.6628886010362695,
+        0.6479922279792746
+      ],
+      "mean": 0.6540911053540587,
+      "seed_spread": 0.007806240333231755,
+      "delta_vs_recorded": 0.007091105354058658,
+      "verdict": "PASS"
+    },
+    {
+      "arm": "by_sign",
+      "rows": 62425,
+      "val_acc": [
+        0.662127523229734,
+        0.6539570650432553,
+        0.6650112143543736
+      ],
+      "mean": 0.6603652675424544,
+      "seed_spread": 0.0057339090574089376,
+      "delta_vs_recorded": 0.013365267542454373,
+      "verdict": "PASS"
+    }
+  ],
+  "verdict": "PASS",
+  "control_has_teeth": false,
+  "separation": -0.0062741621883957155
+}

@@ -14,7 +14,7 @@ lengthen the queue, and the binding constraints turned out to be RAM and how fas
 server can simulate battles (209–242 per minute at concurrency 20).
 
 The rule I set at the start was that every published number had to be gated on an evaluation
-declared *before* the run, and negative results had to be kept. That is now 249 committed result
+declared *before* the run, and negative results had to be kept. That is now 250 committed result
 files and a build log where about a third of the entries are things that did not work.
 
 This post is about the three findings from that discipline that have nothing to do with Pokémon.

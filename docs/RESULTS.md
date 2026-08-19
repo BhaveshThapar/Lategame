@@ -3634,6 +3634,49 @@ supports.
 - **NOT SUBMITTED.** The wrappers are staged and the submit commands are printed; scavenger is
   holding an unrelated 40-task chain and the QoS caps useful parallelism at four tasks.
 
+### Build 31b — THE SHARD FIDELITY GATE: PASS, AND A CONTROL WITH NO TEETH
+
+`results/bc_shard_fidelity_gate.json`. The blocking precondition on the history gate, run before any
+arm was submitted.
+
+| arm | rows | val-acc (3 seeds) | mean | delta vs recorded 0.647 | verdict |
+|---|---|---|---|---|---|
+| **pairwise** (the rule used) | 61,766 | 0.6514 / 0.6629 / 0.6480 | **0.6541** +/- 0.0078 | **+0.0071** | **PASS** |
+| by_sign (negative control) | 62,425 | 0.6621 / 0.6540 / 0.6650 | 0.6604 +/- 0.0057 | +0.0134 | PASS |
+
+- **PASS on the arm.** The reconstructed shard trains to +0.0071 of the recorded 0.647, inside the
+  pre-registered +/-0.020 band. The reconstruction teaches what the lost shard taught, and the
+  history gate is unblocked.
+
+- **THE CONTROL HAS NO TEETH, AND THAT IS THE FINDING.** The shard built by the WRONG rule -- the
+  sign test, carrying 702 extra rows of which ~1.1% are losing POVs -- also passes, at 0.6604.
+  Separation is **-0.0063**, i.e. the wrong shard scored *higher*, by an amount well inside the
+  0.0078 seed spread. **BC validation accuracy does not discriminate the two reconstructions.**
+  Stated rather than omitted, and reported by the gate itself (`control_has_teeth: false`), because
+  the alternative is quoting a PASS whose negative control nobody ran.
+  - What this costs: the gate confirms the shard is *usable*, not that the pairwise rule is *right*.
+  - What still justifies the pairwise rule: the row count. 43 rows off the recorded 61,723 against
+    the sign rule's 702. A rule that took the wrong POV of a meaningful fraction of pairs does not
+    land 0.07% from a number recorded before it existed. That is the evidence; this gate is
+    confirmation that the result of applying it trains normally.
+  - Why 1.1% mislabelled rows are invisible here is unsurprising in hindsight: they are ~1 row in 90,
+    and the recorded seed spread alone is 0.002 while this run's is 0.0078. An instrument would need
+    roughly an order of magnitude more resolution to see them -- which is the Build 22 lesson about
+    diagnostics whose noise exceeds their effect, arriving again from the other direction.
+
+- **THE 6-EPOCH PILOT IS WHY THE GATE RUNS AT 20.** A first pass at `--epochs 6` read **0.6227**
+  with the best epoch being the LAST one -- still climbing, i.e. undertrained, not a shard defect.
+  It would have FAILED the band (-0.024) for a reason having nothing to do with the reconstruction.
+  Recorded because it is the exact failure mode the +/-0.020 band was widened to tolerate, and it
+  showed up on the first run.
+
+- **The seed spread is 4x the recorded one** (0.0078 vs 0.002). The recorded run's epoch count is
+  not in the build log, so the schedules are not identical and the spreads are not comparable; this
+  is noted rather than explained away.
+
+**Verdict: the reconstruction is accepted, on the row count, with this gate as confirmation and its
+control's silence recorded.**
+
 ---
 
 ## Build 32 — THE WRITE-UP, AND FIGURES THAT CANNOT DRIFT

@@ -130,7 +130,16 @@ strength. The ladder checkpoint already descends from that lineage. What has **n
 the part the ladder write-up actually indicts: the missing time axis. That is
 [`results/history_bc_prereg.json`](results/history_bc_prereg.json) — history-conditioned BC → AWR →
 PPO against the existing flat lineage as the control arm, pre-registered, NULL declared the likeliest
-outcome, not yet run.
+outcome, **not yet run**.
+
+Its blocking precondition has passed. The human-replay BC shard was lost to a scratch teardown and
+cannot be re-fetched without confounding the comparison, so it is **reconstructed** from the
+surviving offline-RL shard — 61,766 rows against the 61,723 the build log records, **0.07%** — and
+[`results/bc_shard_fidelity_gate.json`](results/bc_shard_fidelity_gate.json) confirms it trains to
+0.6541 ± 0.0078 against a recorded 0.647. **Its negative control also passed**, so validation
+accuracy does not discriminate the correct reconstruction from a deliberately wrong one; the gate
+reports `control_has_teeth: false` rather than quoting the PASS alone. What justifies the
+reconstruction is the row count, not that gate.
 
 **The write-up.** The methodology result — what it costs to measure a small effect in self-play RL,
 and why a bot-baseline win rate does not license a claim about human-relative strength — is written
@@ -157,7 +166,7 @@ that had to be measured rather than guessed.
 | a training build | **107 task-hours ≈ 32 h wall-clock**, 9 arms × 120–160 PPO iterations, 4.8–5.3 min/iter |
 | real parallelism | **4 concurrent tasks**, not 9 — the `tron` QoS caps a user at `cpu=32,mem=256G` and every job asks 8 CPU / 64 GB, so estimate in **task-hours ÷ 4** |
 | binding constraint | **disk, not time** — ~17.5 MB/checkpoint × 160 iterations × 9 arms ≈ **23 GB** per build |
-| durable record | 249 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
+| durable record | 250 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
 
 **The bug worth stating out loud: two jobs on one node silently shared a simulator.** poke-env's
 `LocalhostServerConfiguration` hardcodes `ws://localhost:8000`. Slurm array tasks routinely land on
@@ -325,7 +334,7 @@ unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-c
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every published number was produced from files that exist only on the machine that
-ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 249
+ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 250
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`rotomai/features/data/`), and the pinned simulator rev.
@@ -347,7 +356,7 @@ Every checkpoint those records name is present on the machine that produced them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-249 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+250 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs
