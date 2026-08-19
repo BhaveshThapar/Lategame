@@ -9,6 +9,7 @@ import math
 
 import pytest
 
+import rotomai.eval.rating as rating
 from rotomai.eval.rating import (
     DEFAULT_RATING,
     MAX_RD,
@@ -176,3 +177,44 @@ def test_rate_win_rate_rejects_impossible_inputs():
 
 def test_zero_battles_leaves_the_prior_untouched():
     assert rate_win_rate(0.0, 0, prior=Rating(1650.0, 90.0)) == Rating(1650.0, 90.0)
+
+
+# --------------------------------------------------------------------------- #
+# The ELO scale, which is not the Glicko scale
+# --------------------------------------------------------------------------- #
+
+
+def test_an_even_record_fits_exactly_at_the_opponents_rating():
+    """The one case with a closed form: 50% against a uniform field IS that field's rating."""
+    elo, bounded = rating.elo_mle([(1500.0, 1.0), (1500.0, 0.0)])
+    assert bounded is True
+    assert elo == pytest.approx(1500.0, abs=0.01)
+
+
+def test_the_fit_reproduces_the_observed_score():
+    """Definitional: at the MLE the summed expectation equals the summed score."""
+    results = [(1045.0, 1.0)] * 7 + [(1045.0, 0.0)] * 18
+    elo, bounded = rating.elo_mle(results)
+    assert bounded is True
+    predicted = sum(rating.elo_expected_score(elo, opp) for opp, _ in results)
+    assert predicted == pytest.approx(sum(s for _, s in results), abs=1e-3)
+
+
+def test_400_points_is_ten_to_one_odds_on_the_elo_scale_too():
+    assert rating.elo_expected_score(1900.0, 1500.0) == pytest.approx(10 / 11, abs=1e-6)
+    assert rating.elo_expected_score(1500.0, 1500.0) == pytest.approx(0.5, abs=1e-12)
+
+
+@pytest.mark.parametrize("scores,expected_bounded", [([1.0, 1.0], False), ([0.0, 0.0], False)])
+def test_a_record_with_no_losses_or_no_wins_is_unbounded(scores, expected_bounded):
+    """The likelihood is monotone, so the MLE is infinite. Callers must not print the clamp."""
+    _, bounded = rating.elo_mle([(1500.0, s) for s in scores])
+    assert bounded is expected_bounded
+
+
+def test_elo_and_glicko_are_different_scales_and_the_module_says_so():
+    """The units error that produced Glicko 501 / GXE 0.024 on a session the account page scored
+    at Elo 1017 / GXE 30%. A new account starts at 1000 on one scale and 1500 on the other."""
+    assert rating.ELO_START == 1000.0
+    assert rating.DEFAULT_RATING == 1500.0
+    assert rating.ELO_START != rating.DEFAULT_RATING

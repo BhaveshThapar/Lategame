@@ -15,11 +15,12 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from rotomai.data.history import episode_start_index, stack_history
 from rotomai.features.codec import codec_for
 
 
 class BCDataset(Dataset):
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, history: int = 0) -> None:
         data = np.load(Path(path), allow_pickle=False)
         version = str(data["obs_version"].item())
         dim = int(data["obs_dim"].item())
@@ -37,8 +38,26 @@ class BCDataset(Dataset):
         self.battle_format = battle_format
         self.codec = codec
 
+        self.history = history
+        if history:
+            if "done" not in data:
+                # Refused rather than assumed. Without episode boundaries a window at the head of
+                # one battle silently splices on the tail of the previous one, and the resulting
+                # shard trains fine and means nothing. The BC schema predates `done`; the rebuilt
+                # human-replay shard carries it.
+                raise ValueError(
+                    f"history={history} needs episode boundaries, and {path} has no `done` "
+                    "column. Rebuild it with scripts/rebuild_bc_shard.py, which writes one."
+                )
+            self.episode_start = episode_start_index(data["done"])
+
     def __len__(self) -> int:
         return self.action.shape[0]
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self.history:
+            frames = stack_history(
+                self.obs, index, int(self.episode_start[index]), self.history
+            )
+            return frames, self.action[index], self.mask[index]
         return self.obs[index], self.action[index], self.mask[index]

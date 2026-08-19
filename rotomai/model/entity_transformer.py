@@ -87,6 +87,7 @@ class EntityTransformer(nn.Module):
         id_embed_dim: int = 32,
         id_embed_init: str = "random",
         layout: ObsLayout | None = None,
+        history: int = 0,
     ) -> None:
         super().__init__()
         # The token layout is a PARAMETER, defaulting to singles. G4 asks for a third format
@@ -110,6 +111,16 @@ class EntityTransformer(nn.Module):
         self.id_embed = id_embed
         self.id_embed_dim = id_embed_dim
         self.id_embed_init = id_embed_init
+        if history < 0:
+            raise ValueError("history must be >= 0")
+        # TRAJECTORY CONTEXT AS EXTRA TOKENS, NOT A WIDER OBSERVATION. `input_dim` stays the
+        # PER-FRAME width, so `_layout_for` is untouched, `OBS_VERSION` does not move, and every
+        # existing shard and checkpoint keeps working -- which matters because the human-replay
+        # shard's source replays are gone and a version bump would strand it. With history=K the
+        # forward pass sees (K+1) x n_tokens tokens instead of n_tokens, each frame carrying a
+        # learned time embedding on top of its within-frame positional one.
+        self.history = history
+        self.n_frames = history + 1
 
         self._layout = layout
         self._n_tokens = layout.n_tokens
@@ -140,6 +151,12 @@ class EntityTransformer(nn.Module):
         self.move_proj = nn.Linear(move_in, d_model)
         self.global_proj = nn.Linear(layout.global_dim, d_model)
         self.pos_embed = nn.Parameter(torch.zeros(1, layout.n_tokens, d_model))
+        # Registered ONLY when history is on, so a history=0 model's state_dict stays byte-identical
+        # to every checkpoint written before this parameter existed -- no key to ignore on load, no
+        # `strict=False` anywhere.
+        self.time_embed = (
+            nn.Parameter(torch.zeros(1, self.n_frames, 1, d_model)) if history > 0 else None
+        )
         self.input_dropout = nn.Dropout(dropout)
 
         # Actor tower.
@@ -165,6 +182,8 @@ class EntityTransformer(nn.Module):
         nn.init.normal_(self.pos_embed, std=0.02)
         nn.init.normal_(self.actor_cls, std=0.02)
         nn.init.normal_(self.critic_cls, std=0.02)
+        if self.time_embed is not None:
+            nn.init.normal_(self.time_embed, std=0.02)
         if self.id_embed and self.id_embed_init == "prior":
             self._apply_id_priors()
 
@@ -184,7 +203,7 @@ class EntityTransformer(nn.Module):
 
     def arch_config(self) -> dict[str, int | bool | str]:
         """Architecture hyperparameters for the checkpoint ``arch`` block."""
-        return {
+        config: dict[str, int | bool | str] = {
             "d_model": self.d_model,
             "n_layers": self.n_layers,
             "n_heads": self.n_heads,
@@ -193,6 +212,11 @@ class EntityTransformer(nn.Module):
             "id_embed_dim": self.id_embed_dim,
             "id_embed_init": self.id_embed_init,
         }
+        # Omitted at history=0 so the `arch` block of a flat checkpoint is unchanged, and an old
+        # checkpoint re-read through `model_metadata` still compares equal to its recorded one.
+        if self.history:
+            config["history"] = self.history
+        return config
 
     def _entity_features(
         self, block: torch.Tensor, numeric_dim: int, id_fields: tuple[str, ...]
@@ -254,8 +278,41 @@ class EntityTransformer(nn.Module):
         x = encoder(x, src_key_padding_mask=mask)
         return x[:, 0]
 
+    def _tokenize_window(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokenize a stack of frames into one (K+1) x n_tokens sequence.
+
+        Accepts ``[B, n_frames, D]`` or the flattened ``[B, n_frames * D]``, because the training
+        loops hand over a stacked tensor and a caller wiring one observation at a time finds the
+        flat form more natural. Frame order is oldest-first with the current turn LAST, matching
+        ``data.history.stack_history`` -- see that module for why both sides share one convention.
+        """
+        if obs.dim() == 2 and obs.shape[1] == self.n_frames * self.input_dim:
+            obs = obs.view(obs.shape[0], self.n_frames, self.input_dim)
+        if obs.dim() != 3 or obs.shape[1] != self.n_frames or obs.shape[2] != self.input_dim:
+            raise ValueError(
+                f"history={self.history} expects obs of shape [B, {self.n_frames}, "
+                f"{self.input_dim}] (or the flat [B, {self.n_frames * self.input_dim}]), "
+                f"got {tuple(obs.shape)}"
+            )
+        batch = obs.shape[0]
+        tokens, padding_mask = self._tokenize(obs.reshape(batch * self.n_frames, self.input_dim))
+        tokens = tokens.view(batch, self.n_frames, self._n_tokens, self.d_model)
+        assert self.time_embed is not None  # history > 0 on this path
+        tokens = (tokens + self.time_embed).reshape(batch, self.n_frames * self._n_tokens, -1)
+
+        # A zero frame is padding from before the battle began. Its Pokemon and move tokens already
+        # self-mask (feature 0 is "present"), but the global token has no present flag and would
+        # otherwise contribute a real, learnable all-zeros key at every padded step.
+        frame_absent = obs.abs().sum(dim=-1) <= 0
+        padding_mask = padding_mask.view(batch, self.n_frames, self._n_tokens).clone()
+        padding_mask[:, :, -1] |= frame_absent
+        return tokens, padding_mask.reshape(batch, self.n_frames * self._n_tokens)
+
     def forward(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        tokens, padding_mask = self._tokenize(obs)
+        if self.history:
+            tokens, padding_mask = self._tokenize_window(obs)
+        else:
+            tokens, padding_mask = self._tokenize(obs)
         actor_repr = self._tower(self.actor_encoder, self.actor_cls, tokens, padding_mask)
         critic_repr = self._tower(self.critic_encoder, self.critic_cls, tokens, padding_mask)
         policy_logits = self.policy_head(actor_repr)

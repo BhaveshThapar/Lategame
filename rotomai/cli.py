@@ -8,7 +8,7 @@
     python -m rotomai.cli train-rl --data data/gen9rb_rl.npz --bc-init checkpoints/bc.pt
     python -m rotomai.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
     python -m rotomai.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
-    python -m rotomai.cli live     --agent ppo --mode accept --n 5
+    python -m rotomai.cli live     --mode accept --n 5
     python -m rotomai.cli eval-ladder --format gen9ou --n 150
     python -m rotomai.cli fetch-replays --min-rating 1200 --limit 200
     python -m rotomai.cli resim-replays --out data/resim_gen9rb_rl.npz
@@ -30,6 +30,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import signal
+import sys
 
 # NOTE: `live.policy` has NO imports of its own, which is why it -- and not `live.session` --
 # is the module imported here: building --help must not pay for poke-env or torch.
@@ -39,7 +42,6 @@ from rotomai.eval.arena import AGENTS, EvalResult, evaluate
 # `eval.ladder` and `eval.rating` are pure-Python (no poke-env, no torch), so importing the
 # constants that fill in --help text here costs nothing.
 from rotomai.eval.ladder import DEFAULT_ANCHOR, DEFAULT_FIELD, DEFAULT_LOOP_PENALTY
-from rotomai.eval.rating import MAX_RD
 from rotomai.live.policy import ALLOW_LADDER_ENV, LADDER_ACK, PASSWORD_ENV, USERNAME_ENV
 
 _DEFAULT_POOL = "random,maxbasepower,simpleheuristics,heuristic"
@@ -108,6 +110,7 @@ def _run_train(args: argparse.Namespace) -> None:
         model_type=args.model_type,
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
+        history=args.history,
         seed=args.seed,
         max_samples=args.max_samples,
         pp_aug_frac=args.pp_aug_frac,
@@ -171,6 +174,7 @@ def _run_train_rl(args: argparse.Namespace) -> None:
         arch_explicit=any(v is not None for v in requested.values()),
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
+        history=args.history,
         seed=args.seed,
     )
     train_offline_rl(args.data, args.out, config)
@@ -272,25 +276,60 @@ def _print_live_summary(outcome: object) -> None:
         print(f"  reconnects: {outcome.restarts}")  # type: ignore[attr-defined]
 
 
+def _install_stop_handlers(stop: asyncio.Event) -> None:
+    """First SIGINT/SIGTERM drains cleanly; a second one is a hard exit.
+
+    A standing ``--mode accept`` service is stopped by a signal, and killing it mid-battle both
+    forfeits a real opponent's game and loses the record of it. The first signal therefore sets the
+    stop event, which `run_session` honours between chunks, after the flush. The handler then
+    removes itself so an impatient operator's second Ctrl-C gets Python's normal KeyboardInterrupt
+    rather than an unresponsive process.
+    """
+    loop = asyncio.get_running_loop()
+
+    def handle(sig: int) -> None:
+        with contextlib.suppress(NotImplementedError, RuntimeError):
+            loop.remove_signal_handler(sig)
+        stop.set()
+        print(
+            "\nstopping after the current battle -- signal again to abandon it",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError, AttributeError):
+            loop.add_signal_handler(sig, handle, sig)
+
+
 async def _run_live(args: argparse.Namespace) -> None:
     from rotomai.live.session import LiveConfig, run_session
 
     cfg = LiveConfig(
         agent=args.agent, mode=args.mode, battle_format=args.battle_format, n=args.n,
         opponent=args.opponent, checkpoint=args.checkpoint, sample=args.sample,
-        loop_penalty=args.loop_penalty, team_pool=args.team_pool, team_seed=args.team_seed,
-        concurrency=args.concurrency, start_timer=args.start_timer,
+        loop_penalty=args.loop_penalty,
+        # Defaulted per format exactly as `evaluate` does. Without this a `--format gen9ou` session
+        # builds a teamless player, and on a live server that is not an error -- it is a session
+        # that silently never battles.
+        team_pool=_default_team_pool(args.battle_format, args.team_pool),
+        team_seed=args.team_seed,
+        concurrency=args.concurrency, battle_delay=args.battle_delay,
+        start_timer=args.start_timer,
         username=args.username, avatar=args.avatar,
         ws_url=args.server, auth_url=args.auth_url, allow_guest=args.allow_guest,
-        save_replays=args.save_replays, out=args.out,
+        save_replays=args.save_replays, out=args.out, out_dir=args.out_dir,
         battle_timeout=args.battle_timeout, stall_timeout=args.stall_timeout,
+        queue_timeout=args.queue_timeout,
         login_timeout=args.login_timeout, max_restarts=args.max_restarts,
         ladder_ack=args.ladder_ack, log_level=args.log_level,
-        use_live_ratings=args.use_live_ratings, opponent_rd=args.opponent_rd,
+        use_live_ratings=args.use_live_ratings,
     )
-    outcome = await run_session(cfg)
+    stop = asyncio.Event()
+    _install_stop_handlers(stop)
+    outcome = await run_session(cfg, stop=stop)
     _print_live_summary(outcome)
-    print(f"\nwrote {args.out}")
+    print(f"\nwrote {outcome.out_path or args.out}")
 
 
 async def _run_eval_ladder(args: argparse.Namespace) -> None:
@@ -526,6 +565,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     train.set_defaults(id_embed=True)
     train.add_argument(
+        "--history", type=int, default=0,
+        help="Trajectory context: also condition on the last N turns of the same battle "
+             "(entity_transformer only). 0 is exact identity -- no extra parameter, no shape "
+             "change. Needs a shard with a `done` column; scripts/rebuild_bc_shard.py writes one",
+    )
+    train.add_argument(
         "--id-embed-init",
         default="random",
         choices=["random", "prior"],
@@ -634,6 +679,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="entity_transformer: disable learned species/move/item/ability embeddings",
     )
     train_rl.set_defaults(id_embed=True)
+    train_rl.add_argument(
+        "--history", type=int, default=0,
+        help="Trajectory context: also condition on the last N turns of the same battle "
+             "(entity_transformer only). 0 is exact identity. Must MATCH --bc-init's history, "
+             "or the strict state-dict load fails on `time_embed`",
+    )
     train_rl.add_argument(
         "--id-embed-init",
         default="random",
@@ -790,7 +841,12 @@ def build_parser() -> argparse.ArgumentParser:
             "ladder, which plan.md NG3 puts out of scope -- see --ladder-ack."
         ),
     )
-    live.add_argument("--agent", default="ppo", choices=sorted(AGENTS), help="Agent to deploy")
+    live.add_argument(
+        "--agent", default="offrl", choices=sorted(AGENTS),
+        help="Agent to deploy. Defaults to the GREEDY read of a learned checkpoint, which is the "
+             "deployed policy every published number describes; `ppo` is the training rollout "
+             "agent and is refused outright with --checkpoint",
+    )
     live.add_argument(
         "--mode", default="accept", choices=["challenge", "accept", "ladder"],
         help="challenge: send --n challenges to --opponent; accept: accept --n incoming "
@@ -801,7 +857,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="challenge: username to challenge (REQUIRED). accept: comma-separated allowlist; "
              "omit to accept anyone",
     )
-    live.add_argument("--n", type=int, default=1, help="Number of battles to play")
+    live.add_argument(
+        "--n", type=int, default=1,
+        help="Number of battles to play. 0 means run until SIGINT/SIGTERM -- the standing-service "
+             "form for --mode accept. Refused for --mode ladder, where the n IS the "
+             "pre-registration",
+    )
     live.add_argument(
         "--format", dest="battle_format", default=DEFAULT_FORMAT,
         help="Showdown format string. FIXED for the session: poke-env silently ignores "
@@ -809,13 +870,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     live.add_argument("--checkpoint", default=None, help="Checkpoint for a learned agent")
     live.add_argument("--sample", action="store_true", help="Sample instead of arg-max")
-    live.add_argument("--loop-penalty", type=float, default=0.0, help="Build-14 LoopGuard")
-    live.add_argument("--team-pool", default=None, help="Packed team pool for teambuilt formats")
+    live.add_argument(
+        "--loop-penalty", type=float, default=DEFAULT_LOOP_PENALTY,
+        help="Build-14 LoopGuard. Defaults to the value EVERY published gen9ou number was "
+             "measured at (eval-ladder, seed_strength_gate); at 0.0 a live session deploys a "
+             "policy no measurement in this repo describes",
+    )
+    live.add_argument(
+        "--team-pool", default=None,
+        help="Packed team pool for teambuilt formats; defaulted per format (omitted on Random "
+             "Battles, where the server supplies teams)",
+    )
     live.add_argument("--team-seed", type=int, default=0, help="TeamPool sampling seed")
     live.add_argument(
         "--concurrency", type=int, default=1,
         help="max_concurrent_battles. Keep at 1 live: the turn clock is per battle and every "
              "concurrent battle shares one process",
+    )
+    live.add_argument(
+        "--battle-delay", type=float, default=0.0,
+        help="Seconds to pause between battles. 0 changes nothing; set it on the ranked ladder, "
+             "where back-to-back searches are the traffic pattern read as farming",
     )
     live.add_argument(
         "--username", default=None,
@@ -843,11 +918,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", default="results/live_session.json",
         help="Per-battle records + Glicko-1/GXE summary (rewritten after every battle)",
     )
+    live.add_argument(
+        "--out-dir", default=None,
+        help="Write session_<NNN>.json into this directory instead of rewriting --out, claiming "
+             "the next free index at startup. Use this for anything long-lived or restarted: --out "
+             "is rebuilt from an empty log on start, so a second process aimed at it erases the "
+             "first one's record. Merge with scripts/merge_live_sessions.py",
+    )
     live.add_argument("--battle-timeout", type=float, default=900.0, help="Per-battle ceiling (s)")
     live.add_argument(
         "--stall-timeout", type=float, default=300.0,
-        help="Seconds without forward progress before the connection is declared dead "
+        help="Seconds a battle may stop advancing turns before the connection is declared dead "
              "(poke-env 0.15 neither reconnects nor raises)",
+    )
+    live.add_argument(
+        "--queue-timeout", type=float, default=900.0,
+        help="The same deadline while NO battle is in progress -- queued for /search, or serving "
+             "--battle-delay. Longer, because a ladder queue makes no forward progress and would "
+             "otherwise be misread as a dead socket and reconnected-and-researched",
     )
     live.add_argument("--login-timeout", type=float, default=30.0, help="Seconds to await login")
     live.add_argument("--max-restarts", type=int, default=3, help="Client rebuilds on a drop")
@@ -864,11 +952,6 @@ def build_parser() -> argparse.ArgumentParser:
              "1500/350. Only rated ladder games report one, so this is a no-op elsewhere. CAVEAT: "
              "Showdown's ladder line carries ELO and this treats it as a Glicko rating -- the "
              "units are not identical, and the results file records that it was used",
-    )
-    live.add_argument(
-        "--opponent-rd", type=float, default=MAX_RD,
-        help="Deviation assigned to an opponent's observed rating (default: the 350 ceiling, i.e. "
-             "treat it as barely-known). Only meaningful with --use-live-ratings",
     )
 
     ladder = sub.add_parser(

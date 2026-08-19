@@ -25,7 +25,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from rotomai.eval.rating import MAX_RD, REFERENCE, Rating, gxe, update
+from rotomai.eval.rating import (
+    REFERENCE,
+    Rating,
+    elo_expected_score,
+    elo_mle,
+    gxe,
+    update,
+)
 
 SCHEMA = "rotomai.live.telemetry/1"
 
@@ -133,7 +140,6 @@ def summarize(
     records: Iterable[BattleRecord],
     *,
     use_live_ratings: bool = False,
-    opponent_rd: float = MAX_RD,
 ) -> dict[str, Any]:
     """Win/score rates plus a Glicko-1 rating and GXE for the session.
 
@@ -159,15 +165,22 @@ def summarize(
     losses = sum(1 for r in finished if r.result == "loss")
     ties = sum(1 for r in finished if r.result == "tie")
 
-    results: list[tuple[Rating, float]] = []
-    for r in finished:
-        if use_live_ratings and r.opponent_showdown_elo_before is not None:
-            opponent = Rating(float(r.opponent_showdown_elo_before), opponent_rd)
-        else:
-            opponent = REFERENCE
-        results.append((opponent, float(r.score or 0.0)))
-
+    # The PINNED-field Glicko. Under --use-live-ratings this is deliberately NOT computed from the
+    # observed Showdown Elos: Elo and Glicko are different scales sharing the 400-point logistic,
+    # so feeding a ladder Elo straight into `Rating` reads every opponent as ~500 points weaker
+    # than it is. That is not a small bias -- a 7-18 session against mean opponent Elo 1045
+    # reported Glicko 501.4 / GXE 0.0242 where the account's own page said Elo 1017 / GXE 30%.
+    # Observed opponent strength is now summarised on ITS OWN scale, below.
+    results: list[tuple[Rating, float]] = [
+        (REFERENCE, float(r.score or 0.0)) for r in finished
+    ]
     rated = update(Rating(), results)
+
+    live = [
+        (float(r.opponent_showdown_elo_before), float(r.score or 0.0))
+        for r in finished
+        if r.opponent_showdown_elo_before is not None
+    ]
 
     elos = [r.showdown_elo_before for r in finished if r.showdown_elo_before is not None]
     opp_elos = [
@@ -192,9 +205,9 @@ def summarize(
         "gxe_basis": (
             "every opponent pinned at rating.REFERENCE (1500/350); Showdown Elo excluded. Against "
             "a pinned field GXE is a monotone reparameterisation of the score rate plus an "
-            "n-driven uncertainty term -- it becomes a real measurement only on a varied field."
-            if not use_live_ratings
-            else "opponent Showdown ELO approximated as a Glicko rating -- units are not identical"
+            "n-driven uncertainty term -- it becomes a real measurement only on a varied field. "
+            "This holds whether or not --use-live-ratings is set: observed ladder ratings are Elo "
+            "and are summarised under `showdown_elo` on the Elo scale, never mixed in here."
         ),
         "showdown_elo": {
             "n_reported": len(elos),
@@ -208,7 +221,22 @@ def summarize(
         },
     }
     if use_live_ratings:
-        summary["opponent_rating_source"] = "showdown_elo_approximated_as_glicko"
+        summary["opponent_rating_source"] = "showdown_elo_fitted_on_the_elo_scale"
+        if live:
+            fitted, bounded = elo_mle(live)
+            mean_opp = sum(o for o, _ in live) / len(live)
+            summary["showdown_elo"]["elo_mle"] = round(fitted, 1) if bounded else None
+            summary["showdown_elo"]["elo_mle_bounded"] = bounded
+            summary["showdown_elo"]["expected_score_vs_mean_opponent"] = (
+                round(elo_expected_score(fitted, mean_opp), 4) if bounded else None
+            )
+            summary["showdown_elo"]["elo_basis"] = (
+                "`elo_mle` is the single Elo that best explains these scores against these "
+                "opponents, on Showdown's own 400-point scale. It is NOT Showdown's ladder Elo, "
+                "which is sequential, K-factor driven and order-dependent -- expect them to "
+                "differ, and treat the account page as authoritative. Null when the record has no "
+                "wins or no losses, where the likelihood is monotone and the MLE is infinite."
+            )
     return summary
 
 

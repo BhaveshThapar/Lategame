@@ -1,0 +1,59 @@
+# systemd unit for a standing "challenge RotomAI" bot, for a VPS without Docker.
+#
+#   sudo cp deploy/rotomai-accept.service /etc/systemd/system/
+#   sudo systemctl edit rotomai-accept          # put the credentials in the drop-in, not here
+#   sudo systemctl enable --now rotomai-accept
+#   journalctl -u rotomai-accept -f
+#
+# Adjust User= and the two paths; nothing else should need editing.
+
+[Unit]
+Description=RotomAI Pokemon Showdown accept-challenges bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rotomai
+# WorkingDirectory is not cosmetic: --checkpoint and --out-dir below are relative to it. The team
+# pool is the one path that no longer needs it -- `teambuilding.pool.resolve_pool_path` falls back
+# to the installed package data -- but the rest still resolve against cwd.
+WorkingDirectory=/opt/rotomai
+
+# Credentials come from the environment and never touch the results file (tests/test_live_*.py pin
+# that). Keep them in a root-owned 0600 file, NOT in this unit -- unit files are world-readable.
+#   ROTOMAI_PS_USERNAME=YourBotAccount
+#   ROTOMAI_PS_PASSWORD=...
+EnvironmentFile=/etc/rotomai/live.env
+
+# --mode accept takes opt-in challenges only. The RANKED ladder is a separate, policy-gated path
+# that also requires --ladder-ack and ROTOMAI_LIVE_ALLOW_LADDER; deliberately absent here, because a
+# rated run has to be pre-registered and a standing service cannot be.
+ExecStart=/opt/rotomai/.venv/bin/python -m rotomai.cli live \
+    --mode accept \
+    --n 0 \
+    --agent offrl \
+    --checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
+    --format gen9ou \
+    --concurrency 1 \
+    --battle-delay 10 \
+    --out-dir results/accept
+
+# SIGINT rather than SIGTERM: the CLI's first signal drains the battle in progress and flushes the
+# record, and only a second one abandons it. 300s is above the per-battle ceiling so a real game
+# gets to finish -- killing mid-battle forfeits a human's game.
+KillSignal=SIGINT
+TimeoutStopSec=300
+
+Restart=on-failure
+RestartSec=30
+
+# The process reads its checkpoint and writes results/; it needs nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rotomai/results
+
+[Install]
+WantedBy=multi-user.target

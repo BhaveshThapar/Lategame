@@ -23,6 +23,7 @@ dist/
 /data/
 /checkpoints/
 *.log
+.env
 slurm-*.out
 
 # Job logs live under logs/<type>/<bucket>/ (ppo run logs, Showdown server logs, slurm stdout).

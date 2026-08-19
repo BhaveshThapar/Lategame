@@ -57,6 +57,9 @@ def build_model(meta: Mapping[str, Any]) -> nn.Module:
             id_embed=bool(arch.get("id_embed", True)),
             id_embed_dim=int(arch.get("id_embed_dim", 32)),
             id_embed_init=str(arch.get("id_embed_init", "random")),
+            # Absent from every checkpoint written before trajectory context existed, and absent
+            # from the `arch` block of a history=0 model, so the default rebuilds them unchanged.
+            history=int(arch.get("history", 0)),
         )
 
     raise ValueError(f"Unknown model_type {model_type!r}; expected one of {KNOWN_MODELS}.")

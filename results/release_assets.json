@@ -2,10 +2,10 @@
   "schema": "rotomai.release_assets/1",
   "note": "Derived from check_artifacts.HEADLINE, not hand-kept, so it cannot drift from the claims it backs. `runnable` marks the minimum set needed to PLAY a format; the rest is provenance for a curve.",
   "verify": "python scripts/release_assets.py --verify",
-  "n_assets": 18,
+  "n_assets": 19,
   "n_runnable": 3,
   "runnable_bytes": 24298165,
-  "total_bytes": 252526522,
+  "total_bytes": 270793978,
   "missing_locally": [],
   "assets": [
     {
@@ -29,11 +29,21 @@
       "runnable": "gen9vgc2025regi -- the AWR doubles policy, and the only viable self-play warm start (the BC one carries no value support)"
     },
     {
+      "path": "checkpoints/offrl_gen9ou_wide_e10_s0.pt",
+      "bytes": 18267456,
+      "sha256": "2b933fca21b51ef8563874666de1959685e5a37bc90cdabc515ba12645cc8a26",
+      "backs": [
+        "paper: the diagnostic retired for a 2.7x probe-seed swing on a FIXED checkpoint"
+      ],
+      "runnable": null
+    },
+    {
       "path": "checkpoints/offrl_gen9ou_wide_s0.pt",
       "bytes": 18266900,
       "sha256": "a91b34266e22faa46d896197cafdf3d70a7e51248be87da8be5195bcd916db93",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     },
@@ -153,7 +163,9 @@
       "sha256": "acb2a87d409422e86cc93e2552b2d20dc888a2eac35fc9ee54d166d6ace80b1d",
       "backs": [
         "gen9ou 0.7513 selection-free terminal",
-        "gen9ou Glicko 1776.3 / GXE 0.7434"
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)",
+        "gen9ou Glicko 1776.3 / GXE 0.7434",
+        "gen9ou ranked ladder Elo 1004 / GXE 30% (n=100, pre-registered WEAK)"
       ],
       "runnable": "gen9ou -- the ladder top (Glicko 1776.3 / GXE 0.7434) and the strongest agent here"
     },
@@ -162,7 +174,8 @@
       "bytes": 18265232,
       "sha256": "a92b8184a7e8529d24f959ca0e0158faabdab4d759519e0301bf23374c28c5f6",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     },
@@ -171,7 +184,8 @@
       "bytes": 18265232,
       "sha256": "30a3c2dcb9c257410c1bdb1cfb81e14b971f3d066110dc1b34a4b385a57a2976",
       "backs": [
-        "gen9ou 0.7513 selection-free terminal"
+        "gen9ou 0.7513 selection-free terminal",
+        "gen9ou 0.7303 vs poke-env SimpleHeuristicsPlayer (n=9000, three runs)"
       ],
       "runnable": null
     }

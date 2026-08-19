@@ -203,6 +203,31 @@ def _unique_username(name: str) -> str:
     return f"{name[:10]}-{secrets.token_hex(3)}"
 
 
+def require_team_for_format(
+    name: str, battle_format: str, team: str | Teambuilder | None
+) -> None:
+    """Refuse a teamless build on a teambuilt format, for LOCAL and LIVE builders alike.
+
+    Forgetting the team is not an error anywhere else. Showdown answers a teamless challenge on a
+    teambuilt format with a popup -- "Your team was rejected ... This format requires you to use
+    your own team" -- which poke-env logs at WARNING and nothing raises. The player then simply
+    never battles, and the run reads as one that produced no wins rather than as one that never
+    started. Three separate call sites in `scripts/curriculum_gate.py` had this defect
+    simultaneously, each found only by watching a cluster job's log.
+
+    Lives here, called from both `build_player` and `live.player.build_live_player`, because the
+    live builder had the same hole and a live session cannot afford to discover it by watching a
+    log: on the public ladder a teamless search burns the session and reports nothing.
+    """
+    if team is None and "randombattle" not in battle_format:
+        raise ValueError(
+            f"'{name}' on the teambuilt format {battle_format!r} needs a `team`; without one "
+            f"Showdown rejects every challenge with a popup rather than an error, and the player "
+            f"silently never battles. Pass a packed team or a TeamPool "
+            f"(rotomai/teambuilding/data/teams_gen9vgc.packed for VGC)."
+        )
+
+
 def build_player(
     name: str,
     battle_format: str,
@@ -246,21 +271,7 @@ def build_player(
         extra["max_concurrent_battles"] = max_concurrent_battles
     # Teambuilt formats (e.g. gen9ou) need a team; Random Battles leave this None and the
     # server supplies one. Accepts a packed/Showdown string or a Teambuilder (R-TEAM pool).
-    #
-    # REFUSED HERE, because forgetting it is not an error anywhere else. Showdown answers a
-    # teamless challenge on a teambuilt format with a popup -- "Your team was rejected ... This
-    # format requires you to use your own team" -- which poke-env logs at WARNING and nothing
-    # raises. The player then simply never battles, and the arm reads as a run that produced no
-    # wins rather than as one that never started. Three separate call sites in
-    # `scripts/curriculum_gate.py` had this defect simultaneously, each found only by watching a
-    # cluster job's log; `build_player` is the one choke point where it can be found at all.
-    if team is None and "randombattle" not in battle_format:
-        raise ValueError(
-            f"'{name}' on the teambuilt format {battle_format!r} needs a `team`; without one "
-            f"Showdown rejects every challenge with a popup rather than an error, and the player "
-            f"silently never battles. Pass a packed team or a TeamPool "
-            f"(rotomai/teambuilding/data/teams_gen9vgc.packed for VGC)."
-        )
+    require_team_for_format(name, battle_format, team)
     if team is not None:
         extra["team"] = team
     return cls(

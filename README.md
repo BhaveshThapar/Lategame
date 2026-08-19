@@ -5,8 +5,18 @@ simulator. Behaviour cloning → offline RL → PPO self-play, across three form
 `gen9ou` and `gen9vgc2025regi` — with **every published number gated on a pre-registered evaluation**
 and the negative results kept.
 
-[**Quickstart**](#quickstart) · [**Results**](#results) · [**Build log**](docs/RESULTS.md) ·
-[**Design doc**](plan.md) · [**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
+[**Results**](#results) · [**Scale & systems**](#scale--systems) · [**How it works**](#how-it-works) ·
+[**Challenge it**](#challenge-rotomai) · [**Operations**](docs/OPERATIONS.md) ·
+[**Build log**](docs/RESULTS.md) · [**Write-up**](paper/rotomai.md) · [**Design doc**](plan.md) ·
+[**Releases**](https://github.com/BhaveshThapar/RotomAI/releases)
+
+![RotomAI closing out a rated gen9ou ladder game — turns 13-17, three consecutive Sucker Punch
+KOs](assets/rotomai_gen9ou.gif)
+
+*Turns 13–17 of `battle-gen9ou-2666751310`, a real rated ladder game against a 1004-Elo human — the
+agent's Kingambit closes 6–3. This is the battle **log** rendered directly
+([`scripts/make_battle_gif.py`](scripts/make_battle_gif.py), no dependencies, no browser), not the
+Showdown sprite view; the log is the authoritative record and the sprites are a rendering of it.*
 
 ---
 
@@ -22,8 +32,8 @@ python -m rotomai.cli evaluate --p1 heuristic --p2 random --n 20 --format gen9ou
 
 The rule-based baseline against `random` on a local server, printing a win rate. **No weights, no
 GPU, no network** — team pools for the teambuilt formats are committed and defaulted per format.
-`rotomai --help` lists the rest; [Run](#run) covers training and evaluation, [Develop](#develop)
-the test / lint / type bar.
+`rotomai --help` lists the rest; [docs/OPERATIONS.md](docs/OPERATIONS.md) covers training,
+evaluation, the cluster and live play, and [Develop](#develop) is the test / lint / type bar.
 
 To play the *trained* agents, fetch the release weights — see
 [Using the released weights](#using-the-released-weights).
@@ -34,11 +44,50 @@ To play the *trained* agents, fetch the release weights — see
 
 | goal | status | headline |
 |---|---|---|
-| **G1** live play | built + verified | `rotomai/live/`, behind an explicit opt-in |
-| **G2** strong-human on one format | **met, both halves** | gen9ou **0.7513** vs the heuristic; agent-only ladder **Glicko 1776.3 / GXE 0.7434** |
+| **G1** live play | **run on the public ranked ladder** | 100 pre-registered rated gen9ou games: Elo **1004** / GXE **30%** — pre-registered **WEAK** |
+| **G2** strong-human on one format | **met, both halves** | gen9ou **0.7303** vs poke-env's `SimpleHeuristicsPlayer` (n=9000), **0.7513** vs the in-repo heuristic; agent-only ladder **Glicko 1776.3 / GXE 0.7434** |
 | **G3** continual improvement | **booked** | five-dose self-play curve, monotone on both reads (80 → 320 updates) |
 | **G4** ≥3 formats through one core | **met** | `gen9randombattle`, `gen9ou`, `gen9vgc2025regi` end to end |
 | **G5** skill stack as testable capability | **met** | four capabilities, each on its own gate's criterion |
+
+**The strength number, against a baseline that is not ours.** `simpleheuristics` here *is* poke-env's
+`SimpleHeuristicsPlayer`, imported unmodified — the rule-based baseline the field inherits — so this
+row is the one an outside reader can situate:
+
+| arm | opponent | task | n | score rate (Wilson 95%) |
+|---|---|---|---|---|
+| v26b terminal, greedy, LoopGuard 4 | poke-env `SimpleHeuristicsPlayer` | **gen9ou**, 12-team committed pool | **9000** | **0.7303** [0.7211, 0.7394] |
+| v26b terminal, same protocol | in-repo `heuristic` — *control* | gen9ou, same pool | 9000 | 0.7504 [0.7414, 0.7593] |
+| v26b terminal | in-repo `heuristic` — *published* | gen9ou, same pool | 5400 | 0.7513 [0.7396, 0.7626] |
+
+Every seed's best checkpoint is scored and pooled, so these are selection-free terminal reads. Each
+row is **three independent runs** in separate Slurm allocations across two nodes, pooled — because
+this project has measured identical checkpoints at 0.472 and 0.499 in two runs, and one read cannot
+tell "this arm" from "this run" apart:
+
+| run | simpleheuristics | heuristic |
+|---|---|---|
+| tron62, 01:00 / 01:46 | 0.7293 | 0.7500 |
+| tron65, 02:14 | 0.7357 | 0.7563 |
+| tron62, 02:27 | 0.7260 | 0.7450 |
+| **pooled, n=9000** | **0.7303** | **0.7504** |
+
+Two things settle it. The three runs span **0.0097** on the headline opponent and **0.0113** on the
+control — both well inside a single run's own interval. And the pooled control re-reads the
+*published* baseline at **0.7504** against 0.7513, **0.0009** apart. The opponent gap holds at
+**0.0201**: poke-env's baseline is consistently the harder of the two, so the rebase moved the
+headline down.
+
+**The replication is itself a result.** Individual checkpoints swung up to **0.028** across runs —
+same weights, same opponent, same settings — while the seed-pooled read moved **0.0097**. Pooling
+over seeds is what buys run-to-run stability, and a single n=300 cell buys none: the `eval-ladder`
+record already held a v26b-s0 vs `simpleheuristics` cell at **0.8167** (n=300), against 0.741, 0.769
+and 0.761 for that same checkpoint at n=1000. Small-n cells on a twelve-team pool cluster by team
+matchup and cannot carry a comparison.
+
+Numbers commonly cited elsewhere against `SimpleHeuristicsPlayer` (~85%) are on **gen8randombattle**,
+where the server supplies both teams. That is a different task from gen9ou with a committed team
+pool, where battles cluster by team matchup. The rows sit side by side; they are not differenced.
 
 **Two of the three formats measure as ceiling-bound, and that is a result rather than a shortfall.**
 gen9-RB and VGC both return `FORMAT_BOUND` from the three-leg ceiling probe — nothing competent
@@ -46,9 +95,58 @@ beats the fixed heuristic there, near-optimal search included — so the project
 not to spend more on their strength axes. gen9ou is where headroom was proven and where the strength
 result lives.
 
-**Not claimed:** no public *ranked* ladder play (NG3), so the Glicko figure is measured against a
-bot field and is **not** comparable to a Showdown GXE against humans; and only the self-play axis of
-G3 has a dose-response curve, not the replay-data axis.
+**Not claimed:** the agent-only Glicko/GXE figure is measured against a **bot field** and is **not**
+comparable to a Showdown GXE against humans; and only the self-play axis of G3 has a dose-response
+curve, not the replay-data axis.
+
+**Public ranked ladder: run, and the result is WEAK.** One bounded, pre-registered measurement run
+on gen9ou — bands, n and the exact command frozen in
+[`results/live_ladder_gen9ou_prereg.json`](results/live_ladder_gen9ou_prereg.json) **before the
+first rated game**, including the statement that a weak result would be published too. It was.
+
+| | |
+|---|---|
+| games | **100** (the pre-registered n, played once, no early stop, no top-up) |
+| record | **35–65**, score rate **0.350** [0.264, 0.448] |
+| **Elo / GXE** | **1004** / **30%** — pre-registered WEAK is Elo < 1200 or GXE < 45% |
+| Glicko | 1339.5 ± 36.0 |
+| clean-run check | `ladder_games_delta` **0** — the ladder charged exactly the games observed; 0 restarts |
+
+**This is the most useful number here, precisely because it is bad.** The same checkpoint scores
+0.7303 against poke-env's shared baseline and 0.350 against ~1055-Elo humans. Both are correct;
+they measure different things. **A bot-baseline win rate does not predict human-ladder
+performance** — and no amount of further self-play against a fixed heuristic could have shown that,
+because every instrument this project had pointed at an agent field.
+
+The diagnosis is specific rather than vague: the policy never saw the human metagame. It trained on
+self-play plus a fixed heuristic, brings a committed 12-team pool against opponents who bring
+anything, and decides from a 761-d **single-turn** observation with no trajectory context.
+
+**And the obvious next step is the one this repo has already measured as null.** "BC on human
+replays, then offline RL" is not missing here — it is the production lineage, it ran end to end on
+2,760 rated gen9ou replays, and it booked Gate B RED and Gate B2 RED; a from-scratch control matched
+the BC warm-start at 0.6485 accuracy *exactly*, so the warm start contributed nothing to final
+strength. The ladder checkpoint already descends from that lineage. What has **not** been tried is
+the part the ladder write-up actually indicts: the missing time axis. That is
+[`results/history_bc_prereg.json`](results/history_bc_prereg.json) — history-conditioned BC → AWR →
+PPO against the existing flat lineage as the control arm, pre-registered, NULL declared the likeliest
+outcome, **not yet run**.
+
+Its blocking precondition has passed. The human-replay BC shard was lost to a scratch teardown and
+cannot be re-fetched without confounding the comparison, so it is **reconstructed** from the
+surviving offline-RL shard — 61,766 rows against the 61,723 the build log records, **0.07%** — and
+[`results/bc_shard_fidelity_gate.json`](results/bc_shard_fidelity_gate.json) confirms it trains to
+0.6541 ± 0.0078 against a recorded 0.647. **Its negative control also passed**, so validation
+accuracy does not discriminate the correct reconstruction from a deliberately wrong one; the gate
+reports `control_has_teeth: false` rather than quoting the PASS alone. What justifies the
+reconstruction is the row count, not that gate.
+
+**The write-up.** The methodology result — what it costs to measure a small effect in self-play RL,
+and why a bot-baseline win rate does not license a claim about human-relative strength — is written
+up in **[paper/rotomai.md](paper/rotomai.md)**, with a shorter version in
+[blog/rotomai.md](blog/rotomai.md). Its figures are generated straight from the committed result
+JSONs by `python scripts/make_figures.py`, so a figure cannot drift from the record; a test fails if
+one does.
 
 Full experimental record, every build in the order it ran with its pre-registration and verdict:
 **[docs/RESULTS.md](docs/RESULTS.md)**. The design document, requirements and milestone roadmap are
@@ -56,159 +154,102 @@ in [plan.md](plan.md).
 
 ---
 
-## Setup
+## Scale & systems
 
-```bash
-# 1. Python env (Python 3.11, isolated) — environment.yml runs `pip install -e ".[dev,ml]"`,
-#    torch included: train / grad_noise_diag / the bc agent all die at the first `import torch`
-conda env create -f environment.yml
-conda activate rotomai
+Every number above was produced on **CPU only**, on a shared Slurm cluster, by an orchestration layer
+that had to be measured rather than guessed.
 
-# 2. On a CPU-only box, install the CPU torch wheel FIRST to avoid pulling ~2.5 GB of CUDA:
-#    pip install "torch>=2.2" --index-url https://download.pytorch.org/whl/cpu
+| | |
+|---|---|
+| hardware | **no GPU, ever** — the net is 4.56M parameters and RAM is the binding constraint (64 GB/task) |
+| throughput | **209–242 self-play battles/min** at concurrency 20, measured |
+| a training build | **107 task-hours ≈ 32 h wall-clock**, 9 arms × 120–160 PPO iterations, 4.8–5.3 min/iter |
+| real parallelism | **4 concurrent tasks**, not 9 — the `tron` QoS caps a user at `cpu=32,mem=256G` and every job asks 8 CPU / 64 GB, so estimate in **task-hours ÷ 4** |
+| binding constraint | **disk, not time** — ~17.5 MB/checkpoint × 160 iterations × 9 arms ≈ **23 GB** per build |
+| durable record | 250 committed `results/*.json`, per-iteration `curve.json` per arm, per-job telemetry JSON |
 
-# 3. Local Showdown server + vendored simulator (fetches smogon/pokemon-showdown into
-#    third_party/ and builds dist/ — dist/ is also used by replay re-simulation)
-bash scripts/setup_server.sh
-```
+**The bug worth stating out loud: two jobs on one node silently shared a simulator.** poke-env's
+`LocalhostServerConfiguration` hardcodes `ws://localhost:8000`. Slurm array tasks routinely land on
+the same node (measured: `7141999` tasks 1 and 2 both on `tron64`), so two arms opened the same
+Showdown server and battled into *each other's* games — no error, no warning, and a comparison that
+looked fine and was corrupt. The fix is a per-task port: `scripts/cluster/_job_common.sh` computes
+`8100 + TASK_ID`, and each non-array wrapper claims a base clear of the others. `results/` has the
+same failure mode — a gate's `--out` is a global, and two overlapping jobs with the same path leave
+only the later one's JSON; Build 28 lost two of six reads that way before it was caught.
 
-**The vendored simulator is pinned** (`SHOWDOWN_REV` in `scripts/setup_server.sh`), and bumping the
-pin is a deliberate act. gen9randombattle sets change upstream, so the same PRNG seed rolls
-different teams under a different rev and every recorded inputlog goes illegal partway through —
-which is how the R-PREDICT fidelity and resim end-to-end tests silently broke against a simulator
-that had moved on. Bump the pin and the inputlog fixture in `tests/conftest.py` must be regenerated
-in the same commit:
-
-```bash
-node scripts/gen_inputlog_fixture.js third_party/pokemon-showdown
-```
+Full resource verdicts, the port-base allocation and the submission recipes:
+[docs/OPERATIONS.md](docs/OPERATIONS.md#cluster) and
+[scripts/cluster/README.md](scripts/cluster/README.md).
 
 ---
 
-## Run
+## How it works
 
-```bash
-# Start the local server (ws://localhost:8000) — required for any battle/eval
-bash scripts/run_server.sh
-
-# Evaluate agents head-to-head (the heuristic is the baseline to beat)
-python -m rotomai.cli evaluate --p1 heuristic --p2 random --n 100
-python -m rotomai.cli evaluate --p1 offrl --p2 heuristic --n 100
+```mermaid
+flowchart LR
+  subgraph T["Training"]
+    direction LR
+    RP["Human replays<br/><code>data/replays.py</code>"]:::dim
+    POV["POV reconstruction<br/>ingest v1 / resim v2"]:::dim
+    BC["Behaviour cloning<br/><code>train/bc.py</code>"]
+    ORL["Offline RL — AWR<br/><code>train/offline_rl.py</code>"]
+    PPO["PPO self-play<br/><code>train/ppo.py</code>"]
+    RP --> POV --> BC --> ORL --> PPO
+  end
+  SP["Self-play collection<br/><code>data/collect.py</code>"] --> ORL
+  PPO --> CK[("checkpoints/*.pt")]
+  CK --> SRCH["Depth-limited expectimax<br/><code>search/</code>"]
+  CK --> EV["Gates + eval ladder<br/><code>eval/</code>, <code>scripts/*_gate.py</code>"]
+  CK --> LV["Live client<br/><code>live/</code>"]
+  classDef dim stroke-dasharray: 4 3;
 ```
 
-Agent names: `random`, `maxbasepower`, `simpleheuristics`, `heuristic` (baselines);
-`bc`, `offrl`, `ppo` (learned — load their default checkpoint); `search` (R-PREDICT
-depth-limited lookahead on the GREEN checkpoint — config via `ROTOMAI_SEARCH_*` env vars).
+A 761-d single-turn observation (`features/encoder.py`; 888-d for doubles) through a shared
+actor-critic or entity-transformer trunk, deployed greedily. The dashed arm is honest rather than
+decorative: the replay pipeline is built and tested, but the replay-data axis was measured once and
+never scaled, so no claim rests on it. Self-play is the axis with a dose-response curve.
 
-**Score a PPO checkpoint through `offrl`, never through `ppo`.** `PPORecordingAgent` is the
-training rollout agent and forces `sample=True`; the same `v25b` terminal checkpoint measures
-**0.675 sampled vs 0.767 greedy** against the heuristic. Every published number here reads these
-checkpoints greedily through `offrl`, which is the deployed policy. `eval-ladder` refuses
-`ppo@<checkpoint>` outright for this reason.
+**Operational manual — environment, cluster, pipelines, live play:
+[docs/OPERATIONS.md](docs/OPERATIONS.md).**
 
-### The eval ladder (G2's metric) and live play
+---
 
-```bash
-# R-EVAL: a VARIED opponent field, which is the only condition under which GXE/Glicko-1 carry
-# information a win rate did not. Round-robin + one joint Bradley-Terry fit on the Glicko scale,
-# with `heuristic` pinned at 1500 to fix the gauge. NOT a replacement for seed_strength_gate.py,
-# and NOT comparable to a Showdown GXE (which is measured against humans).
-python -m rotomai.cli eval-ladder --format gen9ou \
-    --team-pool rotomai/teambuilding/data/teams_gen9ou.packed \
-    --n 150 --out results/eval_ladder_gen9ou.json
+## Challenge RotomAI
 
-# M5 deploy / G1 — live server. Default mode is `accept` (opt-in opponents only). Credentials come
-# from $ROTOMAI_PS_USERNAME / $ROTOMAI_PS_PASSWORD and never reach --out.
-python -m rotomai.cli live --agent ppo --mode accept --n 5 --format gen9ou
-python -m rotomai.cli live --mode challenge --opponent <user> --n 3   # opt-in opponent
-python -m rotomai.cli live --server ws://localhost:8000/showdown/websocket --allow-guest --n 1
-
-# `--mode ladder` is the PUBLIC RANKED ladder, which plan.md NG3 puts out of scope. There is no
-# unranked ladder: `/search` on the public server IS the rated one. It needs BOTH opt-in channels,
-# so neither a stale export nor a recalled command can start ranked play on its own:
-#   export ROTOMAI_LIVE_ALLOW_LADDER=1
-#   python -m rotomai.cli live --mode ladder --ladder-ack i-have-read-plan-md-section-15 \
-#       --use-live-ratings --n 50
-# --use-live-ratings rates each opponent at its OBSERVED rating instead of pinning the field;
-# without it the session's GXE is a reparameterisation of its own score rate. Read plan.md 15 first.
-```
-
-### Data & training pipelines
+The live client's default mode is `accept`: it takes **opt-in challenges only**, and `--n 0` makes
+it a standing service rather than a fixed-length run. One command, on any 1 GB box:
 
 ```bash
-# M2/M3 — collect self-play trajectories, train BC then offline RL
-python -m rotomai.cli collect-rl --n 50
-python -m rotomai.cli train-rl   --data data/gen9rb_rl.npz
+export ROTOMAI_PS_USERNAME=YourBotAccount ROTOMAI_PS_PASSWORD=...
 
-# M4/M5 — self-play league / on-policy PPO improvement loops
-python -m rotomai.cli selfplay --init checkpoints/offrl_gen9randombattle.pt --iters 8
-python -m rotomai.cli ppo      --init checkpoints/offrl_gen9randombattle.pt --iters 8
-
-# Lever experiment gates (win-rate vs the heuristic; write results/*.json)
-python scripts/offrl_scale_gate.py     --out results/offrl_scale_gate.json   # Lever 9: AWR @ 82k (GREEN)
-python scripts/ppo_continue_gate.py    --out results/ppo_continue_gate.json  # Lever 10: PPO continuation (AMBER)
-python scripts/rpredict_fidelity_gate.py --out results/rpredict_fidelity.json  # Lever 11 Gate A: forward-model fidelity (PASS)
-python scripts/rpredict_recon_gate.py    --out results/rpredict_recon.json     # Lever 11: reconstruction mini-gate (PASS)
-python scripts/rpredict_gate.py          --out results/rpredict_gate_b.json    # Lever 11 Gate B: depth-1 search (AMBER)
-python scripts/rpredict_gate.py --depth 2 --opp-cap 4 --out results/rpredict_gate_b2_mean.json  # Lever 12: depth-2 search (AMBER)
-python scripts/curriculum_gate.py        --out results/curriculum_gate.json   # Lever 13: tougher-opponent AWR self-play (AMBER)
-python scripts/rpredict_oppmodel_gate.py --gate a   # Lever 14 Gate A: opponent-model fidelity (PASS)
-python scripts/rpredict_oppmodel_gate.py --gate b --arms whitebox,learned --concurrency 6  # Lever 14 Gate B: real-opponent-model search (AMBER)
-
-# Gen 9 OU PPO builds (19-23) — the build-vs-build toolchain. Run in this order.
-# On the cluster the seeds are an array job (scripts/cluster/ppo_seed.slurm); each writes its own _s{N}.json.
-python scripts/ppo_telemetry.py --log 0 logs/ppo/v21/ppo_v21_s0.log --kl-bar 0.045 --out results/ppo_ou_telemetry_v21.json
-#   ^ the TRUST-REGION CERTIFICATE. Run FIRST: the run log is gitignored, this JSON is the durable copy.
-#     Job logs live under logs/ — logs/ppo/<build>/ (run stdout), logs/slurm/ (sbatch --output),
-#     logs/showdown/<bucket>/ (per-job server). ppo_seed.slurm writes its own; only logs/slurm/.gitkeep
-#     and logs/MANIFEST.tsv are tracked. sbatch does NOT create its --output dir, hence the .gitkeep.
-#     A NULL is only attributable to the lever if the trust region did not bind (Build 22: it bound 59/150,
-#     which cost that build its verdict). --kl-bar MUST be 1.5 * the run's --target-kl, or the certificate
-#     names a bar the optimizer never enforced. ppo_seed.slurm derives both from TARGET_KL so they cannot drift.
-python scripts/merge_gate_seeds.py --seed-json results/ppo_ou_gate_v21_s{0,1,2}.json \
-    --ladder-source ... --note ... --out results/ppo_ou_gate_v21.json
-#   ^ pools the per-seed runs. Drop a seed here and the z-test below silently loses its power.
-python scripts/seed_strength_gate.py --build v20 ... --build v21 ... --out results/seed_strength_gate_v21.json
-#   ^ THE AUTHORITATIVE verdict: every seed's best ckpt, n=300 each, pooled to 900/arm, two-proportion z.
-#     Resolves ~+0.07 at z~3. The training curve does NOT decide WIN vs NULL. Absolute rates move
-#     between runs (winner's curse); only the within-run DIFFERENCE is trustworthy.
-#     ALWAYS pass BOTH arms to ONE invocation (cluster: scripts/cluster/strength_gate.slurm, which
-#     preflights that each arm's best checkpoints are staged and NAMES the missing ones). Build 22
-#     measured v20's IDENTICAL checkpoints at 0.472 and 0.499 in two runs -- 0.027 apart, at the 0.023
-#     SE -- so a cross-run difference under ~0.03 is not a result.
-python scripts/grad_noise_diag.py --policy <best> --init <warm-start> --league-dir <run> \
-    --games-per-opp 48 --rollouts 6 --splits 5 --out results/grad_noise_diag_v21.json
-#   ^ the EXPLAINER: reads |G|^2 (probes[*].arms.same_mix.policy.noise_scale.g_norm_sq).
-#     --games-per-opp MUST match the run under test; --splits defaults to 20 (v20 used 5).
-#     WARNING: its NOISE_LIMITED verdict answers Build 20's question, not yours. B_simple is a RATIO
-#     (tr(Sigma)/|G|^2) — when |G|^2 -> 0 it explodes and "collect more samples" is exactly WRONG.
-#     RETIRED for small effects (Build 22): a FIXED checkpoint swung 2.7x on the --seed alone, larger
-#     than the 2.2x effect the gate was built to detect. Any gate reading a |G|^2 difference under ~3x
-#     MUST run >=2 probe seeds (scripts/cluster/probe_replicate.slurm) and report both, or it is
-#     reporting noise. The seed is NOT recorded in the output JSON -- provenance is the filename only.
-#     The COSINE from the same runs did replicate (0.312 -> 0.317) and remains usable.
-
-# Build 26's whole analysis as ONE submission (server + merge + both strength gates + bias table).
-#   The preflight refuses a MISSING or SHORT arm before starting anything: v26b runs in two chunks
-#   that write the same per-seed JSON, so between them the file exists and is 160 iters long.
-#   N is pinned to Build 25's pre-registered 3000 / 1800 -- the gate's own default is 300, whose
-#   MDE (0.079) is wider than any dose this build can produce, so it would book a NULL by design.
-sbatch -p tron --qos=medium scripts/cluster/build26_analysis.slurm
-
-# R-EVAL — the agent-only eval ladder. On the cluster, scripts/cluster/eval_ladder.slurm.
-#   MUST set a port base clear of any in-flight PPO build: _job_common.sh computes 8100 + TASK_ID,
-#   a non-array job takes TASK_ID=0 -> 8100, and colliding jobs SILENTLY SHARE one Showdown server.
-#   The slurm wrapper defaults ROTOMAI_SHOWDOWN_PORT_BASE=8300 for exactly this reason.
-OUT=results/eval_ladder_gen9ou.json sbatch -p tron --qos=medium scripts/cluster/eval_ladder.slurm
-
-# M6 — human replays: fetch, then reconstruct each player's POV either from the public
-# spectator log (v1) or by re-simulating the inputlog for the private |request| (v2)
-python -m rotomai.cli fetch-replays  --min-rating 1200 --limit 200
-python -m rotomai.cli ingest-replays --out data/ingest_gen9rb_rl.npz   # v1 (public-log POV)
-python -m rotomai.cli resim-replays  --out data/resim_gen9rb_rl.npz    # v2 (needs node + dist/)
+python -m rotomai.cli live --mode accept --n 0 \
+  --agent offrl --checkpoint checkpoints/ppo_v26b_s0/iter_320.pt \
+  --format gen9ou --concurrency 1 --battle-delay 10 --out-dir results/accept
 ```
 
-### Using the released weights
+Then challenge that account to a `[Gen 9] OU` game on [Pokémon Showdown](https://play.pokemonshowdown.com/).
+`--opponent a,b,c` narrows it to an allowlist. Ctrl-C finishes the battle in progress, flushes the
+record and exits; a second Ctrl-C abandons it.
+
+A [`Dockerfile`](Dockerfile) and a [systemd unit](deploy/rotomai-accept.service) are committed for
+the always-on version, and [`requirements-live.txt`](requirements-live.txt) pins the exact versions
+the published ladder run was played on — `pyproject.toml` declares floors, which is right for a
+library and wrong for a service, since `rotomai/live/` is written against poke-env 0.15 semantics in
+particular.
+
+**What you will be playing.** The gen9ou policy that scored **0.7303 against poke-env's
+`SimpleHeuristicsPlayer`** and **Elo 1004 / GXE 30% against humans**. It is a weak-to-average ladder
+opponent that will nonetheless punish a loose switch — see [the ladder result](#results) for why
+those two numbers disagree.
+
+**Ranked play is a different, gated path.** `--mode ladder` additionally requires `--ladder-ack` and
+`ROTOMAI_LIVE_ALLOW_LADDER`, and it refuses `--n 0` outright: a rated run's *n* is its
+pre-registration, and an open-ended one is a selected sample by construction. `accept` mode is
+ungated because a human chose to press the challenge button.
+
+---
+
+## Using the released weights
 
 **The weights are on the release.** Three checkpoints, 23 MiB, one playable policy per teambuilt
 format:
@@ -245,35 +286,22 @@ than reporting them as a failed download.
 ## Develop
 
 ```bash
-pytest            # 783 tests. With the env active (node ON PATH) + a local server up: 782 pass,
-                  #   1 skip -- the opt-in live-client smoke, which ROTOMAI_LIVE_TEST=1 enables
-                  #   for 783/0. `node` on PATH is load-bearing: without it six simulator tests
-                  #   self-skip even with dist/ built.
-                  #   On a bare clone -- no server, no built dist/, no checkpoints/ -- 16 self-skip
-                  #   and 767 pass. That is what CI runs; a 17th skip is a regression, not noise.
+pytest            # 942 tests, both figures MEASURED rather than projected.
+                  #   Full dev box (node ON PATH, a local server up, checkpoints/ + data/ +
+                  #     replays/ staged):            935 pass,  7 skip
+                  #   Fresh worktree (none of the above, which is CI's condition):
+                  #                                  919 pass, 23 skip
+                  #   Every one of the 23 self-gates on something a clone does not have and names
+                  #   its reason. An UNexplained skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
-                  #   two agree, and CI runs the bare form.
+                  #   two agree, and CI runs the bare form -- and `python -m pytest` has already
+                  #   hidden a total collection failure here once.
 ruff check .
 mypy rotomai scripts   # both trees; CI runs the same two arguments
 ```
 
-**Reading the CI result without `gh`.** There is no `gh` on the dev host, which is a large part of
-why a red CI went unnoticed for eleven commits. It does not need one — the runs are public and the
-REST API is unauthenticated:
-
-```bash
-# last 5 runs: which branch, which commit, red or green
-curl -s "https://api.github.com/repos/BhaveshThapar/RotomAI/actions/runs?per_page=5" \
-  | python -m json.tool | grep -E '"(run_number|head_branch|head_sha|conclusion)"'
-
-# per-step conclusions for one run (is it `pytest -q` that failed, or `mypy`?)
-curl -s "https://api.github.com/repos/BhaveshThapar/RotomAI/actions/runs/<RUN_ID>/jobs" \
-  | python -m json.tool | grep -E '"(name|conclusion)"'
-```
-
-Only the log *text* needs a token (the download 403s anonymously), so the pass/skip split is not
-readable remotely — the step conclusion is. Check this after every push. A local run of the same
-command is a reproduction, not an observation, and the distinction is exactly what went wrong.
+Reading the CI result without `gh` (there is none on the dev host, which is why a red CI once went
+unnoticed for eleven commits): [docs/OPERATIONS.md](docs/OPERATIONS.md#reading-ci-without-gh).
 
 ---
 
@@ -283,10 +311,10 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 |---|---|
 | `rotomai/config.py` | Local server config + format constants |
 | `rotomai/engine/damage.py` | Expected-damage / move-value estimator |
-| `rotomai/features/` | `embed_battle` 720-d encoder (`OBS_LAYOUT`) + action-space codec |
+| `rotomai/features/` | `embed_battle` 761-d singles encoder (`OBS_LAYOUT`) / 888-d doubles encoder + action-space codec |
 | `rotomai/model/` | MLP actor-critic + entity transformer + build factory |
 | `rotomai/agents/` | `heuristic`, `bc`, `offrl`, `ppo` agents |
-| `rotomai/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2) |
+| `rotomai/data/` | self-play collection, reward, replay fetch / ingest (v1) / resim (v2), trajectory context (`history.py`) |
 | `rotomai/train/` | BC, offline RL, self-play, PPO training loops |
 | `rotomai/search/` | R-PREDICT: forward model, determinization, expectimax, opponent model |
 | `rotomai/teambuilding/` | R-TEAM: validator-checked packed team pools for teambuilt formats |
@@ -296,6 +324,9 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 | `rotomai/live/` | M5 deploy / G1: live-server client, policy gate, session supervisor, telemetry |
 | `rotomai/cli.py` | all subcommands (eval / collect / train / data / live) |
 | `scripts/` | local Showdown server + simulator setup/run, and every experiment gate |
+| `paper/`, `blog/` | the write-up; figures regenerated from `results/` by `scripts/make_figures.py` |
+| `assets/` | the demo GIF and the SVG figures -- both generated, both committed |
+| `Dockerfile`, `deploy/` | the always-on `--mode accept` service |
 
 ---
 
@@ -303,7 +334,7 @@ command is a reproduction, not an observation, and the distinction is exactly wh
 
 **A clone of this repo contains no weights and no training shards.** `checkpoints/` and `data/` are
 gitignored, so every published number was produced from files that exist only on the machine that
-ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 236
+ran them. What *is* committed, and is the durable record, is the evidence rather than the artifacts: 250
 `results/*.json` gate summaries, each arm's per-iteration `curve.json`, the validator-checked packed
 team pools (`rotomai/teambuilding/data/`), the encoder vocab and the gen9ou usage prior
 (`rotomai/features/data/`), and the pinned simulator rev.
@@ -314,6 +345,8 @@ a gate can be re-pinned and a result file cannot:
 | headline | record |
 |---|---|
 | gen9ou **0.7513** selection-free terminal | `results/ppo_ou_gate_v26b_terminal.json`, `results/seed_strength_gate_v26_terminal.json` |
+| ranked ladder **Elo 1004 / GXE 30%** (n=100, WEAK) | `results/live_ladder_gen9ou.json`, `results/live_ladder_gen9ou_prereg.json`, `results/live_ladder_gen9ou_seg{0,1,2,3}.json` |
+| gen9ou **0.7303** vs poke-env `SimpleHeuristicsPlayer` (n=9000) | `results/seed_strength_gate_v26b_simpleheuristics{,_paired}.json`, `results/seed_strength_gate_v26b_heuristic_{control,paired}.json` |
 | Glicko **1776.3** / GXE **0.7434** | `results/eval_ladder_gen9ou_v26.json` |
 | VGC B6f C1 **0.530** | `results/ppo_vgc_gate_b6f{,_s0,_s1,_s2}.json`, `results/seed_strength_gate_b6f_c1.json`, `results/awr_vgc_arm_b6f.json` |
 | VGC corrected ladder **BC 0.453** / **AWR 0.467** | `results/format_ceiling_gate_vgc_v2.json` |
@@ -323,7 +356,7 @@ Every checkpoint those records name is present on the machine that produced them
 ship. `python scripts/check_artifacts.py` re-derives that statement rather than trusting this table.
 
 **58 of the 122 checkpoint paths named across `results/**.json` no longer exist**, cited by 52 of the
-236 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
+250 result files. 27 are top-level warm starts (`bc_gen9ou_v*.pt`, `offrl_scale_*.pt`); the rest are
 whole absent arm directories (`ppo_ou_*`, `ppo_scale_*`, `curriculum_*`). The cause is scratch
 teardown, not pruning: `scripts/prune_checkpoints.py` iterates directories only
 (`plan_prune`, `p.is_dir()`) and only ever `unlink()`s files, so top-level `*.pt` and whole arm dirs

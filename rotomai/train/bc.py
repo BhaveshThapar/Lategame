@@ -62,6 +62,10 @@ class TrainConfig:
     id_embed: bool = True  # entity_transformer only: learned species/move/item/ability ids
     id_embed_dim: int = 32
     id_embed_init: str = "random"  # entity_transformer only: "random" | "prior" (dex warm-start)
+    # Trajectory context: each sample becomes the last `history + 1` turns of its OWN episode,
+    # zero-padded at the start. 0 is exact identity -- no `time_embed` parameter, no shape change,
+    # nothing to load differently. Needs a shard with a `done` column (see data/history.py).
+    history: int = 0
     max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
     # Build 10 (docs/RESULTS.md): train-time pp augmentation. On this fraction of attack-labeled,
     # deep-turn rows, force the active mon's pp channels to full -- making "full pp deep in a
@@ -99,6 +103,12 @@ def _build_model(config: TrainConfig, device: torch.device, codec: FormatCodec) 
     values it always used, so no existing run changes.
     """
     if config.model_type == BC_POLICY:
+        if config.history:
+            raise ValueError(
+                f"history={config.history} needs an architecture that consumes a sequence of "
+                f"frames; {BC_POLICY!r} is a flat MLP over one turn. Use "
+                "--model-type entity_transformer."
+            )
         return BCPolicy(
             codec.obs_dim,
             hidden_dim=config.hidden_dim,
@@ -115,6 +125,7 @@ def _build_model(config: TrainConfig, device: torch.device, codec: FormatCodec) 
             "id_embed": config.id_embed,
             "id_embed_dim": config.id_embed_dim,
             "id_embed_init": config.id_embed_init,
+            "history": config.history,
         },
     }
     return build_model(meta).to(device)
@@ -180,7 +191,18 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     device = select_device(config.device)
     print(f"training on {device}")
 
-    dataset = BCDataset(data_path)
+    if config.history and (
+        config.pp_aug_frac > 0.0 or config.pp_noise_std > 0.0 or config.pp_resample_frac > 0.0
+    ):
+        # The pp augmentations index the flat OBS_LAYOUT offsets of a single turn. Silently
+        # applying them to a stacked window would perturb whichever frame the offsets happened to
+        # land in, which is a corrupted experiment rather than a smaller one.
+        raise ValueError(
+            "the pp augmentations (--pp-aug-frac / --pp-noise-std / --pp-resample-frac) address "
+            "a single flat observation and are not defined over a stacked window; run them "
+            "against --history 0, or run --history without them."
+        )
+    dataset = BCDataset(data_path, history=config.history)
     battle_format = dataset.battle_format
     codec = codec_for(battle_format)
     print(f"codec: {codec.name} (obs {codec.obs_dim}, {codec.n_actions} logits)")

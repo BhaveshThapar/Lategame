@@ -1,0 +1,52 @@
+{
+  "gate": "seed_strength",
+  "opponent": "heuristic",
+  "opponent_checkpoint": null,
+  "n_per_checkpoint": 1000,
+  "format": "gen9ou",
+  "loop_penalty": 4.0,
+  "builds": {
+    "v26b": {
+      "wins": 2235,
+      "n": 3000,
+      "rate": 0.745,
+      "ci95": [
+        0.7290964050333414,
+        0.7602769360909044
+      ],
+      "per_checkpoint": [
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s0/iter_320.pt",
+          "wins": 777,
+          "n": 1000,
+          "rate": 0.777,
+          "ci95": [
+            0.7501675946610772,
+            0.8017123035220625
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s1/iter_320.pt",
+          "wins": 677,
+          "n": 1000,
+          "rate": 0.677,
+          "ci95": [
+            0.6473866655126974,
+            0.7052586123877205
+          ]
+        },
+        {
+          "checkpoint": "checkpoints/ppo_v26b_s2/iter_320.pt",
+          "wins": 781,
+          "n": 1000,
+          "rate": 0.781,
+          "ci95": [
+            0.7543178981817001,
+            0.8055313848127484
+          ]
+        }
+      ]
+    }
+  },
+  "note": "Every seed's best checkpoint is scored and POOLED -- the across-seed argmax of the old protocol is dropped, and the sample triples. Per-seed 'best iter' is still a max over 50 noisy curve evals, so absolute rates stay optimistic; the protocol is identical across builds, so that bias cancels in the DIFFERENCE, which is what is under test. CI overlap is a CONSERVATIVE test -- read the z-test too. TWO INFERENCE LEVELS, and they do not agree. The pooled z-test ('diff'/'z'/'p_value') is the pre-registered verdict and is a claim about THESE CHECKPOINTS. 'seed_level' is the same contrast paired by seed, and is the claim about the TRAINING PROCEDURE -- the between-seed sd (~0.0706 in Build 23) is 2.5x the within-seed binomial noise, so procedure-level evidence is far weaker than the pooled p reads, and raising --n does not fix it (only more SEEDS would). Report both; the verdict field reflects the pooled test alone."
+}

@@ -1,0 +1,23 @@
+# Pinned runtime for a long-lived `rotomai live --mode accept` service.
+#
+# WHY THIS FILE EXISTS. `pyproject.toml` declares floors (`poke-env>=0.8`) because that is right for
+# a library. It is wrong for a service: `rotomai/live/` is written against poke-env 0.15 semantics
+# specifically -- the swallowed `|nametaken|` diagnosis in `live/player.py`, `max_concurrent_battles`
+# reading 0 as UNLIMITED, and the fact that poke-env neither raises nor reconnects on a dead socket,
+# which is the entire reason `live/session.py` carries a watchdog. A fresh `pip install` on a VPS
+# months from now can resolve a poke-env those assumptions do not hold for, and the failure mode is
+# not an ImportError -- it is a bot that looks connected and never battles.
+#
+# These are the versions the published ladder run was played on. Verify with:
+#   python -c "import poke_env, torch, numpy; print(poke_env.__version__, torch.__version__)"
+#
+# torch must be installed FIRST from the CPU index, or pip pulls ~2 GB of CUDA wheels for a 4.56M
+# parameter network that never touches a GPU:
+#   pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-live.txt
+#   pip install -e .
+
+poke-env==0.15.0
+numpy==2.4.6
+orjson==3.12.0
+websockets==16.0

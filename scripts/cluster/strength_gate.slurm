@@ -119,3 +119,20 @@ python -u scripts/seed_strength_gate.py \
   --out           "$OUT"
 
 echo "[job] strength gate done -> $OUT"
+
+# Optional SECOND opponent, scored in this same allocation -- same server, same node, same hour.
+# Two sbatch submissions would answer a different question: seed_strength_gate.py:29-34 records
+# identical checkpoints scoring 0.472 and 0.499 in two separate runs, so a control read taken on
+# another day inherits exactly the variance it exists to rule out. Unset changes nothing.
+if [[ -n "${OPPONENT_2:-}" ]]; then
+  OUT_2="${OUT_2:?set OUT_2 when OPPONENT_2 is set}"
+  echo "[job] control read: opponent=$OPPONENT_2 (n=$N per checkpoint)"
+  python -u scripts/seed_strength_gate.py \
+    "${ARGS[@]}" \
+    --opponent      "$OPPONENT_2" \
+    --n             "$N" \
+    --loop-penalty  "$LOOP_PENALTY" \
+    --alpha         "$ALPHA" \
+    --out           "$OUT_2"
+  echo "[job] control read done -> $OUT_2"
+fi

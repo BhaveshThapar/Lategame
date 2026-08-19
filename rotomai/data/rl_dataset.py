@@ -18,6 +18,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from rotomai.data.history import episode_start_index, stack_history
 from rotomai.features.codec import codec_for
 
 
@@ -34,7 +35,7 @@ def discounted_returns(reward: np.ndarray, done: np.ndarray, gamma: float) -> np
 
 
 class RLDataset(Dataset):
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, history: int = 0) -> None:
         data = np.load(Path(path), allow_pickle=False)
         version = str(data["obs_version"].item())
         dim = int(data["obs_dim"].item())
@@ -55,6 +56,10 @@ class RLDataset(Dataset):
         self.done = torch.from_numpy(data["done"]).bool()
         ret = discounted_returns(data["reward"], data["done"], self.gamma)
         self.ret = torch.from_numpy(ret).float()
+        # An offline-RL shard always carries `done` -- the MC return already resets on it -- so
+        # trajectory context needs no new column here, only the same boundaries read a second way.
+        self.history = history
+        self.episode_start = episode_start_index(data["done"]) if history else None
 
     def __len__(self) -> int:
         return self.action.shape[0]
@@ -62,4 +67,10 @@ class RLDataset(Dataset):
     def __getitem__(
         self, index: int
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self.history:
+            assert self.episode_start is not None
+            frames = stack_history(
+                self.obs, index, int(self.episode_start[index]), self.history
+            )
+            return frames, self.action[index], self.mask[index], self.ret[index]
         return self.obs[index], self.action[index], self.mask[index], self.ret[index]
