@@ -111,6 +111,7 @@ def _run_train(args: argparse.Namespace) -> None:
         id_embed=args.id_embed,
         id_embed_init=args.id_embed_init,
         history=args.history,
+        split=args.split,
         seed=args.seed,
         max_samples=args.max_samples,
         pp_aug_frac=args.pp_aug_frac,
@@ -564,6 +565,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="entity_transformer: disable learned species/move/item/ability embeddings (ablation)",
     )
     train.set_defaults(id_embed=True)
+    train.add_argument(
+        "--split", default="row", choices=["row", "episode"],
+        help="How to hold out validation rows. 'row' is a random split over turns (every "
+             "historical run); 'episode' holds out whole battles, which is what a history arm "
+             "needs -- a row split leaves a val row's window built from frames that are inputs of "
+             "neighbouring TRAINING rows",
+    )
     train.add_argument(
         "--history", type=int, default=0,
         help="Trajectory context: also condition on the last N turns of the same battle "

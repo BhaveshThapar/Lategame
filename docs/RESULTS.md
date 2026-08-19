@@ -3705,3 +3705,69 @@ a claim about human-relative strength.
   small-sample.
 
 Nothing is posted and nothing is pushed; that is the author's to trigger.
+
+## Build 33 — v30h STAGES 1+2 RAN. A KILL CRITERION TRIPPED, AND PPO WAS NOT LAUNCHED.
+
+Job `7279778`, six tasks, all COMPLETED 0:0. Control ~1.05 h/task, history ~5.6 h/task — against a
+pre-submission estimate of 2 h and 10.6 h, so AWR was **over**-priced. Peak RSS 1.2 GB (control) and
+3.3 GB (history) against the 64 GB cap.
+
+### The result
+
+| arm | BC val-acc (3 seeds) | mean | AWR acc | value-MAE per seed | mean |
+|---|---|---|---|---|---|
+| control, `history=0` | 0.6524 / 0.6634 / 0.6530 | **0.6562** ± 0.0062 | ~0.655 | 0.5305 / **0.6304** / 0.5584 | 0.5731 |
+| hist, `history=4` | 0.7082 / 0.7921 / 0.8122 | **0.7708** ± 0.0551 | ~0.821 | 0.4323 / 0.5366 / 0.4689 | 0.4793 |
+
+### THE KILL CRITERION TRIPPED, ON THE CONTROL ARM
+
+The pre-registration says: *"AWR value-MAE above 0.60 on either arm -> the critic did not fit and the
+AWR stage is not interpretable; report and stop rather than proceeding to PPO."*
+
+**Control seed 1 is 0.6304.** Read per seed it trips; read as an arm mean (0.5731 / 0.4793) it does
+not. The gate does not say which, and that ambiguity is the gate's defect, not a licence.
+
+- **Honoured the strict per-seed reading. PPO was NOT launched.** It is also the reading this
+  project's own idiom uses — the record quotes value-MAE per seed ("3 AWR seeds healthy (value-MAE
+  0.452/0.476/0.554)").
+- **Stated against interest:** the trip is on the CONTROL arm, not the arm under test. Proceeding
+  would have cost the experiment nothing obvious and would have been indefensible, which is exactly
+  why the strict reading was taken rather than argued around.
+- The ambiguity and the clarified wording for future gates are in
+  `results/history_bc_prereg_amendment.json`, a SEPARATE dated file. **The original pre-registration
+  is left byte-for-byte as committed** — amending it in place would destroy the only thing that made
+  it worth writing.
+
+### THE SECONDARY READOUT MOVED +0.115, AND TWO ATTEMPTS TO EXPLAIN IT AWAY FAILED
+
+BC val-acc 0.6562 -> 0.7708 is a large gain for one architectural change, and the history arm's seed
+spread is **9x** the control's (0.0551 vs 0.0062). Both facts are suspicious and were chased before
+being believed.
+
+- **Neighbour leakage from the row-level split — NOT SUPPORTED.** The split is `random_split` over
+  ROWS and rows are consecutive turns of one battle, so a val row's history window is built from
+  frames that are inputs of neighbouring TRAINING rows. Measured directly on the trained
+  checkpoints: val accuracy by how many of the 4 preceding frames were training rows is
+  **0.6845 / 0.7229 / 0.7024** for 2/3/4 — flat, not the monotone climb memorization would give.
+  **The test has LOW POWER**: 94% of val rows have >=3 of 4 preceding frames in train, so there is
+  almost no contrast to detect it with. Recorded as "not supported", not as "ruled out".
+- **Degenerate action persistence — NOT SUPPORTED.** "Repeat the previous action" scores **0.2081**
+  on mid-episode rows, against a majority-class baseline of **0.2123**. The gain is not the model
+  learning to hold its last action.
+- **Still open: the row-level split itself.** Settled by re-running BC with an EPISODE-GROUPED split
+  (`rotomai.data.history.episode_split`), where a validation battle contributes no turn to training.
+  `BUILD=v30e STAGE=bc SPLIT=episode`, job `7282958`, same arms and seeds, realised split
+  55,587 train / 6,179 val (0.100), no battle spanning both.
+  - If the gap survives, the secondary readout is real. **If it collapses, 0.7708 must not be
+    published as a generalisation result** and the v30h BC numbers stand only as a row-split
+    measurement.
+  - `--split episode` refuses to combine with `--max-samples`: `_subset` reindexes into a shuffled
+    sample, so the `done` column no longer describes row i and the boundaries it would split on have
+    moved.
+
+### WHAT IS NOT CLAIMED
+
+No strength number. The primary readout is the seed-pooled score rate vs `SimpleHeuristicsPlayer`
+after PPO, and PPO did not run. **A BC accuracy gain is not a strength result** — this project has
+already measured a BC warm start contributing 0.6485 accuracy and nothing at all to final strength
+(Build 21). The bands (|delta| < 0.030 is NULL) remain unread.

@@ -20,6 +20,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Subset, random_split
 
 from rotomai.data.dataset import BCDataset
+from rotomai.data.history import episode_split
 from rotomai.features.codec import FormatCodec, codec_for
 from rotomai.features.encoder import OBS_LAYOUT
 from rotomai.model.factory import build_model, model_metadata
@@ -66,6 +67,11 @@ class TrainConfig:
     # zero-padded at the start. 0 is exact identity -- no `time_embed` parameter, no shape change,
     # nothing to load differently. Needs a shard with a `done` column (see data/history.py).
     history: int = 0
+    #: "row" (default, every historical run) or "episode". A row-level random split leaves a
+    #: validation row's history window built from frames that are inputs of neighbouring TRAINING
+    #: rows; an episode split holds out whole battles, so a gain has to generalise across them.
+    #: Only meaningful on a shard carrying `done`.
+    split: str = "row"
     max_samples: int | None = None  # data-scaling sweep: train on a nested subset of N samples
     # Build 10 (docs/RESULTS.md): train-time pp augmentation. On this fraction of attack-labeled,
     # deep-turn rows, force the active mon's pp channels to full -- making "full pp deep in a
@@ -208,10 +214,30 @@ def train_bc(data_path: str | Path, out_path: str | Path, config: TrainConfig) -
     print(f"codec: {codec.name} (obs {codec.obs_dim}, {codec.n_actions} logits)")
     data = _subset(dataset, config.max_samples)
     print(f"training on {len(data)}/{len(dataset)} samples")
-    n_val = max(1, int(len(data) * config.val_frac))
-    n_train = len(data) - n_val
-    generator = torch.Generator().manual_seed(config.seed)
-    train_set, val_set = random_split(data, [n_train, n_val], generator=generator)
+    if config.split == "episode":
+        if config.max_samples is not None:
+            # `_subset` reindexes into a shuffled sample, so row i of `data` is no longer row i of
+            # the shard and the `done` column no longer describes it. Refused rather than silently
+            # splitting on boundaries that have moved.
+            raise ValueError("--split episode is incompatible with --max-samples")
+        if dataset.done is None:
+            raise ValueError(
+                f"--split episode needs episode boundaries, and {data_path} has no `done` column. "
+                "Rebuild it with scripts/rebuild_bc_shard.py, which writes one."
+            )
+        train_idx, val_idx = episode_split(dataset.done, config.val_frac, config.seed)
+        train_set, val_set = Subset(data, train_idx), Subset(data, val_idx)
+        print(
+            f"episode-grouped split: {len(train_idx)} train / {len(val_idx)} val rows "
+            f"({len(val_idx) / len(data):.3f} of the shard); no battle spans both"
+        )
+    elif config.split == "row":
+        n_val = max(1, int(len(data) * config.val_frac))
+        n_train = len(data) - n_val
+        generator = torch.Generator().manual_seed(config.seed)
+        train_set, val_set = random_split(data, [n_train, n_val], generator=generator)
+    else:
+        raise ValueError(f"unknown --split {config.split!r}; choose 'row' or 'episode'")
     train_loader = DataLoader(train_set, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=config.batch_size)
 
@@ -263,6 +289,7 @@ def _save_checkpoint(
             "obs_version": codec.obs_version,
             "battle_format": battle_format,
             "metrics": metrics,
+            "split": config.split,
             "pp_aug": {"frac": config.pp_aug_frac, "turn_threshold": config.pp_aug_turn_threshold},
             "pp_noise_std": config.pp_noise_std,
             "pp_resample_frac": config.pp_resample_frac,

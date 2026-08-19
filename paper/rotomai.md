@@ -55,7 +55,7 @@ as the budget shrinks.
 
 **Discipline.** Gates are declared before the run: the arm, the protocol, the primary readout, the
 bands and the stopping rule are committed to a file first, and the verdict is written against them
-afterwards. The record is 250 committed result JSONs and a build log in which roughly a third of the
+afterwards. The record is 251 committed result JSONs and a build log in which roughly a third of the
 entries are negative results kept at full length.
 
 ![Training pipeline and headline results](../assets/fig_pipeline.svg)
