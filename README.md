@@ -20,6 +20,30 @@ Showdown sprite view; the log is the authoritative record and the sprites are a 
 
 ---
 
+## In one screen
+
+Three formats end to end on **CPU only** — no GPU was ever requested, because at 4.56M parameters
+RAM is the binding constraint, not compute. **947 tests** (more test code than package code), with
+`ruff` + `mypy` + `pytest` gating **every branch**. The weights are released, and the agent will
+take your challenge on the live server in [one command](#challenge-rotomai).
+
+The headline is a *disagreement*, and that is the point:
+
+| the same checkpoint | scores |
+|---|---|
+| vs. poke-env's `SimpleHeuristicsPlayer` — the baseline the field inherits — n=9000 | **0.7303** [0.7211, 0.7394] |
+| vs. humans, 100 pre-registered rated ladder games | **Elo 1004 / GXE 30%** — pre-registered **WEAK** |
+
+Both numbers are correct. **A bot-baseline win rate does not predict human-ladder performance**, and
+no instrument this project had could have shown that, because every one of them pointed at a bot
+field. The weak number was pre-registered — bands, *n* and the exact command frozen in a committed
+file before the first rated game, including the statement that a weak result would be published too.
+
+[The full result](#results) · [every build in the order it ran](docs/RESULTS.md) ·
+[the write-up](paper/rotomai.md)
+
+---
+
 ## Quickstart
 
 ```bash
@@ -309,13 +333,14 @@ than reporting them as a failed download.
 ## Develop
 
 ```bash
-pytest            # 942 tests, both figures MEASURED rather than projected.
+pytest            # 947 tests, both figures MEASURED rather than projected.
                   #   Full dev box (node ON PATH, a local server up, checkpoints/ + data/ +
-                  #     replays/ staged):            935 pass,  7 skip
+                  #     replays/ staged):            946 pass,  1 skip
                   #   Fresh worktree (none of the above, which is CI's condition):
-                  #                                  919 pass, 23 skip
-                  #   Every one of the 23 self-gates on something a clone does not have and names
-                  #   its reason. An UNexplained skip is a regression, not noise.
+                  #                                  924 pass, 23 skip
+                  #   The lone dev-box skip is the opt-in live-server test; the other 22 self-gate
+                  #   on something a clone does not have. All 23 name their reason.
+                  #   An UNexplained skip is a regression, not noise.
                   #   Run it as `pytest`, not `python -m pytest`: pyproject sets pythonpath so the
                   #   two agree, and CI runs the bare form -- and `python -m pytest` has already
                   #   hidden a total collection failure here once.

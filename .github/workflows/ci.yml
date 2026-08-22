@@ -60,13 +60,15 @@ jobs:
       # is a claim nobody can check, so the count is gone and the checker covers both trees instead.
       - run: mypy rotomai scripts
 
-      # A runner has no Showdown server, no built third_party/dist and no checkpoints/, so 16 tests
-      # self-skip and 767 pass -- measured on a fresh clone, not inferred. A 17th skip means an
-      # environment gate started firing that should not have, which is a regression, not noise.
+      # A runner has no node, no Showdown server, no built third_party/dist and no checkpoints/,
+      # data/ or replays/, so 23 tests self-skip and 924 pass -- measured in a detached worktree at
+      # HEAD with exactly those absences, not inferred. A 24th skip means an environment gate
+      # started firing that should not have, which is a regression, not noise.
       #
-      # 15/709 until the doubles self-play smoke landed. That test is server-gated like its singles
-      # sibling, so it self-skips here by design; the bar moves with it in the same commit rather
-      # than reading as the regression it is not.
+      # This comment read 767/16 for far longer than it was true, which is precisely the failure
+      # the mypy note above describes: a count nobody runs is a claim nobody can check. It is worth
+      # re-measuring here whenever the README's Develop block is re-measured -- the two state the
+      # same bar under the same condition and must not be allowed to disagree again.
       - run: pytest -q
 
       # NOT run here: `python scripts/check_artifacts.py`. A runner has no checkpoints/ at all, so
